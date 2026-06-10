@@ -17,6 +17,7 @@ DEFAULT_AUDIO_CANDIDATES = [
     / "你好.m4a",
 ]
 OUTPUT_PATH = Path("stage1_feedback.json")
+PLOT_DIR = Path("stage1_plots")
 
 
 def main() -> int:
@@ -27,12 +28,16 @@ def main() -> int:
         print(f'The recording should contain only the target phrase: "{TARGET_TEXT}"')
         return 1
 
-    result = analyze_pronunciation_stage1(TARGET_TEXT, audio_path)
+    result = analyze_pronunciation_stage1(TARGET_TEXT, audio_path, plot_dir=PLOT_DIR)
     save_json(result, OUTPUT_PATH)
 
     print(f'Target text: {result["text"]}')
     print(f'Pinyin: {" ".join(result["pinyin"])}')
     print(f'Overall Stage 1 score: {result["overall_score"]}')
+    print(
+        "Detected speech region: "
+        f'{result["speech_region"]["start"]:.2f}s - {result["speech_region"]["end"]:.2f}s'
+    )
     print()
     for syllable in result["syllables"]:
         print(
@@ -40,6 +45,9 @@ def main() -> int:
             f'tone score={syllable["scores"]["tone"]} - {syllable["feedback"]}'
         )
     print(f"\nSaved full JSON to {OUTPUT_PATH.resolve()}")
+    if result["plots"]:
+        print(f'Saved pitch overview to {Path(result["plots"]["pitch_overview"]).resolve()}')
+        print(f"Saved syllable plots in {PLOT_DIR.resolve()}")
     return 0
 
 
