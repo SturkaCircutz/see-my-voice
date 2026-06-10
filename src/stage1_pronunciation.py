@@ -9,6 +9,10 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
+import matplotlib
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 from pypinyin import Style, lazy_pinyin
 import soundfile as sf
 from scipy.signal import resample_poly
@@ -211,11 +215,94 @@ def estimate_f0(audio: np.ndarray, sr: int) -> tuple[np.ndarray, np.ndarray, np.
     return times, f0, voiced_prob
 
 
-def naive_syllable_windows(total_duration: float, n_syllables: int) -> list[tuple[float, float]]:
-    """Stage 1 approximation: divide speech duration evenly across syllables."""
+def frame_rms(audio: np.ndarray, frame_length: int = 1024, hop_length: int = HOP_LENGTH) -> np.ndarray:
+    """Compute frame energy for simple speech-region detection."""
+    if len(audio) < frame_length:
+        audio = np.pad(audio, (0, frame_length - len(audio)))
+    n_frames = 1 + max(0, (len(audio) - frame_length) // hop_length)
+    rms = np.zeros(n_frames, dtype=float)
+    for frame_idx in range(n_frames):
+        start = frame_idx * hop_length
+        frame = audio[start : start + frame_length]
+        if len(frame) < frame_length:
+            frame = np.pad(frame, (0, frame_length - len(frame)))
+        rms[frame_idx] = float(np.sqrt(np.mean(frame.astype(float) ** 2)))
+    return rms
+
+
+def detect_speech_region(
+    audio: np.ndarray,
+    sr: int,
+    frame_length: int = 1024,
+    hop_length: int = HOP_LENGTH,
+    padding_seconds: float = 0.08,
+) -> dict[str, Any]:
+    """Find the active speech region using a conservative energy threshold."""
+    duration = len(audio) / sr if sr else 0.0
+    if len(audio) == 0 or sr <= 0:
+        return {
+            "start": 0.0,
+            "end": 0.0,
+            "duration": 0.0,
+            "method": "energy_threshold",
+            "confidence": "low",
+            "reason": "Audio is empty.",
+        }
+
+    rms = frame_rms(audio, frame_length=frame_length, hop_length=hop_length)
+    if len(rms) == 0 or float(np.max(rms)) <= 1e-8:
+        return {
+            "start": 0.0,
+            "end": duration,
+            "duration": duration,
+            "method": "energy_threshold",
+            "confidence": "low",
+            "reason": "No clear speech energy was detected.",
+        }
+
+    noise_floor = float(np.percentile(rms, 20))
+    peak = float(np.max(rms))
+    threshold = max(noise_floor * 2.5, peak * 0.08, 1e-4)
+    active = np.flatnonzero(rms >= threshold)
+    if len(active) == 0:
+        return {
+            "start": 0.0,
+            "end": duration,
+            "duration": duration,
+            "method": "energy_threshold",
+            "confidence": "low",
+            "threshold": threshold,
+            "reason": "Energy threshold found no active frames.",
+        }
+
+    pad = int(round(padding_seconds * sr))
+    start_sample = max(0, int(active[0] * hop_length) - pad)
+    end_sample = min(len(audio), int(active[-1] * hop_length + frame_length) + pad)
+    start = start_sample / sr
+    end = end_sample / sr
+    confidence = "medium" if (end - start) < duration * 0.95 else "low"
+
+    return {
+        "start": start,
+        "end": end,
+        "duration": end - start,
+        "method": "energy_threshold",
+        "confidence": confidence,
+        "threshold": threshold,
+        "noise_floor": noise_floor,
+        "peak_rms": peak,
+    }
+
+
+def syllable_windows_in_region(
+    start: float, end: float, n_syllables: int
+) -> list[tuple[float, float]]:
+    """Stage 1.5 approximation: divide detected speech region across syllables."""
     if n_syllables <= 0:
         return []
-    edges = np.linspace(0.0, total_duration, n_syllables + 1)
+    if end <= start:
+        end = start
+    edges = np.linspace(start, end, n_syllables + 1)
     return [(float(edges[i]), float(edges[i + 1])) for i in range(n_syllables)]
 
 
@@ -335,8 +422,87 @@ def tone_feedback_text(tone: str, score: int | None) -> str:
     return "Try making the neutral tone shorter and lighter."
 
 
-def analyze_pronunciation_stage1(text: str, audio_path: Path) -> dict[str, Any]:
-    """Run Stage 1: pinyin parsing + naive syllable windows + tone scoring."""
+def plot_stage15_results(
+    result: dict[str, Any],
+    f0_times: np.ndarray,
+    f0: np.ndarray,
+    output_dir: Path,
+) -> dict[str, Any]:
+    """Save pitch and per-syllable tone plots for visual feedback."""
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    speech_region = result["speech_region"]
+    pitch_plot = output_dir / "pitch_overview.png"
+    plt.figure(figsize=(10, 4))
+    plt.plot(f0_times, f0, marker=".", linewidth=1, markersize=3, label="User F0")
+    plt.axvspan(
+        speech_region["start"],
+        speech_region["end"],
+        color="#cce8ff",
+        alpha=0.35,
+        label="Detected speech region",
+    )
+    for syllable in result["syllables"]:
+        start = syllable["window"]["start"]
+        end = syllable["window"]["end"]
+        plt.axvline(start, color="#999999", linestyle="--", linewidth=0.8)
+        plt.text(
+            (start + end) / 2,
+            0.98,
+            syllable["pinyin"],
+            transform=plt.gca().get_xaxis_transform(),
+            ha="center",
+            va="top",
+            fontsize=10,
+        )
+    if result["syllables"]:
+        plt.axvline(result["syllables"][-1]["window"]["end"], color="#999999", linestyle="--", linewidth=0.8)
+    plt.title(f'Pitch overview: {" ".join(result["pinyin"])}')
+    plt.xlabel("Time (seconds)")
+    plt.ylabel("F0 (Hz)")
+    plt.grid(True, alpha=0.25)
+    plt.legend(loc="best")
+    plt.tight_layout()
+    plt.savefig(pitch_plot, dpi=160)
+    plt.close()
+
+    syllable_plots = []
+    for syllable in result["syllables"]:
+        tone_result = syllable["tone_result"]
+        contour = tone_result.get("contour")
+        template = tone_result.get("template")
+        if contour is None or template is None:
+            continue
+        plot_path = output_dir / f"syllable_{syllable['index']}_{syllable['pinyin']}.png"
+        plt.figure(figsize=(6, 4))
+        plt.plot(contour, label="Your pitch shape", linewidth=2)
+        plt.plot(template, label=f"Tone {syllable['tone']} target", linewidth=2)
+        plt.title(f"{syllable['pinyin']} - tone score {syllable['scores']['tone']}")
+        plt.xlabel("Normalized time")
+        plt.ylabel("Normalized pitch shape")
+        plt.grid(True, alpha=0.25)
+        plt.legend(loc="best")
+        plt.tight_layout()
+        plt.savefig(plot_path, dpi=160)
+        plt.close()
+        syllable_plots.append(
+            {
+                "index": syllable["index"],
+                "pinyin": syllable["pinyin"],
+                "path": str(plot_path),
+            }
+        )
+
+    return {
+        "pitch_overview": str(pitch_plot),
+        "syllables": syllable_plots,
+    }
+
+
+def analyze_pronunciation_stage1(
+    text: str, audio_path: Path, plot_dir: Path | None = None
+) -> dict[str, Any]:
+    """Run Stage 1.5: tone scoring with speech-region trimming and visual output."""
     if not audio_path.exists():
         raise FileNotFoundError(f"Audio file not found: {audio_path}")
 
@@ -344,7 +510,10 @@ def analyze_pronunciation_stage1(text: str, audio_path: Path) -> dict[str, Any]:
     audio, sr = load_audio(audio_path)
     duration = len(audio) / sr if sr else 0.0
     f0_times, f0, voiced_prob = estimate_f0(audio, sr)
-    windows = naive_syllable_windows(duration, len(syllable_parts))
+    speech_region = detect_speech_region(audio, sr)
+    windows = syllable_windows_in_region(
+        speech_region["start"], speech_region["end"], len(syllable_parts)
+    )
 
     syllables = []
     for part, (start, end) in zip(syllable_parts, windows):
@@ -381,8 +550,8 @@ def analyze_pronunciation_stage1(text: str, audio_path: Path) -> dict[str, Any]:
     overall_score = int(round(float(np.mean(syllable_scores)))) if syllable_scores else None
     voiced_frames = int(np.sum(np.isfinite(f0)))
 
-    return {
-        "stage": "stage_1_tone_mvp",
+    result = {
+        "stage": "stage_1_5_visual_tone_mvp",
         "text": text,
         "pinyin": [part.pinyin for part in syllable_parts],
         "audio": {
@@ -395,14 +564,20 @@ def analyze_pronunciation_stage1(text: str, audio_path: Path) -> dict[str, Any]:
             if len(voiced_prob)
             else None,
         },
+        "speech_region": speech_region,
         "overall_score": overall_score,
         "syllables": syllables,
+        "plots": None,
         "notes": [
-            "Stage 1 scores only Mandarin tone shape from pitch/F0.",
-            "Syllable timing uses equal-length windows, not real forced alignment yet.",
+            "Stage 1.5 scores Mandarin tone shape from pitch/F0 and generates visual feedback.",
+            "Syllable timing divides the detected speech region evenly; this is better than using the full recording but is still not real forced alignment.",
             "Initial and final scores are placeholders for a later CTC/GOP stage.",
         ],
     }
+    if plot_dir is not None:
+        result["plots"] = plot_stage15_results(result, f0_times, f0, plot_dir)
+
+    return result
 
 
 def save_json(data: dict[str, Any], output_path: Path) -> None:
@@ -420,9 +595,15 @@ def main() -> int:
         default=Path("stage1_feedback.json"),
         help="Where to save the feedback JSON.",
     )
+    parser.add_argument(
+        "--plot-dir",
+        type=Path,
+        default=Path("stage1_plots"),
+        help="Where to save Stage 1.5 pitch visualizations.",
+    )
     args = parser.parse_args()
 
-    result = analyze_pronunciation_stage1(args.text, args.audio)
+    result = analyze_pronunciation_stage1(args.text, args.audio, plot_dir=args.plot_dir)
     save_json(result, args.output)
     print(json.dumps(result, ensure_ascii=False, indent=2))
     print(f"\nSaved feedback JSON to: {args.output}")
