@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 from dataclasses import dataclass
 from math import gcd
@@ -9,6 +10,8 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
+
+os.environ.setdefault("MPLCONFIGDIR", str(Path.cwd() / ".matplotlib_cache"))
 import matplotlib
 
 matplotlib.use("Agg")
