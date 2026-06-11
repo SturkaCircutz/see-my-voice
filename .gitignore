@@ -3,9 +3,11 @@ __pycache__/
 *.py[cod]
 .matplotlib_cache/
 
-# Generated Stage 1 / Stage 1.5 outputs
+# Generated Stage 1 / Stage 1.5 / Stage 2A outputs
 stage1_feedback.json
 stage1_plots/
+*_feedback.json
+*_plots/
 
 # Local audio recordings
 sample.wav
