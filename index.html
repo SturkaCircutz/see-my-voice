@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SeeMyVoice 1.0</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body data-theme="light">
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true"></span>
+          <div>
+            <h1>SeeMyVoice 1.0</h1>
+            <p>Multimodal Mandarin pronunciation training for deaf and hard-of-hearing learners.</p>
+          </div>
+        </div>
+        <div class="status-block" aria-live="polite">
+          <span class="status-dot" id="status-dot"></span>
+          <span id="status-label">Ready</span>
+        </div>
+      </header>
+
+      <main class="workspace">
+        <section class="control-panel" aria-label="Practice controls">
+          <div class="control-grid">
+            <label class="field">
+              <span>Practice phrase</span>
+              <select id="practice-select">
+                <option value="你好">你好 · ni3 hao3</option>
+                <option value="妈妈">妈妈 · ma1 ma1</option>
+                <option value="谢谢">谢谢 · xie4 xie4</option>
+                <option value="我想喝水">我想喝水 · wo3 xiang3 he1 shui3</option>
+                <option value="请再说一遍">请再说一遍 · qing3 zai4 shuo1 yi2 bian4</option>
+              </select>
+            </label>
+
+            <label class="field custom-field">
+              <span>Custom Chinese text</span>
+              <input id="custom-text" type="text" inputmode="text" autocomplete="off" />
+            </label>
+
+            <button id="apply-text-button" class="button" type="button">Use text</button>
+          </div>
+
+          <div class="control-row primary-actions">
+            <button id="record-button" class="button button-primary" type="button">Record</button>
+            <button id="pause-button" class="button" type="button" disabled>Pause</button>
+            <button id="resume-button" class="button" type="button" disabled>Resume</button>
+            <button id="stop-button" class="button button-danger" type="button" disabled>Stop & analyze</button>
+          </div>
+
+          <div class="control-grid secondary-controls">
+            <label class="field size-field">
+              <span>Target text size <output id="caption-size-output">48px</output></span>
+              <input id="caption-size" type="range" min="34" max="76" step="2" value="48" />
+            </label>
+
+            <fieldset class="theme-field">
+              <legend>Theme</legend>
+              <div class="segmented">
+                <label><input type="radio" name="theme" value="light" checked /> Light</label>
+                <label><input type="radio" name="theme" value="dark" /> Dark</label>
+                <label><input type="radio" name="theme" value="contrast" /> High contrast</label>
+              </div>
+            </fieldset>
+          </div>
+        </section>
+
+        <section id="notice-panel" class="notice-panel" aria-live="polite">
+          <strong id="notice-title">Practice by seeing your voice.</strong>
+          <p id="notice-message">
+            Choose a Mandarin phrase, record yourself, then compare tone shape, rhythm, and syllable feedback.
+          </p>
+        </section>
+
+        <section class="main-grid">
+          <div class="practice-column">
+            <section class="target-card" aria-labelledby="target-heading">
+              <div class="section-heading">
+                <h2 id="target-heading">Target phrase</h2>
+                <span>Mandarin pronunciation</span>
+              </div>
+              <div id="target-text" class="target-text">你好</div>
+              <div id="pinyin-line" class="pinyin-line">ni3  hao3</div>
+              <p id="focus-text" class="practice-helper">hello · third-tone dip and recovery</p>
+            </section>
+
+            <section class="visualizer-card" aria-labelledby="visualizer-heading">
+              <div class="section-heading">
+                <h2 id="visualizer-heading">Live voice shape</h2>
+                <span id="level-label">Voice level 0%</span>
+              </div>
+              <canvas id="visualizer" width="900" height="240" aria-label="Live waveform and frequency bars"></canvas>
+              <div class="meter" aria-hidden="true"><span id="meter-fill"></span></div>
+            </section>
+
+            <section class="tone-card" aria-labelledby="tone-heading">
+              <div class="section-heading">
+                <h2 id="tone-heading">Tone curve</h2>
+                <span>Pitch movement by syllable</span>
+              </div>
+              <canvas id="tone-canvas" width="900" height="260" aria-label="Pronunciation tone curve"></canvas>
+            </section>
+          </div>
+
+          <aside class="feedback-card" aria-labelledby="feedback-heading">
+            <div class="section-heading report-heading">
+              <h2 id="feedback-heading">Feedback report</h2>
+              <div class="export-actions">
+                <button id="copy-button" class="button button-small" type="button" disabled>Copy</button>
+                <button id="download-button" class="button button-small" type="button" disabled>Download</button>
+              </div>
+            </div>
+
+            <div class="score-row" aria-label="Pronunciation summary scores">
+              <div><strong id="score-value">—</strong><span>Overall</span></div>
+              <div><strong id="duration-value">0.0s</strong><span>Duration</span></div>
+            </div>
+
+            <h3>Syllable feedback</h3>
+            <div id="syllable-list" class="syllable-list">
+              <p class="empty-state">Record a phrase to see syllable feedback.</p>
+            </div>
+
+            <h3>Next practice</h3>
+            <ul id="feedback-list" class="feedback-list">
+              <li class="empty-state">Next practice suggestions will appear here.</li>
+            </ul>
+          </aside>
+        </section>
+      </main>
+    </div>
+
+    <div id="sr-status" class="sr-only" aria-live="polite"></div>
+    <script src="app.js" defer></script>
+  </body>
+</html>

@@ -1,0 +1,14 @@
+.DS_Store
+__pycache__/
+*.py[cod]
+.matplotlib_cache/
+
+# Generated Stage 1 / Stage 1.5 outputs
+stage1_feedback.json
+stage1_plots/
+
+# Local audio recordings
+sample.wav
+sample.m4a
+*.m4a
+*.wav
