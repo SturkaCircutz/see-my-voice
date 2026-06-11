@@ -11,7 +11,7 @@ PLOT_DIR = Path("stage1_plots")
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Run Stage 1.5 Mandarin tone feedback.")
+    parser = argparse.ArgumentParser(description="Run Stage 2A Mandarin tone feedback.")
     parser.add_argument(
         "--text",
         default=TARGET_TEXT,
@@ -37,6 +37,8 @@ def main() -> int:
     )
     args = parser.parse_args()
 
+    # If the user gives --audio, use that file. Otherwise, use the simple
+    # default sample so running `python3 src/run_stage1.py` still works.
     audio_path = args.audio if args.audio is not None else DEFAULT_AUDIO
     if not audio_path.exists():
         print(f"Audio file not found: {audio_path}")
@@ -44,17 +46,27 @@ def main() -> int:
         print(f'The recording should contain only the target phrase: "{args.text}"')
         return 1
 
+    # This is the main analysis call. It loads the audio, estimates pitch,
+    # finds syllable windows, scores tones, and creates plot paths.
     result = analyze_pronunciation_stage1(args.text, audio_path, plot_dir=args.plot_dir)
     save_json(result, args.output)
 
     print(f'Target text: {result["text"]}')
     print(f"Audio file: {audio_path}")
     print(f'Pinyin: {" ".join(result["pinyin"])}')
-    print(f'Overall Stage 1 score: {result["overall_score"]}')
+    print(f'Overall Stage 2A score: {result["overall_score"]}')
     print(
         "Detected speech region: "
         f'{result["speech_region"]["start"]:.2f}s - {result["speech_region"]["end"]:.2f}s'
     )
+    print(f'Syllable timing: {result["syllable_timing"]["method"]}')
+    for boundary in result["syllable_timing"]["boundary_details"]:
+        print(
+            "  boundary after syllable "
+            f'{boundary["after_syllable_index"] + 1}: '
+            f'{boundary["boundary"]:.2f}s '
+            f'(shift {boundary["shift_from_equal_seconds"]:+.2f}s from equal split)'
+        )
     print()
     for syllable in result["syllables"]:
         print(

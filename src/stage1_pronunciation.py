@@ -233,6 +233,35 @@ def frame_rms(audio: np.ndarray, frame_length: int = 1024, hop_length: int = HOP
     return rms
 
 
+def frame_times(n_frames: int, sr: int, hop_length: int = HOP_LENGTH) -> np.ndarray:
+    """Return the timestamp for each short audio frame.
+
+    Beginner note: most audio features are not calculated for every single
+    sample. We look at small overlapping chunks called frames. This helper says
+    where each frame starts in seconds.
+    """
+    return np.arange(n_frames) * hop_length / sr
+
+
+def smooth_curve(values: np.ndarray, window_size: int = 9) -> np.ndarray:
+    """Smooth a curve so tiny bumps do not confuse boundary detection."""
+    values = np.asarray(values, dtype=float)
+    if len(values) == 0:
+        return values
+
+    # Use an odd window size so the current point stays in the middle.
+    window_size = max(1, min(window_size, len(values)))
+    if window_size % 2 == 0:
+        window_size -= 1
+    if window_size <= 1:
+        return values.copy()
+
+    half = window_size // 2
+    padded = np.pad(values, (half, half), mode="edge")
+    kernel = np.ones(window_size, dtype=float) / window_size
+    return np.convolve(padded, kernel, mode="valid")
+
+
 def detect_speech_region(
     audio: np.ndarray,
     sr: int,
@@ -300,13 +329,127 @@ def detect_speech_region(
 def syllable_windows_in_region(
     start: float, end: float, n_syllables: int
 ) -> list[tuple[float, float]]:
-    """Stage 1.5 approximation: divide detected speech region across syllables."""
+    """Stage 1.5 approximation: divide detected speech region evenly."""
     if n_syllables <= 0:
         return []
     if end <= start:
         end = start
     edges = np.linspace(start, end, n_syllables + 1)
     return [(float(edges[i]), float(edges[i + 1])) for i in range(n_syllables)]
+
+
+def windows_to_dicts(windows: list[tuple[float, float]]) -> list[dict[str, float]]:
+    """Convert Python tuples into JSON-friendly dictionaries."""
+    return [{"start": float(start), "end": float(end)} for start, end in windows]
+
+
+def syllable_windows_by_energy_valleys(
+    audio: np.ndarray,
+    sr: int,
+    speech_region: dict[str, Any],
+    n_syllables: int,
+    frame_length: int = 1024,
+    hop_length: int = HOP_LENGTH,
+) -> tuple[list[tuple[float, float]], dict[str, Any], dict[str, np.ndarray]]:
+    """Stage 2A: estimate syllable windows by searching for low-energy valleys.
+
+    Beginner note: speech often gets a little quieter between syllables. Those
+    quiet dips are not perfect boundaries, but they are better than always
+    splitting the phrase into equal-length pieces.
+    """
+    start = float(speech_region["start"])
+    end = float(speech_region["end"])
+    equal_windows = syllable_windows_in_region(start, end, n_syllables)
+
+    rms = frame_rms(audio, frame_length=frame_length, hop_length=hop_length)
+    times = frame_times(len(rms), sr, hop_length=hop_length)
+    smoothed = smooth_curve(rms)
+    peak = float(np.max(smoothed)) if len(smoothed) else 0.0
+    normalized = smoothed / peak if peak > 1e-8 else smoothed
+
+    energy_debug = {
+        "times": times,
+        "rms": rms,
+        "smoothed": smoothed,
+        "normalized": normalized,
+    }
+
+    if n_syllables <= 1 or end <= start:
+        timing = {
+            "method": "stage_2a_energy_valleys",
+            "confidence": "low",
+            "reason": "Need at least two syllables to search for a boundary.",
+            "equal_windows": windows_to_dicts(equal_windows),
+            "detected_boundaries": [start, end],
+            "boundary_details": [],
+        }
+        return equal_windows, timing, energy_debug
+
+    speech_duration = end - start
+    equal_edges = np.linspace(start, end, n_syllables + 1)
+
+    # This prevents one syllable from becoming unrealistically tiny.
+    average_syllable_duration = speech_duration / n_syllables
+    min_syllable_duration = min(0.18, average_syllable_duration * 0.45)
+
+    # Around each equal-split boundary, search nearby for the quietest point.
+    search_radius = max(0.08, average_syllable_duration * 0.45)
+    boundaries = [start]
+    boundary_details = []
+
+    for boundary_index in range(1, n_syllables):
+        equal_boundary = float(equal_edges[boundary_index])
+        earliest = boundaries[-1] + min_syllable_duration
+        latest = end - (n_syllables - boundary_index) * min_syllable_duration
+        search_start = max(equal_boundary - search_radius, earliest)
+        search_end = min(equal_boundary + search_radius, latest)
+
+        # Pick the lowest-energy frame inside the search window.
+        search_mask = (times >= search_start) & (times <= search_end)
+        if np.any(search_mask):
+            candidate_times = times[search_mask]
+            candidate_energy = normalized[search_mask]
+            best_index = int(np.argmin(candidate_energy))
+            boundary = float(candidate_times[best_index])
+            source = "energy_valley"
+            valley_energy = float(candidate_energy[best_index])
+        else:
+            # Fallback: if the search window is empty, keep the old equal split.
+            boundary = equal_boundary
+            source = "equal_split_fallback"
+            valley_energy = None
+
+        boundaries.append(boundary)
+        boundary_details.append(
+            {
+                "after_syllable_index": boundary_index - 1,
+                "boundary": boundary,
+                "equal_boundary": equal_boundary,
+                "shift_from_equal_seconds": boundary - equal_boundary,
+                "search_start": search_start,
+                "search_end": search_end,
+                "source": source,
+                "normalized_energy": valley_energy,
+            }
+        )
+
+    boundaries.append(end)
+    windows = [
+        (float(boundaries[i]), float(boundaries[i + 1]))
+        for i in range(len(boundaries) - 1)
+    ]
+    used_energy = any(detail["source"] == "energy_valley" for detail in boundary_details)
+    timing = {
+        "method": "stage_2a_energy_valleys",
+        "confidence": "medium" if used_energy else "low",
+        "reason": "Uses low-energy valleys near equal-split boundaries; still not forced alignment.",
+        "search_radius_seconds": search_radius,
+        "min_syllable_duration_seconds": min_syllable_duration,
+        "equal_windows": windows_to_dicts(equal_windows),
+        "detected_boundaries": [float(boundary) for boundary in boundaries],
+        "boundary_details": boundary_details,
+    }
+    return windows, timing, energy_debug
 
 
 def simple_dtw_distance(a: np.ndarray, b: np.ndarray) -> float:
@@ -429,45 +572,81 @@ def plot_stage15_results(
     result: dict[str, Any],
     f0_times: np.ndarray,
     f0: np.ndarray,
+    energy_debug: dict[str, np.ndarray],
     output_dir: Path,
 ) -> dict[str, Any]:
-    """Save pitch and per-syllable tone plots for visual feedback."""
+    """Save pitch, energy, and per-syllable tone plots for visual feedback."""
     output_dir.mkdir(parents=True, exist_ok=True)
 
     speech_region = result["speech_region"]
     pitch_plot = output_dir / "pitch_overview.png"
-    plt.figure(figsize=(10, 4))
-    plt.plot(f0_times, f0, marker=".", linewidth=1, markersize=3, label="User F0")
-    plt.axvspan(
+    fig, (pitch_ax, energy_ax) = plt.subplots(2, 1, figsize=(10, 6), sharex=True)
+
+    pitch_ax.plot(f0_times, f0, marker=".", linewidth=1, markersize=3, label="User F0")
+    pitch_ax.axvspan(
         speech_region["start"],
         speech_region["end"],
         color="#cce8ff",
         alpha=0.35,
         label="Detected speech region",
     )
+
+    # Gray dotted lines show the old Stage 1.5 equal split. Blue solid lines
+    # show the new Stage 2A energy-valley split used for scoring.
+    for equal_window in result["syllable_timing"]["equal_windows"]:
+        pitch_ax.axvline(equal_window["start"], color="#bbbbbb", linestyle=":", linewidth=0.8)
     for syllable in result["syllables"]:
         start = syllable["window"]["start"]
         end = syllable["window"]["end"]
-        plt.axvline(start, color="#999999", linestyle="--", linewidth=0.8)
-        plt.text(
+        pitch_ax.axvline(start, color="#2563eb", linestyle="--", linewidth=1.1)
+        pitch_ax.text(
             (start + end) / 2,
             0.98,
             syllable["pinyin"],
-            transform=plt.gca().get_xaxis_transform(),
+            transform=pitch_ax.get_xaxis_transform(),
             ha="center",
             va="top",
             fontsize=10,
         )
     if result["syllables"]:
-        plt.axvline(result["syllables"][-1]["window"]["end"], color="#999999", linestyle="--", linewidth=0.8)
-    plt.title(f'Pitch overview: {" ".join(result["pinyin"])}')
-    plt.xlabel("Time (seconds)")
-    plt.ylabel("F0 (Hz)")
-    plt.grid(True, alpha=0.25)
-    plt.legend(loc="best")
-    plt.tight_layout()
-    plt.savefig(pitch_plot, dpi=160)
-    plt.close()
+        pitch_ax.axvline(
+            result["syllables"][-1]["window"]["end"],
+            color="#2563eb",
+            linestyle="--",
+            linewidth=1.1,
+        )
+    pitch_ax.set_title(f'Pitch overview: {" ".join(result["pinyin"])}')
+    pitch_ax.set_ylabel("F0 (Hz)")
+    pitch_ax.grid(True, alpha=0.25)
+    pitch_ax.legend(loc="best")
+
+    energy_ax.plot(
+        energy_debug["times"],
+        energy_debug["normalized"],
+        color="#111827",
+        linewidth=1.5,
+        label="Smoothed energy",
+    )
+    energy_ax.axvspan(
+        speech_region["start"],
+        speech_region["end"],
+        color="#cce8ff",
+        alpha=0.35,
+    )
+    for equal_window in result["syllable_timing"]["equal_windows"]:
+        energy_ax.axvline(equal_window["start"], color="#bbbbbb", linestyle=":", linewidth=0.8)
+    for boundary in result["syllable_timing"]["detected_boundaries"]:
+        energy_ax.axvline(boundary, color="#2563eb", linestyle="--", linewidth=1.1)
+    energy_ax.set_title("Stage 2A timing: energy valleys")
+    energy_ax.set_xlabel("Time (seconds)")
+    energy_ax.set_ylabel("Energy")
+    energy_ax.set_ylim(bottom=0)
+    energy_ax.grid(True, alpha=0.25)
+    energy_ax.legend(loc="best")
+
+    fig.tight_layout()
+    fig.savefig(pitch_plot, dpi=160)
+    plt.close(fig)
 
     syllable_plots = []
     for syllable in result["syllables"]:
@@ -505,7 +684,7 @@ def plot_stage15_results(
 def analyze_pronunciation_stage1(
     text: str, audio_path: Path, plot_dir: Path | None = None
 ) -> dict[str, Any]:
-    """Run Stage 1.5: tone scoring with speech-region trimming and visual output."""
+    """Run Stage 2A: tone scoring with simple energy-valley syllable timing."""
     if not audio_path.exists():
         raise FileNotFoundError(f"Audio file not found: {audio_path}")
 
@@ -514,8 +693,8 @@ def analyze_pronunciation_stage1(
     duration = len(audio) / sr if sr else 0.0
     f0_times, f0, voiced_prob = estimate_f0(audio, sr)
     speech_region = detect_speech_region(audio, sr)
-    windows = syllable_windows_in_region(
-        speech_region["start"], speech_region["end"], len(syllable_parts)
+    windows, syllable_timing, energy_debug = syllable_windows_by_energy_valleys(
+        audio, sr, speech_region, len(syllable_parts)
     )
 
     syllables = []
@@ -554,7 +733,7 @@ def analyze_pronunciation_stage1(
     voiced_frames = int(np.sum(np.isfinite(f0)))
 
     result = {
-        "stage": "stage_1_5_visual_tone_mvp",
+        "stage": "stage_2a_energy_valley_timing",
         "text": text,
         "pinyin": [part.pinyin for part in syllable_parts],
         "audio": {
@@ -568,17 +747,18 @@ def analyze_pronunciation_stage1(
             else None,
         },
         "speech_region": speech_region,
+        "syllable_timing": syllable_timing,
         "overall_score": overall_score,
         "syllables": syllables,
         "plots": None,
         "notes": [
-            "Stage 1.5 scores Mandarin tone shape from pitch/F0 and generates visual feedback.",
-            "Syllable timing divides the detected speech region evenly; this is better than using the full recording but is still not real forced alignment.",
+            "Stage 2A scores Mandarin tone shape from pitch/F0 and uses simple energy valleys for syllable timing.",
+            "Energy-valley timing is better than equal splitting, but it is still not real forced alignment.",
             "Initial and final scores are placeholders for a later CTC/GOP stage.",
         ],
     }
     if plot_dir is not None:
-        result["plots"] = plot_stage15_results(result, f0_times, f0, plot_dir)
+        result["plots"] = plot_stage15_results(result, f0_times, f0, energy_debug, plot_dir)
 
     return result
 
