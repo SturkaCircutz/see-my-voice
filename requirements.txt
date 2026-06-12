@@ -9,3 +9,4 @@ transformers>=4.40.0
 torch>=2.1.0
 torchaudio>=2.1.0
 jupyter>=1.0.0
+funasr>=1.0.0

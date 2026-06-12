@@ -60,13 +60,20 @@ def main() -> int:
         f'{result["speech_region"]["start"]:.2f}s - {result["speech_region"]["end"]:.2f}s'
     )
     print(f'Syllable timing: {result["syllable_timing"]["method"]}')
+    print(
+        "Boundary confidence: "
+        f'{result["syllable_timing"]["confidence"]} - '
+        f'{result["syllable_timing"]["confidence_reason"]}'
+    )
     for boundary in result["syllable_timing"]["boundary_details"]:
         print(
             "  boundary after syllable "
             f'{boundary["after_syllable_index"] + 1}: '
             f'{boundary["boundary"]:.2f}s '
-            f'(shift {boundary["shift_from_equal_seconds"]:+.2f}s from equal split)'
+            f'(shift {boundary["shift_from_equal_seconds"]:+.2f}s from equal split, '
+            f'confidence={boundary["confidence"]})'
         )
+        print(f'    reason: {boundary["reason"]}')
     print()
     for syllable in result["syllables"]:
         print(

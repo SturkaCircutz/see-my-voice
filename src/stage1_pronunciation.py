@@ -343,6 +343,134 @@ def windows_to_dicts(windows: list[tuple[float, float]]) -> list[dict[str, float
     return [{"start": float(start), "end": float(end)} for start, end in windows]
 
 
+def boundary_confidence_from_energy(
+    candidate_energy: np.ndarray,
+    best_index: int | None,
+    source: str,
+) -> dict[str, Any]:
+    """Explain how trustworthy one Stage 2A boundary is.
+
+    Beginner note: a good syllable boundary usually sits in a clear energy dip.
+    If the quietest point is much lower than nearby speech energy, we trust it
+    more. If the curve is flat, the boundary is more of a guess.
+    """
+    if source != "energy_valley" or best_index is None or len(candidate_energy) == 0:
+        return {
+            "confidence": "low",
+            "reason": "No usable energy search window; used fallback timing.",
+            "valley_energy": None,
+            "local_median_energy": None,
+            "energy_contrast": None,
+        }
+
+    valley_energy = float(candidate_energy[best_index])
+    local_median = float(np.median(candidate_energy))
+    local_peak = float(np.max(candidate_energy))
+    energy_contrast = local_median - valley_energy
+
+    if valley_energy <= 0.20 and energy_contrast >= 0.18:
+        confidence = "high"
+        reason = "Clear low-energy valley found between syllables."
+    elif valley_energy <= 0.35 and energy_contrast >= 0.08:
+        confidence = "medium"
+        reason = "Some energy dip found, but the boundary is approximate."
+    else:
+        confidence = "low"
+        reason = "Energy dip is weak; boundary may be close to an equal split guess."
+
+    return {
+        "confidence": confidence,
+        "reason": reason,
+        "valley_energy": valley_energy,
+        "local_median_energy": local_median,
+        "local_peak_energy": local_peak,
+        "energy_contrast": float(energy_contrast),
+    }
+
+
+def summarize_boundary_confidence(boundary_details: list[dict[str, Any]]) -> dict[str, Any]:
+    """Summarize all boundary confidences into one phrase for the whole phrase."""
+    if not boundary_details:
+        return {
+            "overall_confidence": "low",
+            "reason": "No internal syllable boundaries were estimated.",
+        }
+
+    levels = [detail["confidence"] for detail in boundary_details]
+    if all(level == "high" for level in levels):
+        return {
+            "overall_confidence": "high",
+            "reason": "All estimated boundaries have clear energy valleys.",
+        }
+    if any(level == "low" for level in levels):
+        return {
+            "overall_confidence": "low",
+            "reason": "At least one boundary has a weak or unclear energy valley.",
+        }
+    return {
+        "overall_confidence": "medium",
+        "reason": "Boundaries are usable, but at least one is still approximate.",
+    }
+
+
+def lower_confidence(confidence: str) -> str:
+    """Move confidence down one level."""
+    if confidence == "high":
+        return "medium"
+    if confidence == "medium":
+        return "low"
+    return "low"
+
+
+def add_duration_sanity_to_boundaries(
+    boundary_details: list[dict[str, Any]],
+    boundaries: list[float],
+    equal_edges: np.ndarray,
+    average_syllable_duration: float,
+) -> None:
+    """Downgrade boundary confidence when the resulting syllable timing looks odd.
+
+    Beginner note: a real boundary should not create one very long syllable and
+    one very short syllable unless there is a clear reason. This check catches
+    cases like a boundary landing too early even though there is some energy dip.
+    """
+    if not boundary_details or average_syllable_duration <= 0:
+        return
+
+    min_reasonable = max(0.20, average_syllable_duration * 0.55)
+    max_reasonable = average_syllable_duration * 1.45
+    max_shift = average_syllable_duration * 0.28
+
+    for detail_index, detail in enumerate(boundary_details):
+        left_duration = boundaries[detail_index + 1] - boundaries[detail_index]
+        right_duration = boundaries[detail_index + 2] - boundaries[detail_index + 1]
+        duration_ratio = max(left_duration, right_duration) / max(
+            min(left_duration, right_duration), 1e-6
+        )
+        shift = abs(float(detail["boundary"]) - float(equal_edges[detail_index + 1]))
+
+        warnings = []
+        if left_duration < min_reasonable or right_duration < min_reasonable:
+            warnings.append("one neighboring syllable window is unusually short")
+        if left_duration > max_reasonable or right_duration > max_reasonable:
+            warnings.append("one neighboring syllable window is unusually long")
+        if duration_ratio >= 1.45:
+            warnings.append("neighboring syllable durations are unbalanced")
+        if shift > max_shift:
+            warnings.append("boundary shifted far from equal-split timing")
+
+        detail["left_duration"] = float(left_duration)
+        detail["right_duration"] = float(right_duration)
+        detail["duration_ratio"] = float(duration_ratio)
+        detail["duration_warnings"] = warnings
+
+        if warnings:
+            detail["confidence"] = lower_confidence(str(detail["confidence"]))
+            detail["reason"] = (
+                f'{detail["reason"]} Duration check: {"; ".join(warnings)}.'
+            )
+
+
 def syllable_windows_by_energy_valleys(
     audio: np.ndarray,
     sr: int,
@@ -379,6 +507,7 @@ def syllable_windows_by_energy_valleys(
             "method": "stage_2a_energy_valleys",
             "confidence": "low",
             "reason": "Need at least two syllables to search for a boundary.",
+            "confidence_reason": "No internal syllable boundaries were estimated.",
             "equal_windows": windows_to_dicts(equal_windows),
             "detected_boundaries": [start, end],
             "boundary_details": [],
@@ -412,12 +541,12 @@ def syllable_windows_by_energy_valleys(
             best_index = int(np.argmin(candidate_energy))
             boundary = float(candidate_times[best_index])
             source = "energy_valley"
-            valley_energy = float(candidate_energy[best_index])
+            confidence = boundary_confidence_from_energy(candidate_energy, best_index, source)
         else:
             # Fallback: if the search window is empty, keep the old equal split.
             boundary = equal_boundary
             source = "equal_split_fallback"
-            valley_energy = None
+            confidence = boundary_confidence_from_energy(np.array([]), None, source)
 
         boundaries.append(boundary)
         boundary_details.append(
@@ -429,7 +558,7 @@ def syllable_windows_by_energy_valleys(
                 "search_start": search_start,
                 "search_end": search_end,
                 "source": source,
-                "normalized_energy": valley_energy,
+                **confidence,
             }
         )
 
@@ -438,11 +567,16 @@ def syllable_windows_by_energy_valleys(
         (float(boundaries[i]), float(boundaries[i + 1]))
         for i in range(len(boundaries) - 1)
     ]
+    add_duration_sanity_to_boundaries(
+        boundary_details, boundaries, equal_edges, average_syllable_duration
+    )
     used_energy = any(detail["source"] == "energy_valley" for detail in boundary_details)
+    confidence_summary = summarize_boundary_confidence(boundary_details)
     timing = {
         "method": "stage_2a_energy_valleys",
-        "confidence": "medium" if used_energy else "low",
+        "confidence": confidence_summary["overall_confidence"] if used_energy else "low",
         "reason": "Uses low-energy valleys near equal-split boundaries; still not forced alignment.",
+        "confidence_reason": confidence_summary["reason"],
         "search_radius_seconds": search_radius,
         "min_syllable_duration_seconds": min_syllable_duration,
         "equal_windows": windows_to_dicts(equal_windows),

@@ -8,6 +8,10 @@ stage1_feedback.json
 stage1_plots/
 *_feedback.json
 *_plots/
+stage2a_batch_results/
+asr_baseline_results/
+stage2b_combined_results/
+stage2b_eval_results/
 
 # Local audio recordings
 sample.wav
