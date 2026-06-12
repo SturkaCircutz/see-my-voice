@@ -12,6 +12,9 @@ stage2a_batch_results/
 asr_baseline_results/
 stage2b_combined_results/
 stage2b_eval_results/
+stage3a_label_results/
+stage3b_dataset/
+stage3c_ctc_inspection/
 
 # Local audio recordings
 sample.wav
