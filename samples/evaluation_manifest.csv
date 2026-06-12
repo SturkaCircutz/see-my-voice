@@ -1,0 +1,12 @@
+id,text,audio,human_label,expected_issue,human_note
+nihao,你好,samples/你好.m4a,good,boundary_uncertain,ASR understands it; boundary confidence is low so timing still needs review.
+wohenhao,我很好,samples/我很好.m4a,good,boundary_uncertain,ASR understands it; use this as a normal sample but inspect boundaries.
+woyaochifan,我要吃饭,samples/我要吃饭.m4a,good,,Best current sample because ASR understands it and boundary confidence is medium.
+woyaoheshui,我要喝水,samples/我要喝水.m4a,good,boundary_uncertain,ASR understands it; boundary confidence is low.
+qingzaishuoyibian,请再说一遍,samples/请再说一遍.m4a,good,boundary_uncertain,Longer phrase; ASR understands it but boundary confidence is low.
+xiexie,谢谢,samples/谢谢.m4a,boundary_issue,boundary_too_early,You noticed the split looks too early; use this to test whether boundary confidence warns us.
+nihao_tone_bad_002,你好,samples/nihao_tone_bad_002.wav.m4a,tone_issue,tone_issue,Intentionally bad tone recording.
+pengyou_tone_bad_001,朋友,samples/pengyou_tone_bad_001.wav.m4a,tone_issue,tone_issue,Intentionally bad tone recording.
+xiexie_tone_bad_001,谢谢,samples/xiexie_tone_bad_001.wav.m4a,tone_issue,tone_issue,Intentionally bad tone recording.
+woxiangchifan_unclear,我想吃饭,samples/我想吃饭_unclear.m4a,unclear,unclear,Intentionally unclear recording.
+qingzaishuoyibian_unclear,请再说一遍,samples/请再说一遍_unclear.m4a,unclear,unclear,Intentionally unclear recording.
