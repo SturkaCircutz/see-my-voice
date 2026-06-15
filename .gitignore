@@ -2,6 +2,7 @@
 __pycache__/
 *.py[cod]
 .matplotlib_cache/
+.venv/
 
 # Generated Stage 1 / Stage 1.5 / Stage 2A outputs
 stage1_feedback.json
@@ -21,3 +22,5 @@ sample.wav
 sample.m4a
 *.m4a
 *.wav
+*.mp3
+web/.tts_cache/
