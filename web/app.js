@@ -825,7 +825,52 @@ function speakStandard(copy) {
     return;
   }
 
-  speakStandardWithTts(copy, text);
+  speakStandardWithAi(copy, text);
+}
+
+async function fetchAiStandardAudio(text) {
+  const response = await fetch("/api/tts", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text }),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload.error || "AI standard audio failed.");
+  }
+  return payload.audioUrl;
+}
+
+function speakStandardWithAi(copy, text) {
+  state = reduceState(state, { type: "SET_PLAYING", playing: true });
+  render();
+  showToast("Generating AI standard audio.");
+
+  fetchAiStandardAudio(text)
+    .then((audioUrl) => {
+      standardAudio?.pause();
+      standardAudio = new Audio(audioUrl);
+      standardAudio.addEventListener("ended", () => {
+        state = reduceState(state, { type: "SET_PLAYING", playing: false });
+        render();
+      });
+      standardAudio.addEventListener(
+        "error",
+        () => {
+          state = reduceState(state, { type: "SET_PLAYING", playing: false });
+          render();
+          speakStandardWithTts(copy, text);
+        },
+        { once: true },
+      );
+      showToast(`${copy} (AI standard audio)`);
+      return standardAudio.play();
+    })
+    .catch(() => {
+      state = reduceState(state, { type: "SET_PLAYING", playing: false });
+      render();
+      speakStandardWithTts(copy, text);
+    });
 }
 
 function speakStandardWithTts(copy, text) {
