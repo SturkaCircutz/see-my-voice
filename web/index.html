@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#191a2f">
+    <title>声见 · 中文发音练习</title>
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body>
+    <div class="app-stage">
+      <div class="phone-shell">
+        <main id="app" tabindex="-1"></main>
+
+        <nav class="app-nav" aria-label="主要页面">
+          <button type="button" data-view="practice" aria-current="page">
+            <span class="nav-index">01</span>
+            <span>练习</span>
+          </button>
+          <button type="button" data-view="detail">
+            <span class="nav-index">02</span>
+            <span>详情</span>
+          </button>
+          <button type="button" data-view="progress">
+            <span class="nav-index">03</span>
+            <span>进度</span>
+          </button>
+        </nav>
+
+        <div id="toast" class="toast" role="status" aria-live="polite"></div>
+      </div>
+    </div>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
