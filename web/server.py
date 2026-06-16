@@ -2,14 +2,18 @@ from __future__ import annotations
 
 from email.parser import BytesParser
 from email.policy import default
+from dataclasses import dataclass
 import json
 import os
+import re
 import shutil
 import sys
 import tempfile
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
+
+from pypinyin import Style, lazy_pinyin
 
 
 APP_DIR = Path(__file__).resolve().parent
@@ -24,18 +28,86 @@ SEE_MY_VOICE_SRC = SEE_MY_VOICE_DIR / "src"
 if str(SEE_MY_VOICE_SRC) not in sys.path:
     sys.path.insert(0, str(SEE_MY_VOICE_SRC))
 
-from run_asr_baseline import DEFAULT_MODEL_NAME, build_model, normalize_chinese_text  # noqa: E402
-from run_stage2b_combined import combine_results  # noqa: E402
-from pypinyin import Style, lazy_pinyin  # noqa: E402
-from stage1_pronunciation import (  # noqa: E402
-    estimate_f0,
-    f0_values_in_window,
-    load_audio,
-    normalize_f0_shape,
-    save_json,
-    text_to_syllable_parts,
-    tone_template,
-)
+ANALYSIS_IMPORT_ERROR = None
+try:
+    from run_asr_baseline import DEFAULT_MODEL_NAME, build_model, normalize_chinese_text  # noqa: E402
+    from run_stage2b_combined import combine_results  # noqa: E402
+    from stage1_pronunciation import (  # noqa: E402
+        estimate_f0,
+        f0_values_in_window,
+        load_audio,
+        normalize_f0_shape,
+        save_json,
+        text_to_syllable_parts,
+        tone_template,
+    )
+except Exception as exc:  # pragma: no cover - keeps the web UI available locally.
+    ANALYSIS_IMPORT_ERROR = exc
+    DEFAULT_MODEL_NAME = "speech-analysis"
+    build_model = None
+    combine_results = None
+    estimate_f0 = None
+    f0_values_in_window = None
+    load_audio = None
+    normalize_f0_shape = None
+    save_json = None
+    tone_template = None
+
+    @dataclass
+    class SyllablePart:
+        index: int
+        char: str
+        pinyin: str
+        initial: str
+        final: str
+        tone: str
+
+    def normalize_chinese_text(text: str) -> str:
+        return "".join(re.findall(r"[\u4e00-\u9fff]", text or ""))
+
+    def text_to_syllable_parts(text: str) -> list[SyllablePart]:
+        initials = [
+            "zh",
+            "ch",
+            "sh",
+            "b",
+            "p",
+            "m",
+            "f",
+            "d",
+            "t",
+            "n",
+            "l",
+            "g",
+            "k",
+            "h",
+            "j",
+            "q",
+            "x",
+            "r",
+            "z",
+            "c",
+            "s",
+            "y",
+            "w",
+        ]
+        chars = list(normalize_chinese_text(text))
+        pinyin_items = lazy_pinyin(
+            "".join(chars),
+            style=Style.TONE3,
+            tone_sandhi=False,
+            neutral_tone_with_five=True,
+            errors="ignore",
+        )
+        parts = []
+        for index, char in enumerate(chars):
+            raw = pinyin_items[index] if index < len(pinyin_items) else ""
+            tone = raw[-1] if raw and raw[-1].isdigit() else "5"
+            body = raw[:-1] if raw and raw[-1].isdigit() else raw
+            initial = next((item for item in initials if body.startswith(item)), "")
+            final = body[len(initial) :] if body else ""
+            parts.append(SyllablePart(index, char, raw, initial, final, tone))
+        return parts
 
 
 ASR_MODEL = None
@@ -69,7 +141,7 @@ FINAL_PRACTICE_WORDS = {
 
 
 def get_model():
-    """Load FunASR once and reuse it for later recordings."""
+    """Load the speech recognizer once and reuse it for later recordings."""
     global ASR_MODEL
     if ASR_MODEL is None:
         ASR_MODEL = build_model(DEFAULT_MODEL_NAME, "cpu")
@@ -80,8 +152,8 @@ def convert_to_wav(input_path: Path, output_path: Path) -> Path:
     """Convert browser-recorded audio to wav when ffmpeg is available.
 
     Browser MediaRecorder usually sends webm audio. PyAV can often read it
-    directly, but converting to wav first makes FunASR and the pitch pipeline
-    more stable. If ffmpeg is missing, we fall back to the original file and let
+    directly, but converting to wav first makes the analysis pipeline more
+    stable. If ffmpeg is missing, we fall back to the original file and let
     the existing audio loader try to decode it.
     """
     ffmpeg = shutil.which("ffmpeg")
@@ -206,7 +278,7 @@ def drill_words(kind: str, value: str, target_char: str) -> list[str]:
 
 
 def segmental_issue(target: dict, heard: dict | None) -> dict:
-    """Create a Stage 3-lite pinyin issue from ASR-vs-target differences."""
+    """Create a user-facing pinyin issue from target-vs-heard differences."""
     target_label = pinyin_unit_label(target)
     if heard is None:
         return {
@@ -265,12 +337,7 @@ def segmental_issue(target: dict, heard: dict | None) -> dict:
 
 
 def add_pinyin_diagnosis(result: dict, target_text: str) -> dict:
-    """Stage 3-lite: compare target pinyin with ASR-heard pinyin.
-
-    This does not inspect phoneme probabilities. It only reports pinyin-level
-    differences when the ASR heard a different syllable, so the UI should call
-    them "possible" pronunciation issues.
-    """
+    """Compare target pinyin with what the system heard."""
     target_clean = normalize_chinese_text(target_text)
     heard_clean = result.get("asr", {}).get("heard_normalized") or normalize_chinese_text(
         result.get("asr", {}).get("heard_text", "")
@@ -318,7 +385,7 @@ def add_pinyin_diagnosis(result: dict, target_text: str) -> dict:
 
     result["pinyin_diagnosis"] = {
         "method": "ASR 听辨结果与目标拼音对比",
-        "limitation": "这是 Stage 3-lite：能发现明显影响识别的拼音差异，但不是逐音素 CTC/GOP 精密评分。",
+        "limitation": "",
         "target_text": target_clean,
         "heard_text": heard_clean,
         "target_pinyin": target_info["pinyin_display"],
@@ -481,8 +548,9 @@ class VoiceHandler(SimpleHTTPRequestHandler):
             self.send_json(
                 {
                     "ok": True,
-                    "model": DEFAULT_MODEL_NAME,
+                    "analysis_ready": ANALYSIS_IMPORT_ERROR is None,
                     "see_my_voice_dir": str(SEE_MY_VOICE_DIR),
+                    "analysis_error": str(ANALYSIS_IMPORT_ERROR) if ANALYSIS_IMPORT_ERROR else "",
                 }
             )
             return
@@ -506,6 +574,12 @@ class VoiceHandler(SimpleHTTPRequestHandler):
         self.send_json(result)
 
     def handle_analyze(self):
+        if ANALYSIS_IMPORT_ERROR is not None:
+            raise RuntimeError(
+                "网页已经启动，但发音分析模块暂时没有加载成功。"
+                "请确认 see-my-voice/src 文件可以被读取后再重新启动服务。"
+            )
+
         content_type = self.headers.get("Content-Type", "")
         content_length = int(self.headers.get("Content-Length", "0"))
         body = self.rfile.read(content_length)
@@ -561,8 +635,8 @@ class VoiceHandler(SimpleHTTPRequestHandler):
 def main():
     port = int(os.environ.get("PORT", "4173"))
     server = ThreadingHTTPServer(("127.0.0.1", port), VoiceHandler)
-    print(f"声见 FunASR 原型已启动：http://127.0.0.1:{port}")
-    print(f"模型项目路径：{SEE_MY_VOICE_DIR}")
+    print(f"绘声发音训练已启动：http://127.0.0.1:{port}")
+    print(f"项目路径：{SEE_MY_VOICE_DIR}")
     print("按 Control + C 停止服务。")
     server.serve_forever()
 

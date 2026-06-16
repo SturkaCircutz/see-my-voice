@@ -28,6 +28,60 @@ let standardUtterance = null;
 let lastRecordingObjectUrl = "";
 let standardAudio = null;
 
+const ARTICULATION_UNITS = new Set([
+  "a",
+  "ai",
+  "an",
+  "ang",
+  "ao",
+  "b",
+  "c",
+  "ch",
+  "d",
+  "e",
+  "ei",
+  "en",
+  "eng",
+  "er",
+  "f",
+  "g",
+  "h",
+  "i",
+  "in",
+  "ing",
+  "ie",
+  "iu",
+  "j",
+  "k",
+  "l",
+  "m",
+  "n",
+  "o",
+  "ong",
+  "ou",
+  "p",
+  "q",
+  "r",
+  "s",
+  "sh",
+  "t",
+  "u",
+  "ui",
+  "un",
+  "v",
+  "ve",
+  "vn",
+  "w",
+  "x",
+  "y",
+  "z",
+  "zh",
+]);
+
+const INITIALS = ["zh", "ch", "sh", "b", "p", "m", "f", "d", "t", "n", "l", "g", "k", "h", "j", "q", "x", "r", "z", "c", "s", "y", "w"];
+const IMAGE_EXTENSIONS = ["png", "jpeg", "jpg", "webp"];
+const SPLIT_ARTICULATION_UNITS = new Set(["b", "m", "p"]);
+
 function escapeHtml(value) {
   return String(value ?? "")
     .replaceAll("&", "&amp;")
@@ -80,8 +134,54 @@ function mouthShapeClass(syllable) {
   return "shape-neutral";
 }
 
+function normalizedFinal(syllable) {
+  const explicitFinal = (syllable.final || "").toLowerCase();
+  const pinyinBody = (syllable.pinyin || "").toLowerCase().replace(/\d/g, "");
+  const raw = explicitFinal || pinyinBody.replace(/^(zh|ch|sh|[bpmfdtnlgkhjqxrzcsyw])/, "");
+  return raw.replaceAll("ü", "v").replaceAll("u:", "v");
+}
+
+function normalizedInitial(syllable) {
+  const explicitInitial = (syllable.initial || "").toLowerCase();
+  const pinyinBody = (syllable.pinyin || "").toLowerCase().replace(/\d/g, "");
+  return explicitInitial || INITIALS.find((item) => pinyinBody.startsWith(item)) || "";
+}
+
+function resolveArticulationUnit(value) {
+  const unit = String(value || "").toLowerCase().replaceAll("ü", "v").replaceAll("u:", "v");
+  const candidates = [
+    unit,
+    unit.replace(/^y/, "i").replace(/^w/, "u"),
+    unit.slice(-3),
+    unit.slice(-2),
+    unit.slice(-1),
+  ].filter(Boolean);
+  return candidates.find((item) => ARTICULATION_UNITS.has(item)) || "";
+}
+
+function articulationUnits(syllable) {
+  const units = [];
+  const initial = resolveArticulationUnit(normalizedInitial(syllable));
+  const final = resolveArticulationUnit(normalizedFinal(syllable));
+  if (initial) units.push({ kind: "声母", unit: initial });
+  if (final && final !== initial) units.push({ kind: "韵母", unit: final });
+  return units;
+}
+
+function articulationUnit(syllable) {
+  const final = normalizedFinal(syllable);
+  return resolveArticulationUnit(final);
+}
+
+function hasArticulationReference(syllable) {
+  return articulationUnits(syllable).length > 0 || Boolean(articulationUnit(syllable));
+}
+
 function tonguePositionClass(syllable) {
-  const initial = (syllable.pinyin || "").replace(/\d/g, "").match(/^(zh|ch|sh|[bpmfdtnlgkhjqxrzcsyw])/)?.[0] || "";
+  const initial =
+    syllable.initial ||
+    (syllable.pinyin || "").replace(/\d/g, "").match(/^(zh|ch|sh|[bpmfdtnlgkhjqxrzcsyw])/)?.[0] ||
+    "";
   if (["d", "t", "n", "l", "z", "c", "s"].includes(initial)) return "tongue-front";
   if (["j", "q", "x", "y"].includes(initial)) return "tongue-palate";
   if (["g", "k", "h"].includes(initial)) return "tongue-back";
@@ -89,7 +189,56 @@ function tonguePositionClass(syllable) {
   return "tongue-low";
 }
 
+function renderArticulationPhoto(item, imageType, syllable) {
+  const label = `${item.kind} ${item.unit}`;
+  const title = imageType === "mouth" ? "嘴形" : "舌位";
+  const className = imageType === "mouth" ? "articulation-photo" : "tongue-photo";
+  const fallbackSources = IMAGE_EXTENSIONS.map((ext) => `./assets/articulation/${item.unit}/${imageType}.${ext}`);
+  const splitSources = [1, 2].map((index) => `./assets/articulation/${item.unit}/${imageType}-${index}.png`);
+  const fallbackScript = `const sources=JSON.parse(this.dataset.sources);const next=Number(this.dataset.next||0);if(next<sources.length){this.dataset.next=String(next+1);this.src=sources[next];}else{this.closest('.articulation-image-shell').hidden=true;}`;
+  const renderImage = (src, extraSources = fallbackSources) => `
+    <img
+      class="${className}"
+      src="${src}"
+      data-sources='${escapeHtml(JSON.stringify(extraSources))}'
+      data-next="0"
+      alt="${escapeHtml(syllable.character)} ${escapeHtml(label)} 的${title}参考图"
+      onerror="${fallbackScript}"
+    >
+  `;
+  const imageContent = SPLIT_ARTICULATION_UNITS.has(item.unit)
+    ? `
+        <div class="articulation-split-pair">
+          <div class="articulation-image-shell">${renderImage(splitSources[0], fallbackSources)}</div>
+          <div class="articulation-image-shell">${renderImage(splitSources[1], [])}</div>
+        </div>
+      `
+    : `
+        <div class="articulation-image-shell">${renderImage(fallbackSources[0], fallbackSources.slice(1))}</div>
+      `;
+  return `
+    <figure class="articulation-photo-card">
+      <div class="articulation-photo-frame">
+        ${imageContent}
+      </div>
+      <figcaption>
+        <strong>${escapeHtml(item.unit)}</strong>
+        <span>${escapeHtml(item.kind)} · ${title}</span>
+      </figcaption>
+    </figure>
+  `;
+}
+
 function renderGeneratedMouth(syllable) {
+  const units = articulationUnits(syllable);
+  if (units.length) {
+    return `
+      <div class="articulation-unit-grid">
+        ${units.map((item) => renderArticulationPhoto(item, "mouth", syllable)).join("")}
+      </div>
+    `;
+  }
+
   return `
     <div class="mouth-animation ${mouthShapeClass(syllable)}">
       <div class="face-outline">
@@ -109,6 +258,15 @@ function renderGeneratedMouth(syllable) {
 }
 
 function renderGeneratedTongue(syllable) {
+  const units = articulationUnits(syllable);
+  if (units.length) {
+    return `
+      <div class="tongue-unit-grid">
+        ${units.map((item) => renderArticulationPhoto(item, "tongue", syllable)).join("")}
+      </div>
+    `;
+  }
+
   return `
     <div class="tongue-diagram ${tonguePositionClass(syllable)}">
       <span class="palate-line"></span>
@@ -134,7 +292,7 @@ function renderPinyinDiagnosis() {
       <section class="panel diagnosis-card" aria-label="拼音诊断">
         <span class="model-kicker">拼音诊断</span>
         <strong>录音后显示可能不准的音</strong>
-        <p>系统会比较目标拼音和 FunASR 听到的拼音，指出可能影响别人听懂的声母、韵母或声调。</p>
+        <p>系统会根据你的录音给出发音反馈，指出可能影响别人听懂的声母、韵母或声调。</p>
       </section>
     `;
   }
@@ -169,7 +327,7 @@ function renderPinyinDiagnosis() {
                 )
                 .join("")}
             </div>`
-          : `<p class="drill-detail">${escapeHtml(diagnosis.limitation)}</p>`
+          : ""
       }
     </section>
   `;
@@ -184,7 +342,7 @@ function brandHeader({ progress = false } = {}) {
         <span>中文发音训练</span>
       </div>
       <div class="brand-row">
-        <h1 class="brand"><span class="brand-accent">声见</span> · ${progress ? "我的进步" : "See My Voice"}</h1>
+        <h1 class="brand"><span class="brand-accent">绘声</span> · ${progress ? "我的进步" : "See My Voice"}</h1>
         ${
           progress
             ? `<button class="period-button" type="button" data-action="toggle-period">${getProgressData(state).label}</button>`
@@ -206,7 +364,7 @@ function renderPractice() {
   const statusCopy = {
     idle: "等待录音",
     recording: "正在录音",
-    analyzing: "FunASR 分析中",
+    analyzing: "正在分析发音",
     complete: "分析完成",
     error: "需要重试",
   }[state.modelStatus];
@@ -226,13 +384,13 @@ function renderPractice() {
           <p class="pinyin">${state.pinyinText}</p>
         </section>
 
-        <section class="model-card level-${state.modelStatus === "error" ? "focus" : "good"}" aria-label="模型状态">
+        <section class="model-card level-${state.modelStatus === "error" ? "focus" : "good"}" aria-label="发音反馈状态">
           <div>
-            <span class="model-kicker">FunASR Paraformer</span>
+            <span class="model-kicker">发音反馈</span>
             <strong>${statusCopy}</strong>
             <span>系统听到：${state.asrHeard}</span>
           </div>
-          <span class="status-pill">${state.modelStatus === "complete" ? "已连接" : "本地模型"}</span>
+          <span class="status-pill">${state.modelStatus === "complete" ? "已完成" : "准备中"}</span>
         </section>
         <p class="model-summary ${state.recordingError ? "is-error" : ""}">${state.recordingError || state.modelSummary}</p>
 
@@ -316,6 +474,7 @@ function detailHeader(syllable) {
 function renderDetail() {
   const activeSyllables = getSyllables(state);
   const syllable = activeSyllables[state.selectedSyllable] ?? Object.values(activeSyllables)[0];
+  const hasReference = hasArticulationReference(syllable);
   return `
     <section class="screen" data-screen="detail">
       ${detailHeader(syllable)}
@@ -324,7 +483,7 @@ function renderDetail() {
           <p class="section-label" id="mouth-title">嘴型与舌位对照</p>
           <div class="panel mouth-grid">
             <div class="mouth-panel">
-              <p class="panel-title">自动嘴型示意</p>
+              <p class="panel-title">${hasReference ? "参考嘴型图" : "自动嘴型示意"}</p>
               <div class="mouth-reference">
                 ${renderGeneratedMouth(syllable)}
               </div>
@@ -339,12 +498,12 @@ function renderDetail() {
           </div>
           <div class="panel tongue-reference">
             <div>
-              <p class="panel-title">舌位参考照片</p>
+              <p class="panel-title">${hasReference ? "参考舌位图" : "自动舌位示意"}</p>
               <p class="mouth-cue-line">${escapeHtml(syllable.tongueCue)}</p>
             </div>
             ${renderGeneratedTongue(syllable)}
           </div>
-          <p class="model-summary">嘴型和舌位由目标拼音自动生成，用来提示方向；摄像头适合观察嘴唇和下巴，舌头位置仍以示意和文字提示为主。</p>
+          <p class="model-summary">系统会把一个拼音拆成声母和韵母分别展示。请先看声母的嘴形和舌位，再看韵母的嘴形和舌位；摄像头适合观察嘴唇和下巴，舌头位置以参考图和文字提示为主。</p>
         </section>
 
         <section class="panel chart-card" aria-labelledby="tone-title">
