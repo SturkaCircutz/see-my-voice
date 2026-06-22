@@ -3,6 +3,12 @@ __pycache__/
 *.py[cod]
 .matplotlib_cache/
 .venv/
+node_modules/
+*.tsbuildinfo
+frontend/dist/
+backend/dist/
+backend/.env
+frontend/.env
 
 # Generated Stage 1 / Stage 1.5 / Stage 2A outputs
 stage1_feedback.json
