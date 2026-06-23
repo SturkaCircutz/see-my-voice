@@ -462,6 +462,55 @@ button:focus-visible {
   line-height: 1.6;
 }
 
+.assessment-entry-card {
+  display: grid;
+  gap: 11px;
+  border-color: rgba(239, 190, 98, 0.42);
+  background: #fffaf0;
+}
+
+.assessment-entry-heading {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: start;
+}
+
+.assessment-entry-heading h2 {
+  margin: 0 0 5px;
+  font-size: 16px;
+}
+
+.assessment-entry-heading p,
+.assessment-profile-mini p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.assessment-profile-mini {
+  display: grid;
+  gap: 4px;
+  padding: 10px 11px;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.assessment-profile-mini strong {
+  color: var(--amber);
+  font-size: 12px;
+}
+
+.assessment-entry-button {
+  width: 100%;
+  border-radius: 13px;
+  color: #fff;
+  background: var(--amber);
+  font-size: 13px;
+  font-weight: 800;
+}
+
 .today-task-card {
   display: grid;
   gap: 11px;
@@ -1406,6 +1455,7 @@ canvas {
 .teacher-next-card,
 .teacher-review-card,
 .teacher-message-card,
+.teacher-assessment-card,
 .teacher-report-card,
 .teacher-weekly-report-card {
   display: grid;
@@ -1422,6 +1472,7 @@ canvas {
 .teacher-next-card p,
 .teacher-review-card p,
 .teacher-message-card p,
+.teacher-assessment-card p,
 .teacher-report-card p {
   margin: 0;
   color: var(--muted);

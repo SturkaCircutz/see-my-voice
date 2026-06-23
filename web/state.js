@@ -266,6 +266,7 @@ export function createInitialState() {
     publishedTasks: [],
     taskSubmissions: [],
     taskMessages: [],
+    assessmentProfiles: [],
     ...emptyScores,
   };
 }
@@ -722,9 +723,11 @@ export function getSelectedTeacherStudent(state) {
 export function getTeacherDashboardSummary(state) {
   const students = getTeacherStudents(state);
   const pendingReviewCount = getPendingTeacherSubmissions(state).length;
+  const pendingAssessmentCount = getPendingAssessmentProfiles(state).length;
   return {
     studentCount: students.length,
     pendingSubmissions: students.reduce((total, student) => total + Number(student.pendingSubmissions || 0), 0) + pendingReviewCount,
+    pendingAssessments: pendingAssessmentCount,
     overdueTasks: students.reduce((total, student) => total + Number(student.overdueTasks || 0), 0),
     needsAttention: students.filter((student) => student.trend === "需关注" || Number(student.overdueTasks || 0) > 0).length,
   };
@@ -762,12 +765,77 @@ export function buildRecommendedTaskPackage(student) {
   };
 }
 
+export function buildAssessmentProfile(student, existingCount = 0) {
+  if (!student) return null;
+  const focusTags = student.focusTags || [];
+  const categories = focusTags.map((tag) => {
+    if (/声|上扬|读平/.test(tag)) return "声调";
+    if (/韵母|收尾|an|ang|鼻音/.test(tag)) return "韵母";
+    if (/语速|停顿|节奏/.test(tag)) return "节奏";
+    return "声母";
+  });
+  const uniqueCategories = [...new Set(categories)];
+  return {
+    id: `assessment-${student.id}-${existingCount + 1}`,
+    studentId: student.id,
+    studentName: student.name,
+    completedAt: todayKey(),
+    status: "待教师确认",
+    overallScore: student.latestScore,
+    profileSummary: `${student.name} 的入门测评显示：${student.assessmentSummary}`,
+    issueTags: focusTags,
+    issueCategories: uniqueCategories,
+    recommendation: uniqueCategories.length
+      ? `建议先从${uniqueCategories.slice(0, 2).join("、")}开始，采用短时高频练习。`
+      : "建议先保持每日短时跟读，观察稳定性变化。",
+  };
+}
+
+export function buildInitialTaskFromAssessment(profile) {
+  if (!profile) return null;
+  return {
+    id: `initial-task-${profile.id}`,
+    status: "已发布",
+    title: `${profile.studentName} · 入门测评训练包`,
+    targetStudentId: profile.studentId,
+    focusTag: profile.issueTags[0] || "入门测评巩固",
+    goal: profile.recommendation,
+    suggestedDue: "本周内完成",
+    requiredSubmissions: 1,
+    repeatCount: profile.overallScore < 70 ? 5 : 3,
+    items: [
+      "听辨标准音 2 次",
+      "重点音慢速跟读 5 次",
+      "生活短句录音提交 1 次",
+    ],
+    reviewTags: profile.issueTags.slice(0, 3),
+    teacherNote: "该任务由入门测评画像生成，已等待教师确认后发布。",
+    sourceAssessmentId: profile.id,
+  };
+}
+
 export function getPublishedTasks(state) {
   return state.publishedTasks || [];
 }
 
 export function getTodayStudentTask(state) {
   return getPublishedTasks(state).find((task) => task.status === "已发布") || null;
+}
+
+export function getAssessmentProfiles(state) {
+  return state.assessmentProfiles || [];
+}
+
+export function getPendingAssessmentProfiles(state) {
+  return getAssessmentProfiles(state).filter((profile) => profile.status === "待教师确认");
+}
+
+export function getSelectedAssessmentProfile(state) {
+  const student = getSelectedTeacherStudent(state);
+  if (!student) return null;
+  return getAssessmentProfiles(state)
+    .filter((profile) => profile.studentId === student.id)
+    .at(-1) || null;
 }
 
 export function getTaskSubmissions(state) {
@@ -984,6 +1052,33 @@ export function reduceState(state, action) {
         publishedTasks: [
           ...(state.publishedTasks || []).filter((task) => task.targetStudentId !== publishedTask.targetStudentId),
           publishedTask,
+        ],
+      };
+    }
+    case "COMPLETE_ENTRY_ASSESSMENT": {
+      const student = getSelectedTeacherStudent(state) || getTeacherStudents(state)[0];
+      const profile = buildAssessmentProfile(student, (state.assessmentProfiles || []).length);
+      if (!profile) return state;
+      return {
+        ...state,
+        currentView: "practice",
+        assessmentProfiles: [...(state.assessmentProfiles || []), profile].slice(-40),
+      };
+    }
+    case "PUBLISH_ASSESSMENT_TASK": {
+      const profile = getSelectedAssessmentProfile(state);
+      const task = buildInitialTaskFromAssessment(profile);
+      if (!profile || !task) return state;
+      return {
+        ...state,
+        assessmentProfiles: (state.assessmentProfiles || []).map((item) => (
+          item.id === profile.id
+            ? { ...item, status: "教师已确认", confirmedAt: todayKey() }
+            : item
+        )),
+        publishedTasks: [
+          ...(state.publishedTasks || []).filter((item) => item.targetStudentId !== task.targetStudentId),
+          task,
         ],
       };
     }

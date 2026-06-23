@@ -6,6 +6,8 @@ import {
   getProgressData,
   getPendingTeacherSubmissions,
   getLatestStudentFeedback,
+  getPendingAssessmentProfiles,
+  getSelectedAssessmentProfile,
   getSelectedTeacherStudent,
   getSelectedTeacherMessages,
   getStudentTaskMessages,
@@ -170,6 +172,7 @@ function loadStoredState() {
       publishedTasks: Array.isArray(stored.publishedTasks) ? stored.publishedTasks : state.publishedTasks,
       taskSubmissions: Array.isArray(stored.taskSubmissions) ? stored.taskSubmissions : state.taskSubmissions,
       taskMessages: Array.isArray(stored.taskMessages) ? stored.taskMessages : state.taskMessages,
+      assessmentProfiles: Array.isArray(stored.assessmentProfiles) ? stored.assessmentProfiles : state.assessmentProfiles,
       selectedToneDrill: stored.selectedToneDrill || state.selectedToneDrill,
     };
   } catch {
@@ -186,6 +189,7 @@ function saveStoredState() {
         publishedTasks: state.publishedTasks || [],
         taskSubmissions: state.taskSubmissions || [],
         taskMessages: state.taskMessages || [],
+        assessmentProfiles: state.assessmentProfiles || [],
         selectedToneDrill: state.selectedToneDrill,
       }),
     );
@@ -546,6 +550,34 @@ function renderTodayTaskCard() {
   `;
 }
 
+function renderAssessmentEntryCard() {
+  const pendingProfiles = getPendingAssessmentProfiles(state);
+  const latestProfile = (state.assessmentProfiles || []).at(-1);
+  return `
+    <section class="panel assessment-entry-card" aria-labelledby="assessment-entry-title">
+      <div class="assessment-entry-heading">
+        <div>
+          <span class="model-kicker">入门测评</span>
+          <h2 id="assessment-entry-title">生成初始发音画像</h2>
+          <p>完成一组声母、韵母、声调和短句测评后，老师会在教师端确认初始训练方案。</p>
+        </div>
+        <span class="status-pill">${pendingProfiles.length ? "待老师确认" : "可开始"}</span>
+      </div>
+      ${
+        latestProfile
+          ? `<div class="assessment-profile-mini">
+              <strong>${escapeHtml(latestProfile.status)}</strong>
+              <p>${escapeHtml(latestProfile.profileSummary)}</p>
+            </div>`
+          : ""
+      }
+      <button class="assessment-entry-button" type="button" data-action="complete-entry-assessment">
+        完成入门测评
+      </button>
+    </section>
+  `;
+}
+
 function renderPractice() {
   const activeSyllables = getSyllables(state);
   const recordCopy = {
@@ -566,6 +598,7 @@ function renderPractice() {
     <section class="screen" data-screen="practice">
       ${brandHeader()}
       <div class="content">
+        ${renderAssessmentEntryCard()}
         ${renderTodayTaskCard()}
         ${
           state.practiceBackView === "toneDrill"
@@ -843,6 +876,7 @@ function renderTeacherDashboard() {
   const students = getTeacherStudents(state);
   const pendingSubmissions = getPendingTeacherSubmissions(state);
   const selectedStudent = getSelectedTeacherStudent(state);
+  const assessmentProfile = getSelectedAssessmentProfile(state);
   const selectedMessages = getSelectedTeacherMessages(state);
   const recommendedTask = buildRecommendedTaskPackage(selectedStudent);
   const assessmentReport = buildStudentAssessmentReport(state, selectedStudent);
@@ -882,6 +916,10 @@ function renderTeacherDashboard() {
             <div class="teacher-metric-card ${summary.needsAttention ? "is-alert" : ""}">
               <strong>${summary.needsAttention}</strong>
               <span>需要关注</span>
+            </div>
+            <div class="teacher-metric-card ${summary.pendingAssessments ? "is-warm" : ""}">
+              <strong>${summary.pendingAssessments}</strong>
+              <span>待确认测评</span>
             </div>
           </div>
         </section>
@@ -975,6 +1013,28 @@ function renderTeacherDashboard() {
                   ${selectedStudent.focusTags.map((tag) => `<span>${escapeHtml(tag)}</span>`).join("")}
                 </div>
               </section>
+
+              ${
+                assessmentProfile
+                  ? `<section class="panel teacher-assessment-card" aria-labelledby="teacher-assessment-title">
+                      <div class="teacher-review-heading">
+                        <div>
+                          <span class="model-kicker">入门测评画像</span>
+                          <strong id="teacher-assessment-title">${escapeHtml(assessmentProfile.studentName)} · ${escapeHtml(assessmentProfile.status)}</strong>
+                        </div>
+                        <span class="teacher-review-score">${assessmentProfile.overallScore} 分</span>
+                      </div>
+                      <p>${escapeHtml(assessmentProfile.profileSummary)}</p>
+                      <div class="teacher-tag-list">
+                        ${assessmentProfile.issueTags.map((tag) => `<span>${escapeHtml(tag)}</span>`).join("")}
+                      </div>
+                      <p>${escapeHtml(assessmentProfile.recommendation)}</p>
+                      <button class="teacher-primary-button" type="button" data-action="publish-assessment-task" ${assessmentProfile.status === "教师已确认" ? "disabled" : ""}>
+                        ${assessmentProfile.status === "教师已确认" ? "已发布初始任务" : "确认并发布初始任务"}
+                      </button>
+                    </section>`
+                  : ""
+              }
 
               <section class="panel teacher-report-card" aria-labelledby="teacher-report-title">
                 <span class="model-kicker">测评报告</span>
@@ -1949,6 +2009,20 @@ function handleAction(target) {
 
   if (action === "teacher-task-placeholder") {
     showToast("任务包已生成；发布保存会在下一阶段接入。");
+    return true;
+  }
+
+  if (action === "complete-entry-assessment") {
+    state = reduceState(state, { type: "COMPLETE_ENTRY_ASSESSMENT" });
+    render();
+    showToast("入门测评画像已生成，等待老师确认训练方案。");
+    return true;
+  }
+
+  if (action === "publish-assessment-task") {
+    state = reduceState(state, { type: "PUBLISH_ASSESSMENT_TASK" });
+    render();
+    showToast("初始训练任务已发布到学生端。");
     return true;
   }
 

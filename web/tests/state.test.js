@@ -8,8 +8,10 @@ import {
   buildRehabWeeklyReport,
   buildStudentAssessmentReport,
   buildTeachingPlan,
+  getPendingAssessmentProfiles,
   getLatestStudentFeedback,
   getPendingTeacherSubmissions,
+  getSelectedAssessmentProfile,
   getSelectedTeacherStudent,
   getSelectedTeacherMessages,
   getStreak,
@@ -193,6 +195,25 @@ test("teacher can publish a recommended task to the student today task", () => {
   todayTask = getTodayStudentTask(state);
   assert.equal(state.publishedTasks.length, 2);
   assert.ok(state.publishedTasks.some((task) => task.targetStudentId === "student-chen"));
+  assert.equal(todayTask.status, "已发布");
+});
+
+test("student entry assessment creates a teacher-confirmed initial task", () => {
+  let state = createInitialState();
+  state = reduceState(state, { type: "COMPLETE_ENTRY_ASSESSMENT" });
+
+  assert.equal(getPendingAssessmentProfiles(state).length, 1);
+  assert.equal(getTeacherDashboardSummary(state).pendingAssessments, 1);
+  assert.equal(getSelectedAssessmentProfile(state).studentName, "林一一");
+  assert.match(getSelectedAssessmentProfile(state).profileSummary, /入门测评/);
+
+  state = reduceState(state, { type: "PUBLISH_ASSESSMENT_TASK" });
+  const profile = getSelectedAssessmentProfile(state);
+  const todayTask = getTodayStudentTask(state);
+  assert.equal(profile.status, "教师已确认");
+  assert.equal(getPendingAssessmentProfiles(state).length, 0);
+  assert.equal(todayTask.sourceAssessmentId, profile.id);
+  assert.match(todayTask.title, /入门测评训练包/);
   assert.equal(todayTask.status, "已发布");
 });
 
