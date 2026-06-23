@@ -32,6 +32,7 @@ const STORAGE_KEY = "see-my-voice-practice-state";
 let state = createInitialState();
 let recordingTimer = null;
 let playbackTimer = null;
+let clipPlaybackToken = 0;
 let toastTimer = null;
 let textInfoTimer = null;
 let mediaRecorder = null;
@@ -1514,8 +1515,7 @@ function render() {
     if (state.currentView === "teachingClip" || (state.currentView === "detail" && state.teachingPlan)) {
       drawClipToneChart();
       if (state.clipPlaying) {
-        const playResult = document.querySelector(".clip-video")?.play?.();
-        playResult?.catch?.(() => {});
+        playActiveClipVideos();
       }
     }
   });
@@ -1623,6 +1623,74 @@ function drawClipToneChart() {
   ]);
 }
 
+function getActiveClipPanel() {
+  if (state.currentView === "detail") {
+    return document.querySelector(".detail-teaching-video");
+  }
+  if (state.currentView === "teachingClip") {
+    return document.querySelector('[data-screen="teaching-clip"] .clip-player');
+  }
+  return null;
+}
+
+function getActiveClipVideos() {
+  return Array.from(getActiveClipPanel()?.querySelectorAll(".clip-video") || []);
+}
+
+function pauseAllClipVideos() {
+  clipPlaybackToken += 1;
+  document.querySelectorAll(".clip-video").forEach((video) => {
+    video.pause?.();
+  });
+}
+
+async function playActiveClipVideos() {
+  const videos = getActiveClipVideos();
+  if (!videos.length) {
+    scheduleClipAdvance();
+    return;
+  }
+
+  window.clearTimeout(playbackTimer);
+  const token = (clipPlaybackToken += 1);
+  document.querySelectorAll(".clip-video").forEach((video) => {
+    if (!videos.includes(video)) video.pause?.();
+  });
+
+  for (const video of videos) {
+    if (token !== clipPlaybackToken || !state.clipPlaying) return;
+    video.currentTime = 0;
+    try {
+      await video.play?.();
+    } catch {
+      return;
+    }
+
+    const ended = await new Promise((resolve) => {
+      const cleanup = () => {
+        video.removeEventListener("ended", handleEnded);
+        video.removeEventListener("pause", handlePause);
+      };
+      const handleEnded = () => {
+        cleanup();
+        resolve(true);
+      };
+      const handlePause = () => {
+        cleanup();
+        resolve(false);
+      };
+      video.addEventListener("ended", handleEnded, { once: true });
+      video.addEventListener("pause", handlePause, { once: true });
+    });
+
+    if (!ended || token !== clipPlaybackToken || !state.clipPlaying) return;
+  }
+
+  if (token === clipPlaybackToken && state.clipPlaying) {
+    state = reduceState(state, { type: "SET_CLIP_PLAYING", playing: false });
+    render();
+  }
+}
 function drawProgressChart() {
   const progress = getProgressData(state);
   const min = 50;
@@ -2065,6 +2133,7 @@ function handleAction(target) {
   }
 
   if (action === "clip-prev") {
+    pauseAllClipVideos();
     clearTimers();
     state = reduceState(state, { type: "PREVIOUS_CLIP_SEGMENT" });
     render();
@@ -2072,6 +2141,7 @@ function handleAction(target) {
   }
 
   if (action === "clip-next") {
+    pauseAllClipVideos();
     clearTimers();
     state = reduceState(state, { type: "NEXT_CLIP_SEGMENT" });
     state = reduceState(state, { type: "SET_CLIP_PLAYING", playing: false });
@@ -2082,14 +2152,13 @@ function handleAction(target) {
   if (action === "clip-play") {
     state = reduceState(state, { type: "SET_CLIP_PLAYING", playing: true });
     render();
-    scheduleClipAdvance();
     return true;
   }
 
   if (action === "clip-pause") {
+    pauseAllClipVideos();
     clearTimers();
     state = reduceState(state, { type: "SET_CLIP_PLAYING", playing: false });
-    document.querySelector(".clip-video")?.pause?.();
     render();
     return true;
   }
