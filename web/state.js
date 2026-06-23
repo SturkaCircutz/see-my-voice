@@ -785,6 +785,65 @@ export function getLatestStudentFeedback(state) {
   return getReviewedTaskSubmissions(state).at(-1) || null;
 }
 
+export function buildStudentAssessmentReport(state, student = getSelectedTeacherStudent(state)) {
+  if (!student) return null;
+  const submissions = getTaskSubmissions(state).filter((submission) => submission.studentId === student.id);
+  const reviewed = submissions.filter((submission) => submission.status === "教师已复评");
+  const latestSubmission = submissions.at(-1) || null;
+  const averageAiScore = submissions.length
+    ? Math.round(submissions.reduce((total, item) => total + Number(item.aiScores?.overall || 0), 0) / submissions.length)
+    : student.latestScore;
+  const teacherAverage = reviewed.length
+    ? Math.round(reviewed.reduce((total, item) => total + Number(item.teacherScore || 0), 0) / reviewed.length)
+    : null;
+  const focusAreas = [...new Set([
+    ...(student.focusTags || []).slice(0, 3),
+    latestSubmission?.diagnosisSummary,
+  ].filter(Boolean))];
+  const strengths = [
+    student.weeklyPracticeCount >= 5 ? "本周练习频率稳定" : "已开始建立固定练习节奏",
+    student.trend === "进步" ? "清晰度较上阶段有进步" : "能完成老师布置的核心练习",
+    reviewed.length ? "已收到教师复评并能继续按建议练习" : "AI 初评结果已进入教师复评流程",
+  ];
+  const nextSteps = focusAreas.length
+    ? focusAreas.slice(0, 3).map((tag) => `围绕“${tag}”安排短时高频练习`)
+    : ["保持每日 5 分钟慢速跟读与录音复盘"];
+  return {
+    studentId: student.id,
+    studentName: student.name,
+    stage: student.stage,
+    latestScore: student.latestScore,
+    averageAiScore,
+    teacherAverage,
+    weeklyPracticeCount: student.weeklyPracticeCount,
+    completedSubmissions: submissions.length,
+    reviewedSubmissions: reviewed.length,
+    pendingSubmissions: submissions.filter((submission) => submission.status === "待教师复评").length,
+    focusAreas,
+    strengths,
+    nextSteps,
+    conclusion: student.assessmentSummary,
+  };
+}
+
+export function buildRehabWeeklyReport(state, student = getSelectedTeacherStudent(state)) {
+  const report = buildStudentAssessmentReport(state, student);
+  if (!report) return "";
+  const scoreText = report.teacherAverage
+    ? `教师复评分均值 ${report.teacherAverage} 分，AI 初评分均值 ${report.averageAiScore} 分`
+    : `当前参考分 ${report.averageAiScore} 分，等待更多教师复评形成稳定均值`;
+  return [
+    `【绘声康复周报】${report.studentName}`,
+    `训练阶段：${report.stage}`,
+    `本周练习：${report.weeklyPracticeCount} 次，录音提交 ${report.completedSubmissions} 次，教师已复评 ${report.reviewedSubmissions} 次`,
+    `评分概览：${scoreText}`,
+    `主要进步：${report.strengths.join("；")}`,
+    `仍需关注：${report.focusAreas.join("；") || "保持当前发音稳定性"}`,
+    `下周建议：${report.nextSteps.join("；")}`,
+    `教师结论：${report.conclusion}`,
+  ].join("\n");
+}
+
 export function getCalendarDays(state, count = 14) {
   const practiced = new Set((state.practiceHistory || []).map((item) => item.date));
   const today = new Date();

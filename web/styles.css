@@ -1377,23 +1377,98 @@ canvas {
 
 .teacher-profile-card,
 .teacher-next-card,
-.teacher-review-card {
+.teacher-review-card,
+.teacher-report-card,
+.teacher-weekly-report-card {
   display: grid;
   gap: 10px;
 }
 
-.teacher-profile-card h2 {
+.teacher-profile-card h2,
+.teacher-report-card h2 {
   margin: 0;
   font-size: 19px;
 }
 
 .teacher-profile-card p,
 .teacher-next-card p,
-.teacher-review-card p {
+.teacher-review-card p,
+.teacher-report-card p {
   margin: 0;
   color: var(--muted);
   font-size: 12px;
   line-height: 1.6;
+}
+
+.teacher-report-score-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.teacher-report-score-grid span {
+  display: grid;
+  gap: 4px;
+  padding: 10px 8px;
+  border-radius: 11px;
+  color: var(--muted);
+  background: #f8f5ef;
+  font-size: 10px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.teacher-report-score-grid strong {
+  color: var(--green);
+  font-size: 22px;
+  line-height: 1;
+}
+
+.teacher-report-columns {
+  display: grid;
+  gap: 10px;
+}
+
+.teacher-report-columns ul {
+  display: grid;
+  gap: 5px;
+  margin: 6px 0 0;
+  padding-left: 18px;
+  color: var(--ink);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.teacher-report-label {
+  color: var(--green);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.teacher-weekly-report-card pre {
+  max-height: 210px;
+  margin: 0;
+  padding: 11px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  color: var(--ink);
+  background: #f8f5ef;
+  font-family: inherit;
+  font-size: 11px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.teacher-copy-button {
+  align-self: start;
+  padding: 7px 10px;
+  border: 1px solid rgba(32, 154, 120, 0.24);
+  border-radius: 11px;
+  color: var(--green);
+  background: var(--green-soft);
+  font-size: 11px;
+  font-weight: 900;
 }
 
 .teacher-profile-list {

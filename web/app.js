@@ -10,7 +10,9 @@ import {
   getTeacherDashboardSummary,
   getTeacherStudents,
   getTodayStudentTask,
+  buildRehabWeeklyReport,
   buildRecommendedTaskPackage,
+  buildStudentAssessmentReport,
   reduceState,
   toneDrills,
   tips,
@@ -820,6 +822,8 @@ function renderTeacherDashboard() {
   const pendingSubmissions = getPendingTeacherSubmissions(state);
   const selectedStudent = getSelectedTeacherStudent(state);
   const recommendedTask = buildRecommendedTaskPackage(selectedStudent);
+  const assessmentReport = buildStudentAssessmentReport(state, selectedStudent);
+  const weeklyReport = buildRehabWeeklyReport(state, selectedStudent);
   const publishedTask = (state.publishedTasks || []).find((task) => task.targetStudentId === selectedStudent?.id);
   return `
     <section class="screen teacher-screen" data-screen="teacher">
@@ -949,6 +953,31 @@ function renderTeacherDashboard() {
                 </div>
               </section>
 
+              <section class="panel teacher-report-card" aria-labelledby="teacher-report-title">
+                <span class="model-kicker">测评报告</span>
+                <h2 id="teacher-report-title">${escapeHtml(assessmentReport.studentName)} · 阶段画像</h2>
+                <div class="teacher-report-score-grid">
+                  <span><strong>${assessmentReport.latestScore}</strong>最近测评</span>
+                  <span><strong>${assessmentReport.averageAiScore}</strong>AI 均分</span>
+                  <span><strong>${assessmentReport.teacherAverage || "--"}</strong>教师均分</span>
+                </div>
+                <p>${escapeHtml(assessmentReport.conclusion)}</p>
+                <div class="teacher-report-columns">
+                  <div>
+                    <span class="teacher-report-label">主要进步</span>
+                    <ul>
+                      ${assessmentReport.strengths.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
+                    </ul>
+                  </div>
+                  <div>
+                    <span class="teacher-report-label">下周建议</span>
+                    <ul>
+                      ${assessmentReport.nextSteps.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
+                    </ul>
+                  </div>
+                </div>
+              </section>
+
               <section class="panel teacher-next-card" aria-label="AI 辅助建议">
                 <span class="model-kicker">AI 辅助建议</span>
                 <strong>${escapeHtml(recommendedTask.title)}</strong>
@@ -968,6 +997,17 @@ function renderTeacherDashboard() {
                 <button class="teacher-primary-button" type="button" data-action="publish-recommended-task">
                   ${publishedTask ? "已发布到学生端" : "审核并发布"}
                 </button>
+              </section>
+
+              <section class="panel teacher-weekly-report-card" aria-labelledby="teacher-weekly-report-title">
+                <div class="teacher-review-heading">
+                  <div>
+                    <span class="model-kicker">康复周报</span>
+                    <strong id="teacher-weekly-report-title">给家长/学校的草稿</strong>
+                  </div>
+                  <button class="teacher-copy-button" type="button" data-copy-report="${escapeHtml(weeklyReport)}">复制</button>
+                </div>
+                <pre>${escapeHtml(weeklyReport)}</pre>
               </section>
             `
             : ""
@@ -1927,6 +1967,14 @@ function handleClick(event) {
     render();
     app.scrollTop = 0;
     showToast("教师复评已保存，学生端可以看到老师反馈。");
+    return;
+  }
+
+  const copyReportButton = target.closest("[data-copy-report]");
+  if (copyReportButton) {
+    navigator.clipboard?.writeText(copyReportButton.dataset.copyReport || "")
+      .then(() => showToast("康复周报草稿已复制。"))
+      .catch(() => showToast("当前浏览器不支持自动复制，可以直接选中周报文本。"));
     return;
   }
 

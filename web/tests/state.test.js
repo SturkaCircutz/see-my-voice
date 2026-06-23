@@ -5,6 +5,8 @@ import path from "node:path";
 import {
   createInitialState,
   buildRecommendedTaskPackage,
+  buildRehabWeeklyReport,
+  buildStudentAssessmentReport,
   buildTeachingPlan,
   getLatestStudentFeedback,
   getPendingTeacherSubmissions,
@@ -284,6 +286,52 @@ test("teacher review completes a submission and exposes student feedback", () =>
   assert.equal(getLatestStudentFeedback(state).teacherScore, 74);
   assert.match(getLatestStudentFeedback(state).teacherFeedback, /下一次/);
   assert.equal(getLatestStudentFeedback(state).status, "教师已复评");
+});
+
+test("teacher assessment report summarizes profile and reviewed submissions", () => {
+  const result = {
+    target_text: "我要吃饭",
+    pinyin_display: ["wo3", "yao4", "chi1", "fan4"],
+    communication_result: {
+      readiness_score: 67,
+      main_feedback: "f 的起音比上次清楚。",
+    },
+    asr: { heard_text: "我要吃饭", text_similarity: 82 },
+    pinyin_diagnosis: { summary: "继续关注 an 收尾。", issues: [] },
+    tone_timing: {
+      overall_score: 71,
+      boundary_confidence: "medium",
+      syllables: [
+        { index: 0, char: "我", pinyin: "wo3", pinyin_display: "wo3", initial: "", final: "uo", tone: "3", tone_score: 75 },
+      ],
+    },
+  };
+  let state = createInitialState();
+  let report = buildStudentAssessmentReport(state);
+  assert.equal(report.studentName, "林一一");
+  assert.equal(report.averageAiScore, 72);
+  assert.equal(report.teacherAverage, null);
+  assert.ok(report.focusAreas.includes("f 起音不稳定"));
+
+  state = reduceState(state, { type: "PUBLISH_RECOMMENDED_TASK" });
+  state = reduceState(state, { type: "APPLY_ANALYSIS", result, recordingUrl: "blob:student-recording" });
+  state = reduceState(state, {
+    type: "REVIEW_TASK_SUBMISSION",
+    submissionId: getPendingTeacherSubmissions(state)[0].id,
+    teacherScore: 74,
+    feedback: "这次更清楚了。",
+  });
+  report = buildStudentAssessmentReport(state);
+  assert.equal(report.completedSubmissions, 1);
+  assert.equal(report.reviewedSubmissions, 1);
+  assert.equal(report.teacherAverage, 74);
+  assert.equal(report.averageAiScore, 67);
+  assert.ok(report.nextSteps.some((item) => item.includes("f 起音不稳定")));
+
+  const weeklyReport = buildRehabWeeklyReport(state);
+  assert.match(weeklyReport, /绘声康复周报/);
+  assert.match(weeklyReport, /教师复评分均值 74 分/);
+  assert.match(weeklyReport, /继续关注 an 收尾/);
 });
 
 test("teaching issue selection prefers segmental issues over tone-only issues", () => {
