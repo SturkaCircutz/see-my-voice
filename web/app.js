@@ -4,6 +4,9 @@ import {
   getStreak,
   getSyllables,
   getProgressData,
+  getSelectedTeacherStudent,
+  getTeacherDashboardSummary,
+  getTeacherStudents,
   reduceState,
   toneDrills,
   tips,
@@ -27,6 +30,7 @@ let cameraStream = null;
 let standardUtterance = null;
 let lastRecordingObjectUrl = "";
 let standardAudio = null;
+let pronunciationClipManifest = { clips: { initial: {}, final: {} } };
 
 const ARTICULATION_UNITS = new Set([
   "a",
@@ -47,9 +51,72 @@ const ARTICULATION_UNITS = new Set([
   "g",
   "h",
   "i",
+  "ia",
+  "ian",
+  "iang",
+  "iao",
   "in",
   "ing",
+  "iong",
   "ie",
+  "iu",
+  "j",
+  "k",
+  "l",
+  "m",
+  "n",
+  "o",
+  "ong",
+  "ou",
+  "p",
+  "q",
+  "r",
+  "s",
+  "sh",
+  "t",
+  "u",
+  "ua",
+  "uai",
+  "uan",
+  "uang",
+  "uo",
+  "ueng",
+  "ui",
+  "un",
+  "v",
+  "van",
+  "ve",
+  "vn",
+  "x",
+  "z",
+  "zh",
+]);
+
+const INITIALS = ["zh", "ch", "sh", "b", "p", "m", "f", "d", "t", "n", "l", "g", "k", "h", "j", "q", "x", "r", "z", "c", "s"];
+const IMAGE_EXTENSIONS = ["png", "jpeg", "jpg", "webp"];
+const SPLIT_ARTICULATION_UNITS = new Set(["b", "m", "p"]);
+const ARTICULATION_IMAGE_UNITS = new Set([
+  "a",
+  "ai",
+  "an",
+  "ang",
+  "ao",
+  "b",
+  "c",
+  "ch",
+  "d",
+  "e",
+  "ei",
+  "en",
+  "eng",
+  "er",
+  "f",
+  "g",
+  "h",
+  "i",
+  "ie",
+  "in",
+  "ing",
   "iu",
   "j",
   "k",
@@ -71,16 +138,10 @@ const ARTICULATION_UNITS = new Set([
   "v",
   "ve",
   "vn",
-  "w",
   "x",
-  "y",
   "z",
   "zh",
 ]);
-
-const INITIALS = ["zh", "ch", "sh", "b", "p", "m", "f", "d", "t", "n", "l", "g", "k", "h", "j", "q", "x", "r", "z", "c", "s", "y", "w"];
-const IMAGE_EXTENSIONS = ["png", "jpeg", "jpg", "webp"];
-const SPLIT_ARTICULATION_UNITS = new Set(["b", "m", "p"]);
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -120,10 +181,27 @@ function saveStoredState() {
 }
 
 function standardPronunciationText() {
+  if (state.currentView === "teachingClip" || (state.currentView === "detail" && state.teachingPlan)) {
+    const segment = state.teachingPlan?.segments?.[state.selectedClipSegmentIndex];
+    return segment?.practiceWords?.[0]
+      || state.teachingPlan?.targetSyllable?.character
+      || state.teachingPlan?.targetText
+      || state.targetText.trim();
+  }
   const activeSyllables = getSyllables(state);
   const syllable = activeSyllables[state.selectedSyllable];
   if (state.currentView === "detail" && syllable?.character) return syllable.character;
   return state.targetText.trim();
+}
+
+async function loadPronunciationClipManifest() {
+  try {
+    const response = await fetch("./assets/pronunciation-clips/manifest.json", { cache: "no-store" });
+    if (!response.ok) return;
+    pronunciationClipManifest = await response.json();
+  } catch {
+    pronunciationClipManifest = { clips: { initial: {}, final: {} } };
+  }
 }
 
 function mouthShapeClass(syllable) {
@@ -134,24 +212,60 @@ function mouthShapeClass(syllable) {
   return "shape-neutral";
 }
 
+function normalizePinyinUnit(value) {
+  return String(value || "").toLowerCase().replaceAll("ü", "v").replaceAll("u:", "v");
+}
+
+function pinyinBodyFor(syllable) {
+  return normalizePinyinUnit(syllable.pinyin || syllable.pinyinDisplay || "").replace(/\d/g, "");
+}
+
+function splitZeroInitialSpelling(pinyinBody) {
+  if (!pinyinBody) return null;
+  if (pinyinBody === "yi") return { initial: "", final: "i" };
+  if (pinyinBody === "wu") return { initial: "", final: "u" };
+  if (pinyinBody === "yu") return { initial: "", final: "v" };
+  if (pinyinBody === "ye") return { initial: "", final: "ie" };
+  if (pinyinBody === "yue") return { initial: "", final: "ve" };
+  if (pinyinBody === "yuan") return { initial: "", final: "van" };
+  if (pinyinBody === "yun") return { initial: "", final: "vn" };
+  if (pinyinBody === "yin") return { initial: "", final: "in" };
+  if (pinyinBody === "ying") return { initial: "", final: "ing" };
+  if (pinyinBody === "you") return { initial: "", final: "iu" };
+  if (pinyinBody === "ya") return { initial: "", final: "ia" };
+  if (pinyinBody === "yan") return { initial: "", final: "ian" };
+  if (pinyinBody === "yao") return { initial: "", final: "iao" };
+  if (pinyinBody === "yang") return { initial: "", final: "iang" };
+  if (pinyinBody === "yong") return { initial: "", final: "iong" };
+  if (pinyinBody === "wo") return { initial: "", final: "uo" };
+  if (pinyinBody === "wei") return { initial: "", final: "ui" };
+  if (pinyinBody === "wen") return { initial: "", final: "un" };
+  if (pinyinBody === "weng") return { initial: "", final: "ueng" };
+  if (pinyinBody.startsWith("y")) return { initial: "", final: `i${pinyinBody.slice(1)}` };
+  if (pinyinBody.startsWith("w")) return { initial: "", final: `u${pinyinBody.slice(1)}` };
+  return null;
+}
+
 function normalizedFinal(syllable) {
-  const explicitFinal = (syllable.final || "").toLowerCase();
-  const pinyinBody = (syllable.pinyin || "").toLowerCase().replace(/\d/g, "");
+  const pinyinBody = pinyinBodyFor(syllable);
+  const zeroInitial = splitZeroInitialSpelling(pinyinBody);
+  if (zeroInitial) return zeroInitial.final;
+  const explicitFinal = normalizePinyinUnit(syllable.final);
   const raw = explicitFinal || pinyinBody.replace(/^(zh|ch|sh|[bpmfdtnlgkhjqxrzcsyw])/, "");
-  return raw.replaceAll("ü", "v").replaceAll("u:", "v");
+  return normalizePinyinUnit(raw);
 }
 
 function normalizedInitial(syllable) {
-  const explicitInitial = (syllable.initial || "").toLowerCase();
-  const pinyinBody = (syllable.pinyin || "").toLowerCase().replace(/\d/g, "");
+  const pinyinBody = pinyinBodyFor(syllable);
+  if (splitZeroInitialSpelling(pinyinBody)) return "";
+  const explicitInitial = normalizePinyinUnit(syllable.initial);
   return explicitInitial || INITIALS.find((item) => pinyinBody.startsWith(item)) || "";
 }
 
 function resolveArticulationUnit(value) {
-  const unit = String(value || "").toLowerCase().replaceAll("ü", "v").replaceAll("u:", "v");
+  const unit = normalizePinyinUnit(value);
   const candidates = [
     unit,
-    unit.replace(/^y/, "i").replace(/^w/, "u"),
     unit.slice(-3),
     unit.slice(-2),
     unit.slice(-1),
@@ -173,8 +287,16 @@ function articulationUnit(syllable) {
   return resolveArticulationUnit(final);
 }
 
+function preciseArticulationUnits(syllable) {
+  return articulationUnits(syllable).filter((item) => ARTICULATION_IMAGE_UNITS.has(item.unit));
+}
+
+function missingArticulationImageUnits(syllable) {
+  return articulationUnits(syllable).filter((item) => !ARTICULATION_IMAGE_UNITS.has(item.unit));
+}
+
 function hasArticulationReference(syllable) {
-  return articulationUnits(syllable).length > 0 || Boolean(articulationUnit(syllable));
+  return preciseArticulationUnits(syllable).length > 0;
 }
 
 function tonguePositionClass(syllable) {
@@ -230,7 +352,7 @@ function renderArticulationPhoto(item, imageType, syllable) {
 }
 
 function renderGeneratedMouth(syllable) {
-  const units = articulationUnits(syllable);
+  const units = preciseArticulationUnits(syllable);
   if (units.length) {
     return `
       <div class="articulation-unit-grid">
@@ -258,7 +380,7 @@ function renderGeneratedMouth(syllable) {
 }
 
 function renderGeneratedTongue(syllable) {
-  const units = articulationUnits(syllable);
+  const units = preciseArticulationUnits(syllable);
   if (units.length) {
     return `
       <div class="tongue-unit-grid">
@@ -306,7 +428,10 @@ function renderPinyinDiagnosis() {
       <p>系统听到：${escapeHtml((diagnosis.heard_pinyin || []).join(" ") || "未稳定听清")}</p>
       ${
         issues.length
-          ? `<div class="drill-list">
+          ? `<button class="teaching-clip-entry" type="button" data-action="generate-teaching-clip">
+              生成本次个性化教学短片
+            </button>
+            <div class="drill-list">
               ${issues
                 .map(
                   (issue) => `
@@ -473,12 +598,18 @@ function detailHeader(syllable) {
 
 function renderDetail() {
   const activeSyllables = getSyllables(state);
-  const syllable = activeSyllables[state.selectedSyllable] ?? Object.values(activeSyllables)[0];
+  const activeTeachingSegment = state.teachingPlan?.segments?.[state.selectedClipSegmentIndex];
+  const segmentSyllable = activeTeachingSegment?.syllableId
+    ? activeSyllables[activeTeachingSegment.syllableId]
+    : activeTeachingSegment?.syllable;
+  const syllable = segmentSyllable ?? activeSyllables[state.selectedSyllable] ?? Object.values(activeSyllables)[0];
   const hasReference = hasArticulationReference(syllable);
+  const missingImageUnits = missingArticulationImageUnits(syllable);
   return `
     <section class="screen" data-screen="detail">
       ${detailHeader(syllable)}
       <div class="content">
+        ${renderTeachingVideoPanel()}
         <section aria-labelledby="mouth-title">
           <p class="section-label" id="mouth-title">嘴型与舌位对照</p>
           <div class="panel mouth-grid">
@@ -504,6 +635,11 @@ function renderDetail() {
             ${renderGeneratedTongue(syllable)}
           </div>
           <p class="model-summary">系统会把一个拼音拆成声母和韵母分别展示。请先看声母的嘴形和舌位，再看韵母的嘴形和舌位；摄像头适合观察嘴唇和下巴，舌头位置以参考图和文字提示为主。</p>
+          ${
+            missingImageUnits.length
+              ? `<p class="model-summary">当前 ${missingImageUnits.map((item) => `${item.kind} ${item.unit}`).join("、")} 暂无精确嘴型/舌位图，已避免显示不匹配图片；请以上方教学视频和文字提示为准。</p>`
+              : ""
+          }
         </section>
 
         <section class="panel chart-card" aria-labelledby="tone-title">
@@ -633,6 +769,107 @@ function renderProgress() {
   `;
 }
 
+function renderTeacherDashboard() {
+  const summary = getTeacherDashboardSummary(state);
+  const students = getTeacherStudents(state);
+  const selectedStudent = getSelectedTeacherStudent(state);
+  return `
+    <section class="screen teacher-screen" data-screen="teacher">
+      <header class="app-header teacher-header">
+        <div class="status-row">
+          <span>9:41</span>
+          <span>康复训练管理后台</span>
+        </div>
+        <div class="brand-row">
+          <div>
+            <h1 class="brand"><span class="brand-accent">绘声</span> 教师端</h1>
+            <p class="teacher-subtitle">${escapeHtml(state.teacherDashboard.teacherName)} · ${escapeHtml(state.teacherDashboard.className)}</p>
+          </div>
+          <button class="header-link" type="button" data-view="practice">学生端</button>
+        </div>
+      </header>
+      <div class="content teacher-content">
+        <section aria-labelledby="teacher-today-title">
+          <p class="section-label" id="teacher-today-title">今日待处理</p>
+          <div class="teacher-metric-grid">
+            <div class="teacher-metric-card">
+              <strong>${summary.studentCount}</strong>
+              <span>学生档案</span>
+            </div>
+            <div class="teacher-metric-card is-warm">
+              <strong>${summary.pendingSubmissions}</strong>
+              <span>未批改录音</span>
+            </div>
+            <div class="teacher-metric-card ${summary.overdueTasks ? "is-alert" : ""}">
+              <strong>${summary.overdueTasks}</strong>
+              <span>逾期任务</span>
+            </div>
+            <div class="teacher-metric-card ${summary.needsAttention ? "is-alert" : ""}">
+              <strong>${summary.needsAttention}</strong>
+              <span>需要关注</span>
+            </div>
+          </div>
+        </section>
+
+        <section aria-labelledby="teacher-students-title">
+          <p class="section-label" id="teacher-students-title">学生列表</p>
+          <div class="teacher-student-list">
+            ${students
+              .map(
+                (student) => `
+                  <button class="teacher-student-card ${student.id === selectedStudent?.id ? "is-selected" : ""}" type="button" data-teacher-student="${escapeHtml(student.id)}">
+                    <span>
+                      <strong>${escapeHtml(student.name)}</strong>
+                      <span>${escapeHtml(student.stage)} · 本周 ${student.weeklyPracticeCount} 次</span>
+                    </span>
+                    <span class="status-pill">${student.latestScore} 分</span>
+                  </button>
+                `,
+              )
+              .join("")}
+          </div>
+        </section>
+
+        ${
+          selectedStudent
+            ? `
+              <section class="panel teacher-profile-card" aria-labelledby="teacher-profile-title">
+                <span class="model-kicker">学生发音档案</span>
+                <h2 id="teacher-profile-title">${escapeHtml(selectedStudent.name)} · ${selectedStudent.age} 岁</h2>
+                <p>${escapeHtml(selectedStudent.hearingProfile)}</p>
+                <dl class="teacher-profile-list">
+                  <div>
+                    <dt>康复目标</dt>
+                    <dd>${escapeHtml(selectedStudent.rehabGoal)}</dd>
+                  </div>
+                  <div>
+                    <dt>最近练习</dt>
+                    <dd>${escapeHtml(selectedStudent.lastPracticeAt)} · ${selectedStudent.weeklyPracticeCount} 次/周</dd>
+                  </div>
+                  <div>
+                    <dt>测评结论</dt>
+                    <dd>${escapeHtml(selectedStudent.assessmentSummary)}</dd>
+                  </div>
+                </dl>
+                <div class="teacher-tag-list">
+                  ${selectedStudent.focusTags.map((tag) => `<span>${escapeHtml(tag)}</span>`).join("")}
+                </div>
+              </section>
+
+              <section class="panel teacher-next-card" aria-label="AI 辅助建议">
+                <span class="model-kicker">AI 辅助建议</span>
+                <strong>先生成任务包，再由老师确认发布</strong>
+                <p>建议围绕“${escapeHtml(selectedStudent.focusTags[0])}”安排 5 分钟跟读任务，并保留教师复评入口。</p>
+                <button class="teacher-primary-button" type="button" data-action="teacher-task-placeholder">生成任务包</button>
+              </section>
+            `
+            : ""
+        }
+      </div>
+    </section>
+  `;
+}
+
 function renderToneDrill() {
   const drill = toneDrills[state.selectedToneDrill] || toneDrills["3"];
   return `
@@ -676,16 +913,232 @@ function renderToneDrill() {
   `;
 }
 
+function renderClipSegmentContent(segment, plan) {
+  const syllable = plan.targetSyllable || Object.values(getSyllables(state))[0];
+  if (segment.type === "syllable-video") {
+    const clips = segment.videoClips || [];
+    return `
+      <div class="clip-syllable-videos">
+        ${
+          clips.length
+            ? clips.map((clip) => `
+                <div class="clip-syllable-video">
+                  <p class="panel-title">${escapeHtml(clip.title || clip.videoTitle || "发音示范")}</p>
+                  ${
+                    clip.videoUrl
+                      ? `
+                        <div class="clip-video-shell">
+                          <video class="clip-video" controls playsinline ${clip.posterUrl ? `poster="${escapeHtml(clip.posterUrl)}"` : ""}>
+                            <source src="${escapeHtml(clip.videoUrl)}" type="video/mp4">
+                          </video>
+                        </div>
+                      `
+                      : `<p class="clip-asset-note">这个发音暂时没有切好的视频素材。</p>`
+                  }
+                  <p class="clip-asset-note">${escapeHtml(clip.guidanceText || clip.videoTitle || "")}</p>
+                </div>
+              `).join("")
+            : `<p class="clip-asset-note">这个音节暂时没有匹配到可用视频素材。</p>`
+        }
+      </div>
+      ${
+        segment.standardAudioUrl || plan.standardAudioUrl
+          ? `<button class="replay-button" type="button" data-action="clip-replay-standard">播放整句标准发音</button>`
+          : ""
+      }
+    `;
+  }
+  if (segment.type === "video-articulation") {
+    return `
+      <div class="clip-video-shell">
+        <video class="clip-video" controls playsinline ${segment.posterUrl ? `poster="${escapeHtml(segment.posterUrl)}"` : ""}>
+          <source src="${escapeHtml(segment.videoUrl)}" type="video/mp4">
+        </video>
+      </div>
+      <p class="clip-asset-note">${escapeHtml(segment.videoTitle || `${segment.unit} 发音片段`)}</p>
+    `;
+  }
+  if (segment.type === "articulation") {
+    return `
+      <div class="clip-articulation-grid">
+        <div class="clip-articulation-panel">
+          <p class="panel-title">口型参考</p>
+          ${renderGeneratedMouth(syllable)}
+        </div>
+        <div class="clip-articulation-panel">
+          <p class="panel-title">舌位参考</p>
+          ${renderGeneratedTongue(syllable)}
+        </div>
+      </div>
+      <p class="clip-asset-note">这个音暂时没有切好的视频片段，先使用口型和舌位参考图练习。</p>
+    `;
+  }
+  if (segment.type === "tone") {
+    return `
+      <div class="panel chart-card clip-tone-card">
+        <div class="chart-title">
+          <h2>声调趋势</h2>
+          <div class="chart-legend" aria-hidden="true">
+            <span class="legend-key">目标</span>
+            <span class="legend-key current">你的</span>
+          </div>
+        </div>
+        <canvas id="clip-tone-chart" width="640" height="248" aria-label="教学短片声调趋势图"></canvas>
+      </div>
+    `;
+  }
+  if (segment.type === "practice") {
+    return `
+      <div class="clip-practice-words">
+        ${(segment.practiceWords || [])
+          .map((word) => `<button type="button" data-set-text="${escapeHtml(word)}">${escapeHtml(word)}</button>`)
+          .join("")}
+      </div>
+      <button class="replay-button" type="button" data-action="clip-replay-standard">播放标准发音</button>
+    `;
+  }
+  return `
+    <div class="clip-focus-character" aria-hidden="true">
+      ${escapeHtml(plan.targetSyllable?.character || plan.focusIssue?.focus || "练")}
+    </div>
+  `;
+}
+
+function renderTeachingVideoPanel() {
+  const plan = state.teachingPlan;
+  if (!plan) {
+    return `
+      <section class="panel clip-summary" aria-label="教学视频">
+        <span class="model-kicker">教学视频</span>
+        <strong>录音后自动生成</strong>
+        <p>完成一次录音分析后，这里会显示本次的个性化教学视频。</p>
+      </section>
+    `;
+  }
+
+  const segments = plan.segments || [];
+  const index = Math.min(state.selectedClipSegmentIndex, Math.max(segments.length - 1, 0));
+  const segment = segments[index] || segments[0];
+  const progress = segments.length ? `${index + 1} / ${segments.length}` : "0 / 0";
+  const showSegmentNavigation = segments.length > 1;
+  return `
+    <section class="panel clip-player detail-teaching-video" aria-labelledby="detail-teaching-video-title">
+      <span class="model-kicker">教学视频</span>
+      <h2 id="detail-teaching-video-title">教学视频</h2>
+      <p class="detail-subtitle">${escapeHtml(plan.title || "本次个性化教学视频")}</p>
+      ${
+        showSegmentNavigation
+          ? `
+            <div class="clip-progress-row">
+              <span>${progress}</span>
+              <span>${state.clipPlaying ? "自动播放中" : "已暂停"}</span>
+            </div>
+            <div class="clip-progress-track" aria-hidden="true">
+              <span style="width:${segments.length ? ((index + 1) / segments.length) * 100 : 0}%"></span>
+            </div>
+          `
+          : ""
+      }
+      <h3>${escapeHtml(segment.title)}</h3>
+      <p>${escapeHtml(segment.guidanceText)}</p>
+      ${renderClipSegmentContent(segment, plan)}
+      <div class="clip-controls" aria-label="教学视频控制">
+        ${showSegmentNavigation ? `<button type="button" data-action="clip-prev" ${index <= 0 ? "disabled" : ""}>上一段</button>` : ""}
+        <button type="button" data-action="${state.clipPlaying ? "clip-pause" : "clip-play"}">
+          ${state.clipPlaying ? "暂停" : "播放"}
+        </button>
+        ${showSegmentNavigation ? `<button type="button" data-action="clip-next" ${index >= segments.length - 1 ? "disabled" : ""}>下一段</button>` : ""}
+      </div>
+    </section>
+  `;
+}
+
+function renderTeachingClip() {
+  const plan = state.teachingPlan;
+  if (!plan) {
+    return `
+      <section class="screen" data-screen="teaching-clip">
+        <header class="app-header detail-header">
+          <div class="status-row">
+            <span>9:41</span>
+            <span>教学短片</span>
+          </div>
+          <div class="detail-title-row">
+            <div>
+              <button class="back-button" type="button" data-view="practice">返回练习</button>
+              <h1 class="detail-heading">还没有教学短片</h1>
+              <p class="detail-subtitle">完成一次分析后再生成。</p>
+            </div>
+          </div>
+        </header>
+      </section>
+    `;
+  }
+
+  const segments = plan.segments || [];
+  const index = Math.min(state.selectedClipSegmentIndex, Math.max(segments.length - 1, 0));
+  const segment = segments[index] || segments[0];
+  const progress = segments.length ? `${index + 1} / ${segments.length}` : "0 / 0";
+  return `
+    <section class="screen" data-screen="teaching-clip">
+      <header class="app-header clip-header">
+        <div class="status-row">
+          <span>9:41</span>
+          <span>个性化教学短片</span>
+        </div>
+        <div class="detail-title-row">
+          <div>
+            <button class="back-button" type="button" data-view="practice">返回练习</button>
+            <h1 class="detail-heading">${escapeHtml(plan.title)}</h1>
+            <p class="detail-subtitle">目标句：${escapeHtml(plan.targetText || state.targetText)}</p>
+          </div>
+          <div class="detail-character" aria-hidden="true">${escapeHtml(plan.targetSyllable?.character || "练")}</div>
+        </div>
+      </header>
+      <div class="content">
+        <section class="panel clip-summary">
+          <span class="model-kicker">本次重点</span>
+          <strong>${escapeHtml(plan.focusIssue?.title || plan.focusIssue?.focus || "发音练习")}</strong>
+          <p>${escapeHtml(plan.focusIssue?.summary || "系统会根据你的分析结果安排练习。")}</p>
+        </section>
+
+        <section class="panel clip-player" aria-labelledby="clip-segment-title">
+          <div class="clip-progress-row">
+            <span>${progress}</span>
+            <span>${state.clipPlaying ? "自动播放中" : "已暂停"}</span>
+          </div>
+          <div class="clip-progress-track" aria-hidden="true">
+            <span style="width:${segments.length ? ((index + 1) / segments.length) * 100 : 0}%"></span>
+          </div>
+          <h2 id="clip-segment-title">${escapeHtml(segment.title)}</h2>
+          <p>${escapeHtml(segment.guidanceText)}</p>
+          ${renderClipSegmentContent(segment, plan)}
+        </section>
+
+        <div class="clip-controls" aria-label="教学短片控制">
+          <button type="button" data-action="clip-prev" ${index <= 0 ? "disabled" : ""}>上一段</button>
+          <button type="button" data-action="${state.clipPlaying ? "clip-pause" : "clip-play"}">
+            ${state.clipPlaying ? "暂停" : "播放"}
+          </button>
+          <button type="button" data-action="clip-next" ${index >= segments.length - 1 ? "disabled" : ""}>下一段</button>
+        </div>
+      </div>
+    </section>
+  `;
+}
+
 function render() {
   saveStoredState();
   const views = {
     practice: renderPractice,
     detail: renderDetail,
     progress: renderProgress,
+    teacher: renderTeacherDashboard,
     toneDrill: renderToneDrill,
+    teachingClip: renderTeachingClip,
   };
 
-  app.innerHTML = views[state.currentView]();
+  app.innerHTML = (views[state.currentView] || renderPractice)();
   nav.querySelectorAll("[data-view]").forEach((button) => {
     const active = button.dataset.view === state.currentView;
     button.setAttribute("aria-current", active ? "page" : "false");
@@ -699,6 +1152,13 @@ function render() {
       stopCameraPreview();
     }
     if (state.currentView === "progress") drawProgressChart();
+    if (state.currentView === "teachingClip" || (state.currentView === "detail" && state.teachingPlan)) {
+      drawClipToneChart();
+      if (state.clipPlaying) {
+        const playResult = document.querySelector(".clip-video")?.play?.();
+        playResult?.catch?.(() => {});
+      }
+    }
   });
 }
 
@@ -795,6 +1255,15 @@ function drawToneChart() {
   ]);
 }
 
+function drawClipToneChart() {
+  const segment = state.teachingPlan?.segments?.[state.selectedClipSegmentIndex];
+  if (segment?.type !== "tone") return;
+  drawLineChart(document.querySelector("#clip-tone-chart"), [
+    { values: segment.targetTone || [50, 50, 50, 50, 50, 50], color: "#209a78", width: 3 },
+    { values: segment.currentTone || [50, 50, 50, 50, 50, 50], color: "#cf4b31", width: 3 },
+  ]);
+}
+
 function drawProgressChart() {
   const progress = getProgressData(state);
   const min = 50;
@@ -832,6 +1301,23 @@ function clearTimers() {
   recordingTimer = null;
   playbackTimer = null;
   textInfoTimer = null;
+}
+
+function scheduleClipAdvance() {
+  window.clearTimeout(playbackTimer);
+  if (!state.clipPlaying || !["teachingClip", "detail"].includes(state.currentView)) return;
+  const count = state.teachingPlan?.segments?.length || 0;
+  if (count <= 1) return;
+  if (!count || state.selectedClipSegmentIndex >= count - 1) {
+    state = reduceState(state, { type: "SET_CLIP_PLAYING", playing: false });
+    render();
+    return;
+  }
+  playbackTimer = window.setTimeout(() => {
+    state = reduceState(state, { type: "NEXT_CLIP_SEGMENT" });
+    render();
+    scheduleClipAdvance();
+  }, 5200);
 }
 
 async function startCameraPreview() {
@@ -937,9 +1423,75 @@ async function analyzeRecording(blob) {
     type: "APPLY_ANALYSIS",
     result: payload,
     recordingUrl: lastRecordingObjectUrl,
+    clipManifest: pronunciationClipManifest,
   });
   render();
   showToast("分析完成，结果已更新。 ");
+}
+
+function demoTeachingClipResult() {
+  return {
+    target_text: "光",
+    pinyin_display: ["guang1"],
+    communication_result: {
+      readiness_score: 62,
+      main_feedback: "系统发现这次最值得先练的是韵母 uang 的口型过渡。",
+    },
+    asr: {
+      heard_text: "刚",
+      text_similarity: 60,
+    },
+    pinyin_diagnosis: {
+      method: "demo",
+      issues: [
+        {
+          index: 0,
+          type: "final",
+          title: "韵母 uang 需要更完整",
+          summary: "目标韵母是 uang，圆唇到开口再收到后鼻音的过程还不够稳定。",
+          focus: "韵母 uang",
+          detail: "先圆唇发 u，再自然打开到 ang，最后把后鼻音收住。",
+          practice: ["光", "广", "逛"],
+        },
+      ],
+    },
+    tone_timing: {
+      overall_score: 62,
+      boundary_confidence: "medium",
+      syllables: [
+        {
+          index: 0,
+          char: "光",
+          pinyin: "guang1",
+          pinyin_display: "guang1",
+          initial: "g",
+          final: "uang",
+          tone: "1",
+          tone_score: 70,
+          feedback: "第一声保持平稳，重点先放在韵母口型变化。",
+          tone_curve: {
+            target: [50, 50, 50, 50, 50, 50],
+            user: [45, 52, 48, 55, 50, 46],
+            has_user_pitch: true,
+          },
+        },
+      ],
+    },
+  };
+}
+
+function loadDemoTeachingClip() {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("demoClip") !== "1") return false;
+  state = reduceState(state, { type: "SET_TEXT", text: "光" });
+  state = reduceState(state, {
+    type: "APPLY_ANALYSIS",
+    result: demoTeachingClipResult(),
+    clipManifest: pronunciationClipManifest,
+  });
+  state = reduceState(state, { type: "NAVIGATE", view: "detail" });
+  render();
+  return true;
 }
 
 function setPlaying(copy) {
@@ -964,6 +1516,11 @@ function speakStandard(copy) {
   standardAudio?.pause();
   standardAudio = null;
 
+  if (state.currentView === "teachingClip") {
+    speakStandardWithAi(copy, text);
+    return;
+  }
+
   if (state.standardAudioUrl) {
     standardAudio = new Audio(state.standardAudioUrl);
     state = reduceState(state, { type: "SET_PLAYING", playing: true });
@@ -984,7 +1541,52 @@ function speakStandard(copy) {
     return;
   }
 
-  speakStandardWithTts(copy, text);
+  speakStandardWithAi(copy, text);
+}
+
+async function fetchAiStandardAudio(text) {
+  const response = await fetch("/api/tts", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text }),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload.error || "AI standard audio failed.");
+  }
+  return payload.audioUrl;
+}
+
+function speakStandardWithAi(copy, text) {
+  state = reduceState(state, { type: "SET_PLAYING", playing: true });
+  render();
+  showToast("正在生成 AI 标准音。");
+
+  fetchAiStandardAudio(text)
+    .then((audioUrl) => {
+      standardAudio?.pause();
+      standardAudio = new Audio(audioUrl);
+      standardAudio.addEventListener("ended", () => {
+        state = reduceState(state, { type: "SET_PLAYING", playing: false });
+        render();
+      });
+      standardAudio.addEventListener(
+        "error",
+        () => {
+          state = reduceState(state, { type: "SET_PLAYING", playing: false });
+          render();
+          speakStandardWithTts(copy, text);
+        },
+        { once: true },
+      );
+      showToast(`${copy}（AI 标准音）`);
+      return standardAudio.play();
+    })
+    .catch(() => {
+      state = reduceState(state, { type: "SET_PLAYING", playing: false });
+      render();
+      speakStandardWithTts(copy, text);
+    });
 }
 
 function speakStandardWithTts(copy, text) {
@@ -1090,6 +1692,54 @@ function handleAction(target) {
     return true;
   }
 
+  if (action === "generate-teaching-clip") {
+    state = reduceState(state, {
+      type: "GENERATE_TEACHING_CLIP",
+      clipManifest: pronunciationClipManifest,
+    });
+    render();
+    app.scrollTop = 0;
+    showToast(state.currentView === "teachingClip"
+      ? "已生成本次个性化教学短片。"
+      : "这次分析没有发现需要生成短片的问题。");
+    return true;
+  }
+
+  if (action === "clip-prev") {
+    clearTimers();
+    state = reduceState(state, { type: "PREVIOUS_CLIP_SEGMENT" });
+    render();
+    return true;
+  }
+
+  if (action === "clip-next") {
+    clearTimers();
+    state = reduceState(state, { type: "NEXT_CLIP_SEGMENT" });
+    state = reduceState(state, { type: "SET_CLIP_PLAYING", playing: false });
+    render();
+    return true;
+  }
+
+  if (action === "clip-play") {
+    state = reduceState(state, { type: "SET_CLIP_PLAYING", playing: true });
+    render();
+    scheduleClipAdvance();
+    return true;
+  }
+
+  if (action === "clip-pause") {
+    clearTimers();
+    state = reduceState(state, { type: "SET_CLIP_PLAYING", playing: false });
+    document.querySelector(".clip-video")?.pause?.();
+    render();
+    return true;
+  }
+
+  if (action === "clip-replay-standard") {
+    speakStandard("正在播放短片练习标准音。");
+    return true;
+  }
+
   if (action === "play-self") {
     playSelfRecording();
     return true;
@@ -1097,6 +1747,11 @@ function handleAction(target) {
 
   if (action === "toggle-period") {
     showToast("进度页现在显示你的真实练习记录。");
+    return true;
+  }
+
+  if (action === "teacher-task-placeholder") {
+    showToast("下一步会把该学生的问题标签生成可编辑任务包。");
     return true;
   }
 
@@ -1127,11 +1782,24 @@ function handleClick(event) {
     state = reduceState(state, {
       type: "SELECT_SYLLABLE",
       syllableId: syllableButton.dataset.syllable,
+      clipManifest: pronunciationClipManifest,
     });
     const activeSyllables = getSyllables(state);
     render();
     app.scrollTop = 0;
     showToast(`正在查看“${activeSyllables[state.selectedSyllable].character}”的发音详情。`);
+    return;
+  }
+
+  const teacherStudentButton = target.closest("[data-teacher-student]");
+  if (teacherStudentButton) {
+    state = reduceState(state, {
+      type: "SELECT_TEACHER_STUDENT",
+      studentId: teacherStudentButton.dataset.teacherStudent,
+    });
+    render();
+    app.scrollTop = 0;
+    showToast("已切换学生发音档案。");
     return;
   }
 
@@ -1218,6 +1886,10 @@ window.addEventListener("resize", () => {
 });
 
 loadStoredState();
-render();
-syncSentenceInput();
-scheduleTextInfo(state.targetText);
+loadPronunciationClipManifest().finally(() => {
+  if (!loadDemoTeachingClip()) {
+    render();
+    scheduleTextInfo(state.targetText);
+  }
+  syncSentenceInput();
+});

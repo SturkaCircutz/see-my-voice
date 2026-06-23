@@ -154,6 +154,61 @@ function defaultPracticeHistory() {
   return [];
 }
 
+export const teacherDashboard = {
+  className: "启音一班",
+  teacherName: "王老师",
+  students: [
+    {
+      id: "student-lin",
+      name: "林一一",
+      age: 8,
+      stage: "声母稳定期",
+      hearingProfile: "双侧助听器，课堂口语跟读稳定",
+      rehabGoal: "让生活常用句更容易被同伴听懂",
+      focusTags: ["f 起音不稳定", "an 收尾不完整", "第二声上扬不明显"],
+      latestScore: 72,
+      weeklyPracticeCount: 5,
+      pendingSubmissions: 2,
+      overdueTasks: 0,
+      lastPracticeAt: "今天",
+      assessmentSummary: "清晰度比上周提升，韵母收尾仍需要慢速跟读。",
+      trend: "进步",
+    },
+    {
+      id: "student-chen",
+      name: "陈小禾",
+      age: 10,
+      stage: "声调强化期",
+      hearingProfile: "人工耳蜗术后康复，长句节奏易变快",
+      rehabGoal: "稳定四声方向，减少长句含混",
+      focusTags: ["第三声常读平", "语速偏快", "停顿不自然"],
+      latestScore: 66,
+      weeklyPracticeCount: 3,
+      pendingSubmissions: 1,
+      overdueTasks: 1,
+      lastPracticeAt: "昨天",
+      assessmentSummary: "单字声调可辨，短句中第三声和停顿需要继续观察。",
+      trend: "需关注",
+    },
+    {
+      id: "student-qiao",
+      name: "乔安",
+      age: 7,
+      stage: "韵母完整度训练",
+      hearingProfile: "轻中度听损，家庭陪练积极",
+      rehabGoal: "把鼻音韵母说完整，建立练习信心",
+      focusTags: ["n/l 混淆", "ang 收尾不稳", "跟读音量偏小"],
+      latestScore: 81,
+      weeklyPracticeCount: 6,
+      pendingSubmissions: 0,
+      overdueTasks: 0,
+      lastPracticeAt: "今天",
+      assessmentSummary: "本周练习频率很好，ang 的结尾比上次更清楚。",
+      trend: "稳定",
+    },
+  ],
+};
+
 export function createInitialState() {
   return {
     currentView: "practice",
@@ -171,12 +226,329 @@ export function createInitialState() {
     analysisResult: null,
     pinyinDiagnosis: null,
     analysisSyllables: null,
+    teachingPlan: null,
+    selectedClipSegmentIndex: 0,
+    clipPlaying: false,
     lastRecordingUrl: "",
     standardAudioUrl: "",
     selectedToneDrill: "3",
     practiceBackView: "",
     practiceHistory: defaultPracticeHistory(),
+    teacherDashboard,
+    selectedTeacherStudentId: teacherDashboard.students[0]?.id || "",
     ...emptyScores,
+  };
+}
+
+function normalizeUnit(value) {
+  return String(value || "").toLowerCase().replaceAll("ü", "v").replaceAll("u:", "v");
+}
+
+function pinyinBodyFor(syllable) {
+  return normalizeUnit(syllable?.pinyin || syllable?.pinyinDisplay || "").replace(/\d/g, "");
+}
+
+function splitZeroInitialSpelling(pinyinBody) {
+  if (!pinyinBody) return null;
+  if (pinyinBody === "yi") return { initial: "", final: "i" };
+  if (pinyinBody === "wu") return { initial: "", final: "u" };
+  if (pinyinBody === "yu") return { initial: "", final: "v" };
+  if (pinyinBody === "ye") return { initial: "", final: "ie" };
+  if (pinyinBody === "yue") return { initial: "", final: "ve" };
+  if (pinyinBody === "yuan") return { initial: "", final: "van" };
+  if (pinyinBody === "yun") return { initial: "", final: "vn" };
+  if (pinyinBody === "yin") return { initial: "", final: "in" };
+  if (pinyinBody === "ying") return { initial: "", final: "ing" };
+  if (pinyinBody === "you") return { initial: "", final: "iu" };
+  if (pinyinBody === "ya") return { initial: "", final: "ia" };
+  if (pinyinBody === "yan") return { initial: "", final: "ian" };
+  if (pinyinBody === "yao") return { initial: "", final: "iao" };
+  if (pinyinBody === "yang") return { initial: "", final: "iang" };
+  if (pinyinBody === "yong") return { initial: "", final: "iong" };
+  if (pinyinBody === "wo") return { initial: "", final: "uo" };
+  if (pinyinBody === "wei") return { initial: "", final: "ui" };
+  if (pinyinBody === "wen") return { initial: "", final: "un" };
+  if (pinyinBody === "weng") return { initial: "", final: "ueng" };
+  if (pinyinBody.startsWith("y")) return { initial: "", final: `i${pinyinBody.slice(1)}` };
+  if (pinyinBody.startsWith("w")) return { initial: "", final: `u${pinyinBody.slice(1)}` };
+  return null;
+}
+
+function normalizedPinyinParts(syllable) {
+  const pinyinBody = pinyinBodyFor(syllable);
+  const zeroInitial = splitZeroInitialSpelling(pinyinBody);
+  return {
+    initial: zeroInitial ? "" : normalizeUnit(syllable?.initial),
+    final: zeroInitial?.final || normalizeUnit(syllable?.final),
+  };
+}
+
+function manifestClipFor(manifest, type, unit) {
+  const normalizedType = type === "initial" ? "initial" : "final";
+  const normalizedUnit = normalizeUnit(unit);
+  if (!normalizedUnit) return null;
+  const clips = manifest?.clips;
+  if (Array.isArray(clips)) {
+    return clips.find(
+      (clip) => clip.type === normalizedType && normalizeUnit(clip.unit) === normalizedUnit,
+    ) || null;
+  }
+  return clips?.[normalizedType]?.[normalizedUnit] || null;
+}
+
+function issuePriority(issue) {
+  if (["initial", "final", "syllable", "missing"].includes(issue?.type)) return 0;
+  if (issue?.type === "tone") return 1;
+  return 2;
+}
+
+export function selectPrimaryTeachingIssue(issues = []) {
+  return [...issues]
+    .filter((issue) => issue && issue.type !== "extra")
+    .sort((left, right) => issuePriority(left) - issuePriority(right))
+    .at(0) || null;
+}
+
+function selectTeachingIssues(issues = []) {
+  return [...issues]
+    .filter((issue) => issue && issue.type !== "extra")
+    .sort((left, right) => {
+      const leftIndex = Number(left.index ?? 0);
+      const rightIndex = Number(right.index ?? 0);
+      if (leftIndex !== rightIndex) return leftIndex - rightIndex;
+      return issuePriority(left) - issuePriority(right);
+    });
+}
+
+function findTeachingSyllable(state, issue) {
+  const syllables = getSyllables(state);
+  const rows = Object.values(syllables);
+  if (!issue) return rows[0] || null;
+  return rows.find((row) => row.issue === issue || row.issue?.index === issue.index)
+    || rows.find((row) => row.id?.startsWith(`${issue.index}-`))
+    || rows[issue.index]
+    || rows[0]
+    || null;
+}
+
+function articulationTargetsFor(issue, syllable) {
+  if (!syllable) return [];
+  const parts = normalizedPinyinParts(syllable);
+  const initial = parts.initial;
+  let final = parts.final;
+  if (final === "i" && ["z", "c", "s"].includes(initial)) final = "i_z";
+  if (final === "i" && ["zh", "ch", "sh", "r"].includes(initial)) final = "i_zh";
+  if (issue?.type === "initial" && initial) {
+    return [{ type: "initial", unit: initial, label: `声母 ${initial}` }];
+  }
+  if (issue?.type === "final" && final) {
+    return [{ type: "final", unit: final, label: `韵母 ${final}` }];
+  }
+  return [
+    initial ? { type: "initial", unit: initial, label: `声母 ${initial}` } : null,
+    final ? { type: "final", unit: final, label: `韵母 ${final}` } : null,
+  ].filter(Boolean);
+}
+
+function practiceWordsFor(issue, syllable, targetText) {
+  const words = Array.isArray(issue?.practice) ? issue.practice.filter(Boolean) : [];
+  if (words.length) return words;
+  if (syllable?.character) return [syllable.character];
+  return targetText ? [targetText] : [];
+}
+
+function selectedOrLowestScoredSyllable(state) {
+  const syllables = getSyllables(state);
+  const rows = Object.values(syllables);
+  const selected = syllables[state.selectedSyllable] || rows.find((row) => row.id === state.selectedSyllable);
+  const scored = rows
+    .filter((row) => Number.isFinite(Number(row.score)) && Number(row.score) > 0)
+    .sort((left, right) => Number(left.score) - Number(right.score));
+  return scored[0] || selected || rows[0] || null;
+}
+
+function reviewIssueFor(syllable, targetText) {
+  return {
+    index: Number(syllable?.index || 0),
+    type: "review",
+    title: "本次发音巩固",
+    summary: "本次发音整体不错，跟着教学视频巩固口型、舌位和发音稳定性。",
+    focus: syllable?.pinyinDisplay || syllable?.pinyin || targetText || "发音巩固",
+    detail: "先保持清晰稳定，再逐步回到自然语速。",
+    practice: syllable?.character ? [syllable.character] : [],
+  };
+}
+
+function teachingRowsFor(state, options = {}) {
+  const syllables = getSyllables(state);
+  const preferredSyllable = options.preferredSyllableId ? syllables[options.preferredSyllableId] : null;
+  if (preferredSyllable) {
+    const preferredIssue = preferredSyllable.issue
+      || selectTeachingIssues(state?.pinyinDiagnosis?.issues || [])
+        .find((issue) => Number(issue.index) === Number(preferredSyllable.index));
+    return [{ issue: preferredIssue || reviewIssueFor(preferredSyllable, state.targetText), syllable: preferredSyllable }];
+  }
+
+  const rowsBySyllable = new Map();
+  selectTeachingIssues(state?.pinyinDiagnosis?.issues || []).forEach((issue) => {
+    const syllable = findTeachingSyllable(state, issue);
+    const key = syllable?.id || `issue-${issue.index ?? rowsBySyllable.size}`;
+    if (!rowsBySyllable.has(key)) {
+      rowsBySyllable.set(key, { issue, syllable });
+    }
+  });
+  if (rowsBySyllable.size > 0) return [...rowsBySyllable.values()];
+
+  const reviewSyllable = selectedOrLowestScoredSyllable(state);
+  return reviewSyllable ? [{ issue: reviewIssueFor(reviewSyllable, state.targetText), syllable: reviewSyllable }] : [];
+}
+
+function clipItemsFor(issue, syllable, clipManifest) {
+  return articulationTargetsFor(issue, syllable).map((target) => {
+    const clip = manifestClipFor(clipManifest, target.type, target.unit);
+    return {
+      type: clip?.url ? "video-articulation" : "missing-articulation",
+      title: `${target.label} 发音示范`,
+      guidanceText: clip?.notes
+        || (target.type === "initial"
+          ? `先看 ${target.label} 的起音动作，再接上后面的韵母。`
+          : `注意 ${target.label} 的口型变化和结尾收音，把声音说完整。`),
+      unitType: target.type,
+      unit: target.unit,
+      videoUrl: clip?.url || "",
+      videoTitle: clip?.title || `${target.label} 发音片段`,
+      posterUrl: clip?.posterUrl || "",
+    };
+  });
+}
+
+function buildSyllableVideoTeachingPlan(state, clipManifest = {}, options = {}) {
+  const targetText = state.analysisResult?.target_text || state.targetText || "";
+  const rows = teachingRowsFor(state, options);
+  if (!rows.length && !targetText) return null;
+
+  const standardAudioUrl = state.standardAudioUrl || state.analysisResult?.standard_audio_url || "";
+  const segments = rows.map(({ issue, syllable }, index) => {
+    const title = syllable
+      ? `${syllable.character} / ${syllable.pinyinDisplay || syllable.pinyin}`
+      : issue?.focus || targetText || "目标发音";
+    return {
+      type: "syllable-video",
+      title,
+      guidanceText: issue?.summary || issue?.detail || "跟着示范视频巩固这个音节的发音动作。",
+      issueType: issue?.type || "review",
+      issue,
+      syllableId: syllable?.id || "",
+      syllable: syllable || null,
+      character: syllable?.character || "",
+      pinyin: syllable?.pinyinDisplay || syllable?.pinyin || "",
+      videoClips: clipItemsFor(issue, syllable, clipManifest),
+      practiceWords: practiceWordsFor(issue, syllable, targetText),
+      standardAudioUrl,
+      order: index,
+    };
+  });
+
+  const primarySegment = segments[0] || null;
+  return {
+    title: segments.length > 1
+      ? `${targetText || primarySegment?.title || "本次"} 个性化教学视频`
+      : `${primarySegment?.title || targetText || "本次"} 个性化教学视频`,
+    targetText,
+    focusIssue: primarySegment?.issue || null,
+    targetSyllableId: primarySegment?.syllableId || "",
+    targetSyllable: primarySegment?.syllable || null,
+    standardAudioUrl,
+    segments,
+  };
+}
+
+export function buildTeachingPlan(state, clipManifest = {}, options = {}) {
+  const syllableVideoPlan = buildSyllableVideoTeachingPlan(state, clipManifest, options);
+  if (syllableVideoPlan) return syllableVideoPlan;
+
+  const issues = state?.pinyinDiagnosis?.issues || [];
+  const targetText = state.analysisResult?.target_text || state.targetText || "";
+  const primaryIssueFromDiagnosis = selectPrimaryTeachingIssue(issues);
+  const preferredSyllable = options.preferredSyllableId
+    ? getSyllables(state)[options.preferredSyllableId]
+    : null;
+  const syllable = preferredSyllable || findTeachingSyllable(state, primaryIssueFromDiagnosis);
+  const issueMatchesSyllable = !preferredSyllable
+    || primaryIssueFromDiagnosis?.index === undefined
+    || Number(primaryIssueFromDiagnosis.index) === Number(preferredSyllable.index);
+  const fallbackPracticeWords = practiceWordsFor(primaryIssueFromDiagnosis, syllable, targetText);
+  const primaryIssue = issueMatchesSyllable && primaryIssueFromDiagnosis ? primaryIssueFromDiagnosis : {
+    index: Number(syllable?.index || 0),
+    type: "review",
+    title: "本次发音巩固",
+    summary: "本次发音整体不错，跟着教学视频巩固口型、舌位和声调稳定性。",
+    focus: syllable?.pinyinDisplay || syllable?.pinyin || "发音巩固",
+    detail: "先保持清晰稳定，再逐步回到自然语速。",
+    practice: fallbackPracticeWords,
+  };
+  if (!syllable && !targetText) return null;
+
+  const practiceWords = practiceWordsFor(primaryIssue, syllable, targetText);
+  const targetLabel = syllable
+    ? `${syllable.character} / ${syllable.pinyinDisplay || syllable.pinyin}`
+    : primaryIssue.focus || "目标发音";
+  const segments = [
+    {
+      type: "intro",
+      title: "本次短片重点",
+      guidanceText: `这段教学短片只聚焦这次最影响听懂的问题：${primaryIssue.title || primaryIssue.focus || "目标发音"}。先看示范，再跟读练习。`,
+    },
+    {
+      type: "issue",
+      title: "系统听辨结果",
+      guidanceText: primaryIssue.summary || "系统发现这个音节需要重点练习。",
+    },
+  ];
+
+  articulationTargetsFor(primaryIssue, syllable).forEach((target) => {
+    const clip = manifestClipFor(clipManifest, target.type, target.unit);
+    segments.push({
+      type: clip?.url ? "video-articulation" : "articulation",
+      title: `${target.label} 发音示范`,
+      guidanceText: clip?.notes
+        || (target.type === "initial"
+          ? `先单独看 ${target.label} 的起音动作，再接上后面的韵母。`
+          : `注意 ${target.label} 的口型变化和结尾收音，把声音说完整。`),
+      unitType: target.type,
+      unit: target.unit,
+      videoUrl: clip?.url || "",
+      videoTitle: clip?.title || "",
+      posterUrl: clip?.posterUrl || "",
+    });
+  });
+
+  if (syllable?.tone && Array.isArray(syllable.targetTone)) {
+    segments.push({
+      type: "tone",
+      title: `${targetLabel} 的声调走向`,
+      guidanceText: syllable.toneCue || "对照目标声调线，先夸张读准方向，再回到自然语速。",
+      targetTone: syllable.targetTone,
+      currentTone: syllable.currentTone,
+      hasUserPitch: syllable.hasUserPitch,
+    });
+  }
+
+  segments.push({
+    type: "practice",
+    title: "跟读练习",
+    guidanceText: primaryIssue.detail || "先慢速读准，再逐渐恢复正常语速。",
+    practiceWords,
+    standardAudioUrl: state.standardAudioUrl || state.analysisResult?.standard_audio_url || "",
+  });
+
+  return {
+    title: `${targetLabel} 个性化教学短片`,
+    targetText,
+    focusIssue: primaryIssue,
+    targetSyllableId: syllable?.id || "",
+    targetSyllable: syllable || null,
+    segments,
   };
 }
 
@@ -308,6 +680,25 @@ export function getSyllables(state) {
     : defaultSyllables;
 }
 
+export function getTeacherStudents(state) {
+  return state.teacherDashboard?.students || [];
+}
+
+export function getSelectedTeacherStudent(state) {
+  const students = getTeacherStudents(state);
+  return students.find((student) => student.id === state.selectedTeacherStudentId) || students[0] || null;
+}
+
+export function getTeacherDashboardSummary(state) {
+  const students = getTeacherStudents(state);
+  return {
+    studentCount: students.length,
+    pendingSubmissions: students.reduce((total, student) => total + Number(student.pendingSubmissions || 0), 0),
+    overdueTasks: students.reduce((total, student) => total + Number(student.overdueTasks || 0), 0),
+    needsAttention: students.filter((student) => student.trend === "需关注" || Number(student.overdueTasks || 0) > 0).length,
+  };
+}
+
 export function getCalendarDays(state, count = 14) {
   const practiced = new Set((state.practiceHistory || []).map((item) => item.date));
   const today = new Date();
@@ -357,8 +748,11 @@ function appendPracticeHistory(state, result) {
 export function reduceState(state, action) {
   switch (action.type) {
     case "NAVIGATE":
-      if (!["practice", "detail", "progress", "toneDrill"].includes(action.view)) return state;
-      return { ...state, currentView: action.view, playing: false };
+      if (!["practice", "detail", "progress", "toneDrill", "teachingClip", "teacher"].includes(action.view)) return state;
+      return { ...state, currentView: action.view, playing: false, clipPlaying: false };
+    case "SELECT_TEACHER_STUDENT":
+      if (!getTeacherStudents(state).some((student) => student.id === action.studentId)) return state;
+      return { ...state, selectedTeacherStudentId: action.studentId, currentView: "teacher" };
     case "SET_TARGET_TEXT":
       return {
         ...state,
@@ -369,6 +763,9 @@ export function reduceState(state, action) {
         analysisResult: null,
         pinyinDiagnosis: null,
         analysisSyllables: null,
+        teachingPlan: null,
+        selectedClipSegmentIndex: 0,
+        clipPlaying: false,
         lastRecordingUrl: "",
         standardAudioUrl: "",
         practiceBackView: action.returnToToneDrill ? "toneDrill" : "",
@@ -402,13 +799,16 @@ export function reduceState(state, action) {
       const syllableMap = toSyllableMap(result);
       const firstSyllable = Object.keys(syllableMap)[0] || state.selectedSyllable;
       const history = appendPracticeHistory(state, result);
-      return {
+      const nextState = {
         ...state,
         modelStatus: "complete",
         recordingState: "complete",
         analysisResult: result,
         pinyinDiagnosis: result?.pinyin_diagnosis ?? null,
         analysisSyllables: syllableMap,
+        teachingPlan: null,
+        selectedClipSegmentIndex: 0,
+        clipPlaying: false,
         selectedSyllable: firstSyllable,
         lastRecordingUrl: action.recordingUrl || state.lastRecordingUrl,
         standardAudioUrl: result?.standard_audio_url || "",
@@ -425,6 +825,10 @@ export function reduceState(state, action) {
             : result?.tone_timing?.boundary_confidence === "medium"
               ? 78
               : 88,
+      };
+      return {
+        ...nextState,
+        teachingPlan: buildTeachingPlan(nextState, action.clipManifest),
       };
     }
     case "ANALYZE_ERROR":
@@ -443,6 +847,9 @@ export function reduceState(state, action) {
         analysisResult: null,
         pinyinDiagnosis: null,
         analysisSyllables: null,
+        teachingPlan: null,
+        selectedClipSegmentIndex: 0,
+        clipPlaying: false,
         lastRecordingUrl: "",
         standardAudioUrl: "",
         practiceBackView: "",
@@ -453,12 +860,21 @@ export function reduceState(state, action) {
       };
     case "SELECT_SYLLABLE":
       if (!getSyllables(state)[action.syllableId]) return state;
-      return {
-        ...state,
-        selectedSyllable: action.syllableId,
-        currentView: "detail",
-        playing: false,
-      };
+      {
+        const nextState = {
+          ...state,
+          selectedSyllable: action.syllableId,
+          currentView: "detail",
+          playing: false,
+          clipPlaying: false,
+          selectedClipSegmentIndex: 0,
+        };
+        if (!nextState.analysisResult) return nextState;
+        return {
+          ...nextState,
+          teachingPlan: buildTeachingPlan(nextState, action.clipManifest, { preferredSyllableId: action.syllableId }),
+        };
+      }
     case "SELECT_TIP":
       if (!tips.some((tip) => tip.id === action.tipId)) return state;
       return { ...state, selectedTip: action.tipId };
@@ -470,6 +886,44 @@ export function reduceState(state, action) {
       return { ...state, selectedToneDrill: action.tone, currentView: "toneDrill" };
     case "SET_PLAYING":
       return { ...state, playing: Boolean(action.playing) };
+    case "GENERATE_TEACHING_CLIP": {
+      const teachingPlan = buildTeachingPlan(state, action.clipManifest);
+      if (!teachingPlan) return state;
+      return {
+        ...state,
+        teachingPlan,
+        selectedClipSegmentIndex: 0,
+        clipPlaying: false,
+        currentView: action.openView === false ? state.currentView : "teachingClip",
+        playing: false,
+      };
+    }
+    case "SET_CLIP_SEGMENT": {
+      const count = state.teachingPlan?.segments?.length || 0;
+      if (!count) return state;
+      const index = Math.min(Math.max(Number(action.index) || 0, 0), count - 1);
+      return { ...state, selectedClipSegmentIndex: index, clipPlaying: false, playing: false };
+    }
+    case "NEXT_CLIP_SEGMENT": {
+      const count = state.teachingPlan?.segments?.length || 0;
+      if (!count) return state;
+      const index = Math.min(state.selectedClipSegmentIndex + 1, count - 1);
+      const atEnd = index === count - 1 && state.selectedClipSegmentIndex === count - 1;
+      return {
+        ...state,
+        selectedClipSegmentIndex: index,
+        clipPlaying: atEnd ? false : state.clipPlaying,
+      };
+    }
+    case "PREVIOUS_CLIP_SEGMENT":
+      return {
+        ...state,
+        selectedClipSegmentIndex: Math.max(state.selectedClipSegmentIndex - 1, 0),
+        clipPlaying: false,
+        playing: false,
+      };
+    case "SET_CLIP_PLAYING":
+      return { ...state, clipPlaying: Boolean(action.playing), playing: false };
     default:
       return state;
   }

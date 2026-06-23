@@ -520,6 +520,21 @@ button:focus-visible {
   font-weight: 700;
 }
 
+.teaching-clip-entry {
+  width: 100%;
+  min-height: 46px;
+  margin: 3px 0;
+  border-radius: 13px;
+  color: #fff;
+  background: var(--navy);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.diagnosis-card .teaching-clip-entry {
+  display: none;
+}
+
 .detail-header {
   min-height: 174px;
 }
@@ -1218,6 +1233,169 @@ canvas {
   background: #35546e;
 }
 
+.teacher-header {
+  min-height: 178px;
+}
+
+.teacher-subtitle {
+  margin: 7px 0 0;
+  color: rgba(255, 255, 255, 0.54);
+  font-size: 12px;
+}
+
+.teacher-content {
+  gap: 16px;
+}
+
+.teacher-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.teacher-metric-card {
+  display: grid;
+  gap: 5px;
+  min-height: 82px;
+  align-content: center;
+  padding: 13px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+}
+
+.teacher-metric-card strong {
+  color: var(--green);
+  font-size: 30px;
+  line-height: 1;
+}
+
+.teacher-metric-card span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.teacher-metric-card.is-warm strong {
+  color: var(--amber);
+}
+
+.teacher-metric-card.is-alert strong {
+  color: var(--red);
+}
+
+.teacher-student-list {
+  display: grid;
+  gap: 8px;
+}
+
+.teacher-student-card {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  width: 100%;
+  align-items: center;
+  padding: 13px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  text-align: left;
+}
+
+.teacher-student-card.is-selected {
+  border-color: rgba(32, 154, 120, 0.75);
+  background: var(--green-soft);
+  box-shadow: inset 3px 0 var(--green);
+}
+
+.teacher-student-card strong,
+.teacher-student-card span:not(.status-pill) {
+  display: block;
+}
+
+.teacher-student-card strong {
+  margin-bottom: 4px;
+  font-size: 15px;
+}
+
+.teacher-student-card span:not(.status-pill) {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.teacher-profile-card,
+.teacher-next-card {
+  display: grid;
+  gap: 10px;
+}
+
+.teacher-profile-card h2 {
+  margin: 0;
+  font-size: 19px;
+}
+
+.teacher-profile-card p,
+.teacher-next-card p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.teacher-profile-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.teacher-profile-list div {
+  display: grid;
+  gap: 3px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+
+.teacher-profile-list dt {
+  color: var(--green);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.teacher-profile-list dd {
+  margin: 0;
+  color: var(--ink);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.teacher-tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.teacher-tag-list span {
+  padding: 6px 9px;
+  border-radius: 999px;
+  color: var(--amber);
+  background: var(--amber-soft);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.teacher-next-card strong {
+  font-size: 15px;
+}
+
+.teacher-primary-button {
+  width: 100%;
+  border-radius: 13px;
+  color: #fff;
+  background: var(--navy);
+  font-size: 13px;
+  font-weight: 800;
+}
+
 .calendar-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
@@ -1347,6 +1525,156 @@ canvas {
   background: var(--green-soft);
 }
 
+.clip-header {
+  min-height: 190px;
+}
+
+.clip-summary {
+  display: grid;
+  gap: 7px;
+}
+
+.clip-summary strong {
+  font-size: 15px;
+}
+
+.clip-summary p,
+.clip-player p,
+.clip-asset-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.clip-player {
+  display: grid;
+  gap: 12px;
+}
+
+.clip-player h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.clip-player h3 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.detail-teaching-video {
+  border-color: rgba(31, 111, 97, 0.24);
+  box-shadow: 0 12px 28px rgba(31, 111, 97, 0.08);
+}
+
+.clip-progress-row {
+  display: flex;
+  justify-content: space-between;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.clip-progress-track {
+  height: 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #eceae6;
+}
+
+.clip-progress-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--red);
+}
+
+.clip-video-shell {
+  overflow: hidden;
+  border-radius: 14px;
+  background: #111;
+}
+
+.clip-video {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: #111;
+}
+
+.clip-articulation-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.clip-articulation-panel {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fffaf4;
+}
+
+.clip-articulation-panel .articulation-photo-frame {
+  min-height: 148px;
+}
+
+.clip-articulation-panel .tongue-unit-grid,
+.clip-articulation-panel .articulation-unit-grid {
+  padding: 8px;
+}
+
+.clip-tone-card {
+  padding: 12px;
+  background: #fffaf4;
+}
+
+.clip-focus-character {
+  display: grid;
+  min-height: 180px;
+  place-items: center;
+  border-radius: 16px;
+  color: var(--red);
+  background: #fff5eb;
+  font-family: var(--serif);
+  font-size: 80px;
+}
+
+.clip-practice-words {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.clip-practice-words button {
+  min-height: 42px;
+  padding: 0 15px;
+  border-radius: 999px;
+  color: var(--green);
+  background: var(--green-soft);
+  font-family: var(--serif);
+  font-size: 22px;
+}
+
+.clip-controls {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+}
+
+.clip-controls button {
+  border-radius: 13px;
+  color: #fff;
+  background: var(--navy);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.clip-controls button:disabled {
+  color: var(--muted);
+  background: #efede7;
+  cursor: default;
+}
+
 .app-nav {
   position: absolute;
   right: 0;
@@ -1354,7 +1682,7 @@ canvas {
   left: 0;
   z-index: 5;
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   padding: 7px 10px calc(7px + env(safe-area-inset-bottom));
   border-top: 1px solid rgba(207, 200, 189, 0.92);
   background: rgba(255, 254, 250, 0.94);
