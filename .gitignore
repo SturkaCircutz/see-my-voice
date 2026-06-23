@@ -1,7 +1,9 @@
 .DS_Store
 __pycache__/
 *.py[cod]
+.venv/
 .matplotlib_cache/
+web/.analysis_debug/
 
 # Generated Stage 1 / Stage 1.5 / Stage 2A outputs
 stage1_feedback.json
