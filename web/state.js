@@ -838,6 +838,52 @@ export function getSelectedAssessmentProfile(state) {
     .at(-1) || null;
 }
 
+export function buildTeacherClassProgress(state) {
+  const students = getTeacherStudents(state);
+  const publishedTasks = getPublishedTasks(state);
+  const submissions = getTaskSubmissions(state);
+  const assessmentProfiles = getAssessmentProfiles(state);
+  const studentCount = students.length || 1;
+  const completedStudentIds = new Set(submissions.map((submission) => submission.studentId));
+  const completionRate = Math.round((completedStudentIds.size / studentCount) * 100);
+  const averageLatestScore = Math.round(
+    students.reduce((total, student) => total + Number(student.latestScore || 0), 0) / studentCount,
+  );
+  const taskCoverageRate = Math.round(
+    (new Set(publishedTasks.map((task) => task.targetStudentId)).size / studentCount) * 100,
+  );
+  const focusCounts = students
+    .flatMap((student) => student.focusTags || [])
+    .reduce((items, tag) => {
+      items[tag] = (items[tag] || 0) + 1;
+      return items;
+    }, {});
+  const commonFocusTags = Object.entries(focusCounts)
+    .sort((left, right) => right[1] - left[1])
+    .slice(0, 4)
+    .map(([tag, count]) => ({ tag, count }));
+  const attentionStudents = students
+    .filter((student) => student.trend === "需关注" || Number(student.overdueTasks || 0) > 0 || Number(student.latestScore || 0) < 70)
+    .map((student) => ({
+      id: student.id,
+      name: student.name,
+      reason: student.overdueTasks ? "有逾期任务" : student.latestScore < 70 ? "最近测评分偏低" : "趋势需关注",
+      score: student.latestScore,
+    }));
+  return {
+    studentCount: students.length,
+    completionRate,
+    taskCoverageRate,
+    averageLatestScore,
+    totalPublishedTasks: publishedTasks.length,
+    totalSubmissions: submissions.length,
+    confirmedAssessments: assessmentProfiles.filter((profile) => profile.status === "教师已确认").length,
+    pendingAssessments: getPendingAssessmentProfiles(state).length,
+    commonFocusTags,
+    attentionStudents,
+  };
+}
+
 export function getTaskSubmissions(state) {
   return state.taskSubmissions || [];
 }

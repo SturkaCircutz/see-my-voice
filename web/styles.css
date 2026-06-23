@@ -1456,6 +1456,7 @@ canvas {
 .teacher-review-card,
 .teacher-message-card,
 .teacher-assessment-card,
+.teacher-class-progress-card,
 .teacher-report-card,
 .teacher-weekly-report-card {
   display: grid;
@@ -1473,11 +1474,83 @@ canvas {
 .teacher-review-card p,
 .teacher-message-card p,
 .teacher-assessment-card p,
+.teacher-class-progress-card p,
 .teacher-report-card p {
   margin: 0;
   color: var(--muted);
   font-size: 12px;
   line-height: 1.6;
+}
+
+.teacher-class-progress-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.teacher-class-progress-grid span {
+  display: grid;
+  gap: 4px;
+  padding: 10px 8px;
+  border-radius: 11px;
+  color: var(--muted);
+  background: #f8f5ef;
+  font-size: 10px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.teacher-class-progress-grid strong {
+  color: var(--navy);
+  font-size: 22px;
+  line-height: 1;
+}
+
+.teacher-progress-bar {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #f8f5ef;
+}
+
+.teacher-progress-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--green);
+}
+
+.teacher-class-columns {
+  display: grid;
+  gap: 12px;
+}
+
+.teacher-attention-list {
+  display: grid;
+  gap: 7px;
+  margin-top: 7px;
+}
+
+.teacher-attention-list button {
+  display: grid;
+  gap: 3px;
+  width: 100%;
+  padding: 10px;
+  border: 1px solid rgba(207, 75, 49, 0.16);
+  border-radius: 11px;
+  color: var(--ink);
+  background: #fffaf6;
+  text-align: left;
+}
+
+.teacher-attention-list strong {
+  font-size: 12px;
+}
+
+.teacher-attention-list span,
+.teacher-attention-list p {
+  color: var(--muted);
+  font-size: 11px;
 }
 
 .teacher-report-score-grid {

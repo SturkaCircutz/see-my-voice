@@ -7,6 +7,7 @@ import {
   buildRecommendedTaskPackage,
   buildRehabWeeklyReport,
   buildStudentAssessmentReport,
+  buildTeacherClassProgress,
   buildTeachingPlan,
   getPendingAssessmentProfiles,
   getLatestStudentFeedback,
@@ -155,6 +156,39 @@ test("teacher dashboard starts with student profiles and review workload", () =>
   assert.equal(summary.pendingSubmissions, 3);
   assert.equal(summary.overdueTasks, 1);
   assert.equal(getSelectedTeacherStudent(state).name, "林一一");
+});
+
+test("teacher class progress summarizes completion and attention", () => {
+  const result = {
+    target_text: "我要吃饭",
+    pinyin_display: ["wo3", "yao4", "chi1", "fan4"],
+    communication_result: { readiness_score: 67, main_feedback: "继续关注 f 和 an。" },
+    asr: { heard_text: "我要吃饭", text_similarity: 82 },
+    pinyin_diagnosis: { summary: "继续关注 an 收尾。", issues: [] },
+    tone_timing: {
+      overall_score: 71,
+      boundary_confidence: "medium",
+      syllables: [
+        { index: 0, char: "我", pinyin: "wo3", pinyin_display: "wo3", initial: "", final: "uo", tone: "3", tone_score: 75 },
+      ],
+    },
+  };
+  let state = createInitialState();
+  let progress = buildTeacherClassProgress(state);
+  assert.equal(progress.studentCount, 3);
+  assert.equal(progress.completionRate, 0);
+  assert.equal(progress.taskCoverageRate, 0);
+  assert.equal(progress.averageLatestScore, 73);
+  assert.ok(progress.commonFocusTags.some((item) => item.tag === "f 起音不稳定"));
+  assert.ok(progress.attentionStudents.some((student) => student.id === "student-chen"));
+
+  state = reduceState(state, { type: "PUBLISH_RECOMMENDED_TASK" });
+  state = reduceState(state, { type: "APPLY_ANALYSIS", result, recordingUrl: "blob:student-recording" });
+  progress = buildTeacherClassProgress(state);
+  assert.equal(progress.taskCoverageRate, 33);
+  assert.equal(progress.completionRate, 33);
+  assert.equal(progress.totalPublishedTasks, 1);
+  assert.equal(progress.totalSubmissions, 1);
 });
 
 test("teacher view navigation and student selection update teacher profile", () => {

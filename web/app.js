@@ -14,6 +14,7 @@ import {
   getTeacherDashboardSummary,
   getTeacherStudents,
   getTodayStudentTask,
+  buildTeacherClassProgress,
   buildRehabWeeklyReport,
   buildRecommendedTaskPackage,
   buildStudentAssessmentReport,
@@ -873,6 +874,7 @@ function renderProgress() {
 
 function renderTeacherDashboard() {
   const summary = getTeacherDashboardSummary(state);
+  const classProgress = buildTeacherClassProgress(state);
   const students = getTeacherStudents(state);
   const pendingSubmissions = getPendingTeacherSubmissions(state);
   const selectedStudent = getSelectedTeacherStudent(state);
@@ -920,6 +922,51 @@ function renderTeacherDashboard() {
             <div class="teacher-metric-card ${summary.pendingAssessments ? "is-warm" : ""}">
               <strong>${summary.pendingAssessments}</strong>
               <span>待确认测评</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel teacher-class-progress-card" aria-labelledby="teacher-class-progress-title">
+          <div class="teacher-review-heading">
+            <div>
+              <span class="model-kicker">班级进度</span>
+              <strong id="teacher-class-progress-title">训练完成与关注概览</strong>
+            </div>
+            <span class="status-pill">${classProgress.studentCount} 人</span>
+          </div>
+          <div class="teacher-class-progress-grid">
+            <span><strong>${classProgress.completionRate}%</strong>提交覆盖</span>
+            <span><strong>${classProgress.taskCoverageRate}%</strong>任务覆盖</span>
+            <span><strong>${classProgress.averageLatestScore}</strong>平均测评</span>
+          </div>
+          <div class="teacher-progress-bar" aria-label="班级提交覆盖率">
+            <span style="width:${classProgress.completionRate}%"></span>
+          </div>
+          <div class="teacher-class-columns">
+            <div>
+              <span class="teacher-report-label">常见关注点</span>
+              <div class="teacher-tag-list">
+                ${
+                  classProgress.commonFocusTags.length
+                    ? classProgress.commonFocusTags.map((item) => `<span>${escapeHtml(item.tag)} · ${item.count}</span>`).join("")
+                    : "<span>暂无集中问题</span>"
+                }
+              </div>
+            </div>
+            <div>
+              <span class="teacher-report-label">需要跟进</span>
+              <div class="teacher-attention-list">
+                ${
+                  classProgress.attentionStudents.length
+                    ? classProgress.attentionStudents.map((student) => `
+                        <button type="button" data-teacher-student="${escapeHtml(student.id)}">
+                          <strong>${escapeHtml(student.name)}</strong>
+                          <span>${escapeHtml(student.reason)} · ${student.score} 分</span>
+                        </button>
+                      `).join("")
+                    : "<p>当前没有需要额外跟进的学生。</p>"
+                }
+              </div>
             </div>
           </div>
         </section>
