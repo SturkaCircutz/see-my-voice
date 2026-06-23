@@ -980,6 +980,37 @@ export function buildRehabWeeklyReport(state, student = getSelectedTeacherStuden
   ].join("\n");
 }
 
+export function buildParentCompanionSummary(state, student = getSelectedTeacherStudent(state)) {
+  if (!student) return null;
+  const todayTask = getTodayStudentTask(state);
+  const latestFeedback = getLatestStudentFeedback(state);
+  const messages = getStudentTaskMessages(state).slice(-3);
+  const report = buildStudentAssessmentReport(state, student);
+  const focusText = todayTask?.focusTag || report.focusAreas[0] || "今天的重点音";
+  return {
+    studentName: student.name,
+    todayTitle: todayTask?.title || "今日短时陪练",
+    todayGoal: todayTask?.goal || `陪孩子慢慢练习“${focusText}”，先清楚，再自然。`,
+    practiceItems: todayTask?.items?.slice(0, 3) || [
+      "听一遍标准音",
+      "陪孩子慢速跟读 3 次",
+      "录一遍短句给老师看",
+    ],
+    teacherAdvice: latestFeedback?.teacherFeedback
+      || messages.at(-1)?.body
+      || student.assessmentSummary,
+    encouragement: latestFeedback
+      ? "老师已经看到这次练习，可以继续按建议巩固。"
+      : "先关注孩子愿不愿意开口和有没有比上次更清楚。",
+    companionTips: [
+      "每次陪练控制在 5 分钟左右，少量多次更稳定。",
+      "听不清时先请孩子放慢，不急着说“错了”。",
+      "完成后给一句具体鼓励，例如“这个音比刚才更清楚”。",
+    ],
+    weeklyPlainReport: `${student.name} 本周练习 ${report.weeklyPracticeCount} 次，重点关注：${report.focusAreas.slice(0, 2).join("、") || focusText}。${report.conclusion}`,
+  };
+}
+
 export function getCalendarDays(state, count = 14) {
   const practiced = new Set((state.practiceHistory || []).map((item) => item.date));
   const today = new Date();
@@ -1079,7 +1110,7 @@ function buildTeacherReviewMessage(state, submission, action) {
 export function reduceState(state, action) {
   switch (action.type) {
     case "NAVIGATE":
-      if (!["practice", "detail", "progress", "toneDrill", "teachingClip", "teacher"].includes(action.view)) return state;
+      if (!["practice", "detail", "progress", "toneDrill", "teachingClip", "teacher", "parent"].includes(action.view)) return state;
       return { ...state, currentView: action.view, playing: false, clipPlaying: false };
     case "SELECT_TEACHER_STUDENT":
       if (!getTeacherStudents(state).some((student) => student.id === action.studentId)) return state;

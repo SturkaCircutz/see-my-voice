@@ -4,6 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import {
   createInitialState,
+  buildParentCompanionSummary,
   buildRecommendedTaskPackage,
   buildRehabWeeklyReport,
   buildStudentAssessmentReport,
@@ -197,6 +198,41 @@ test("teacher view navigation and student selection update teacher profile", () 
   state = reduceState(state, { type: "SELECT_TEACHER_STUDENT", studentId: "student-chen" });
   assert.equal(state.currentView, "teacher");
   assert.equal(getSelectedTeacherStudent(state).name, "陈小禾");
+});
+
+test("parent companion mode summarizes task and teacher advice", () => {
+  const result = {
+    target_text: "我要吃饭",
+    pinyin_display: ["wo3", "yao4", "chi1", "fan4"],
+    communication_result: {
+      readiness_score: 67,
+      main_feedback: "f 的起音比上次清楚。",
+    },
+    asr: { heard_text: "我要吃饭", text_similarity: 82 },
+    pinyin_diagnosis: { summary: "继续关注 an。", issues: [] },
+    tone_timing: {
+      overall_score: 71,
+      boundary_confidence: "medium",
+      syllables: [
+        { index: 0, char: "我", pinyin: "wo3", pinyin_display: "wo3", initial: "", final: "uo", tone: "3", tone_score: 75 },
+      ],
+    },
+  };
+  let state = reduceState(createInitialState(), { type: "NAVIGATE", view: "parent" });
+  assert.equal(state.currentView, "parent");
+  state = reduceState(state, { type: "PUBLISH_RECOMMENDED_TASK" });
+  state = reduceState(state, { type: "APPLY_ANALYSIS", result, recordingUrl: "blob:student-recording" });
+  state = reduceState(state, {
+    type: "REVIEW_TASK_SUBMISSION",
+    submissionId: getPendingTeacherSubmissions(state)[0].id,
+    teacherScore: 74,
+    feedback: "这次更清楚了，陪练时把 an 的收尾再放慢一点。",
+  });
+  const summary = buildParentCompanionSummary(state);
+  assert.match(summary.todayTitle, /声母专项|入门测评|训练包/);
+  assert.ok(summary.practiceItems.length > 0);
+  assert.match(summary.teacherAdvice, /陪练时/);
+  assert.match(summary.weeklyPlainReport, /林一一 本周练习/);
 });
 
 test("recommended task package stays teacher-reviewed before publishing", () => {

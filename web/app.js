@@ -15,6 +15,7 @@ import {
   getTeacherStudents,
   getTodayStudentTask,
   buildTeacherClassProgress,
+  buildParentCompanionSummary,
   buildRehabWeeklyReport,
   buildRecommendedTaskPackage,
   buildStudentAssessmentReport,
@@ -1174,6 +1175,59 @@ function renderTeacherDashboard() {
   `;
 }
 
+function renderParentCompanion() {
+  const summary = buildParentCompanionSummary(state);
+  if (!summary) return renderPractice();
+  return `
+    <section class="screen parent-screen" data-screen="parent">
+      <header class="app-header parent-header">
+        <div class="status-row">
+          <span>9:41</span>
+          <span>家庭陪练</span>
+        </div>
+        <div class="brand-row">
+          <div>
+            <h1 class="brand"><span class="brand-accent">绘声</span> 陪练模式</h1>
+            <p class="teacher-subtitle">${escapeHtml(summary.studentName)} · 今天怎么陪练</p>
+          </div>
+          <button class="header-link" type="button" data-view="practice">学生端</button>
+        </div>
+      </header>
+      <div class="content parent-content">
+        <section class="panel parent-plan-card" aria-labelledby="parent-plan-title">
+          <span class="model-kicker">今日任务</span>
+          <h2 id="parent-plan-title">${escapeHtml(summary.todayTitle)}</h2>
+          <p>${escapeHtml(summary.todayGoal)}</p>
+          <ol class="parent-step-list">
+            ${summary.practiceItems.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
+          </ol>
+        </section>
+
+        <section class="panel parent-advice-card" aria-labelledby="parent-advice-title">
+          <span class="model-kicker">老师建议</span>
+          <h2 id="parent-advice-title">陪练时重点看这一点</h2>
+          <p>${escapeHtml(summary.teacherAdvice)}</p>
+          <strong>${escapeHtml(summary.encouragement)}</strong>
+        </section>
+
+        <section class="panel parent-tips-card" aria-labelledby="parent-tips-title">
+          <span class="model-kicker">怎么陪练</span>
+          <h2 id="parent-tips-title">少纠错，多引导</h2>
+          <ul>
+            ${summary.companionTips.map((tip) => `<li>${escapeHtml(tip)}</li>`).join("")}
+          </ul>
+        </section>
+
+        <section class="panel parent-report-card" aria-labelledby="parent-report-title">
+          <span class="model-kicker">简版周报</span>
+          <h2 id="parent-report-title">本周看得懂的进展</h2>
+          <p>${escapeHtml(summary.weeklyPlainReport)}</p>
+        </section>
+      </div>
+    </section>
+  `;
+}
+
 function renderToneDrill() {
   const drill = toneDrills[state.selectedToneDrill] || toneDrills["3"];
   return `
@@ -1438,6 +1492,7 @@ function render() {
     detail: renderDetail,
     progress: renderProgress,
     teacher: renderTeacherDashboard,
+    parent: renderParentCompanion,
     toneDrill: renderToneDrill,
     teachingClip: renderTeachingClip,
   };

@@ -1824,6 +1824,86 @@ canvas {
   color: var(--ink);
 }
 
+.parent-header {
+  min-height: 178px;
+}
+
+.parent-content {
+  gap: 14px;
+}
+
+.parent-plan-card,
+.parent-advice-card,
+.parent-tips-card,
+.parent-report-card {
+  display: grid;
+  gap: 10px;
+}
+
+.parent-plan-card h2,
+.parent-advice-card h2,
+.parent-tips-card h2,
+.parent-report-card h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.parent-plan-card p,
+.parent-advice-card p,
+.parent-report-card p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+.parent-advice-card {
+  border-color: rgba(239, 190, 98, 0.45);
+  background: #fffaf0;
+}
+
+.parent-advice-card strong {
+  color: var(--amber);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.parent-step-list,
+.parent-tips-card ul {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: parent-step;
+}
+
+.parent-step-list li,
+.parent-tips-card li {
+  display: grid;
+  grid-template-columns: 24px 1fr;
+  gap: 8px;
+  align-items: center;
+  color: var(--ink);
+  font-size: 12px;
+  line-height: 1.5;
+  counter-increment: parent-step;
+}
+
+.parent-step-list li::before,
+.parent-tips-card li::before {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border-radius: 50%;
+  color: #fff;
+  background: var(--green);
+  font-size: 10px;
+  font-weight: 900;
+  content: counter(parent-step);
+}
+
 .calendar-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
@@ -2110,7 +2190,7 @@ canvas {
   left: 0;
   z-index: 5;
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   padding: 7px 10px calc(7px + env(safe-area-inset-bottom));
   border-top: 1px solid rgba(207, 200, 189, 0.92);
   background: rgba(255, 254, 250, 0.94);
