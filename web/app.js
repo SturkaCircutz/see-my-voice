@@ -5,6 +5,7 @@ import {
   getSyllables,
   getProgressData,
   getPendingTeacherSubmissions,
+  getLatestStudentFeedback,
   getSelectedTeacherStudent,
   getTeacherDashboardSummary,
   getTeacherStudents,
@@ -487,6 +488,7 @@ function brandHeader({ progress = false } = {}) {
 
 function renderTodayTaskCard() {
   const task = getTodayStudentTask(state);
+  const feedback = getLatestStudentFeedback(state);
   if (!task) return "";
   return `
     <section class="panel today-task-card" aria-labelledby="today-task-title">
@@ -507,6 +509,15 @@ function renderTodayTaskCard() {
         ${(task.items || []).map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
       </ol>
       <p class="today-task-note">完成录音后会作为本次任务提交给老师查看。</p>
+      ${
+        feedback
+          ? `<div class="student-feedback-card">
+              <span class="model-kicker">老师反馈</span>
+              <strong>${feedback.teacherScore} 分 · ${escapeHtml(feedback.status)}</strong>
+              <p>${escapeHtml(feedback.teacherFeedback)}</p>
+            </div>`
+          : ""
+      }
     </section>
   `;
 }
@@ -900,7 +911,7 @@ function renderTeacherDashboard() {
                             <span>清晰度 ${submission.aiScores.clarity}</span>
                             <span>节奏 ${submission.aiScores.rhythm}</span>
                           </div>
-                          <button class="teacher-secondary-button" type="button" data-action="teacher-review-placeholder">
+                          <button class="teacher-secondary-button" type="button" data-review-submission="${escapeHtml(submission.id)}">
                             听录音并复评
                           </button>
                         </article>
@@ -1851,11 +1862,6 @@ function handleAction(target) {
     return true;
   }
 
-  if (action === "teacher-review-placeholder") {
-    showToast("已打开 AI 初评摘要；录音复评保存会在下一阶段接入。");
-    return true;
-  }
-
   if (action === "publish-recommended-task") {
     state = reduceState(state, { type: "PUBLISH_RECOMMENDED_TASK" });
     render();
@@ -1908,6 +1914,19 @@ function handleClick(event) {
     render();
     app.scrollTop = 0;
     showToast("已切换学生发音档案。");
+    return;
+  }
+
+  const reviewSubmissionButton = target.closest("[data-review-submission]");
+  if (reviewSubmissionButton) {
+    state = reduceState(state, {
+      type: "REVIEW_TASK_SUBMISSION",
+      submissionId: reviewSubmissionButton.dataset.reviewSubmission,
+      feedback: "这次比上次更接近目标，继续把重点音放慢一点练，老师已经看到你的进步。",
+    });
+    render();
+    app.scrollTop = 0;
+    showToast("教师复评已保存，学生端可以看到老师反馈。");
     return;
   }
 

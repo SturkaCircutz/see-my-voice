@@ -493,6 +493,27 @@ button:focus-visible {
   padding-top: 2px;
 }
 
+.student-feedback-card {
+  display: grid;
+  gap: 5px;
+  padding: 11px;
+  border: 1px solid rgba(239, 190, 98, 0.55);
+  border-radius: 12px;
+  background: #fffaf0;
+}
+
+.student-feedback-card strong {
+  color: var(--amber);
+  font-size: 13px;
+}
+
+.student-feedback-card p {
+  margin: 0;
+  color: var(--ink);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
 .diagnosis-card {
   display: grid;
   gap: 7px;

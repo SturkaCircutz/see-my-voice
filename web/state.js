@@ -777,6 +777,14 @@ export function getPendingTeacherSubmissions(state) {
   return getTaskSubmissions(state).filter((submission) => submission.status === "待教师复评");
 }
 
+export function getReviewedTaskSubmissions(state) {
+  return getTaskSubmissions(state).filter((submission) => submission.status === "教师已复评");
+}
+
+export function getLatestStudentFeedback(state) {
+  return getReviewedTaskSubmissions(state).at(-1) || null;
+}
+
 export function getCalendarDays(state, count = 14) {
   const practiced = new Set((state.practiceHistory || []).map((item) => item.date));
   const today = new Date();
@@ -881,6 +889,20 @@ export function reduceState(state, action) {
         ],
       };
     }
+    case "REVIEW_TASK_SUBMISSION":
+      return {
+        ...state,
+        taskSubmissions: (state.taskSubmissions || []).map((submission) => {
+          if (submission.id !== action.submissionId) return submission;
+          return {
+            ...submission,
+            status: "教师已复评",
+            reviewedAt: todayKey(),
+            teacherFeedback: action.feedback || "这次有进步，继续按老师建议练习。",
+            teacherScore: Number(action.teacherScore ?? submission.aiScores?.overall ?? 0),
+          };
+        }),
+      };
     case "SET_TARGET_TEXT":
       return {
         ...state,
