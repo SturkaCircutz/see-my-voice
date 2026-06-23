@@ -4,6 +4,7 @@ import {
   getStreak,
   getSyllables,
   getProgressData,
+  getPendingTeacherSubmissions,
   getSelectedTeacherStudent,
   getTeacherDashboardSummary,
   getTeacherStudents,
@@ -161,6 +162,8 @@ function loadStoredState() {
     state = {
       ...state,
       practiceHistory: Array.isArray(stored.practiceHistory) ? stored.practiceHistory : [],
+      publishedTasks: Array.isArray(stored.publishedTasks) ? stored.publishedTasks : state.publishedTasks,
+      taskSubmissions: Array.isArray(stored.taskSubmissions) ? stored.taskSubmissions : state.taskSubmissions,
       selectedToneDrill: stored.selectedToneDrill || state.selectedToneDrill,
     };
   } catch {
@@ -174,6 +177,8 @@ function saveStoredState() {
       STORAGE_KEY,
       JSON.stringify({
         practiceHistory: state.practiceHistory || [],
+        publishedTasks: state.publishedTasks || [],
+        taskSubmissions: state.taskSubmissions || [],
         selectedToneDrill: state.selectedToneDrill,
       }),
     );
@@ -801,6 +806,7 @@ function renderProgress() {
 function renderTeacherDashboard() {
   const summary = getTeacherDashboardSummary(state);
   const students = getTeacherStudents(state);
+  const pendingSubmissions = getPendingTeacherSubmissions(state);
   const selectedStudent = getSelectedTeacherStudent(state);
   const recommendedTask = buildRecommendedTaskPackage(selectedStudent);
   const publishedTask = (state.publishedTasks || []).find((task) => task.targetStudentId === selectedStudent?.id);
@@ -859,6 +865,51 @@ function renderTeacherDashboard() {
               )
               .join("")}
           </div>
+        </section>
+
+        <section class="panel teacher-review-card" aria-labelledby="teacher-review-title">
+          <div class="teacher-review-heading">
+            <div>
+              <span class="model-kicker">批改中心</span>
+              <strong id="teacher-review-title">学生录音待复评</strong>
+            </div>
+            <span class="status-pill">${pendingSubmissions.length} 条</span>
+          </div>
+          ${
+            pendingSubmissions.length
+              ? `<div class="teacher-review-list">
+                  ${pendingSubmissions
+                    .map(
+                      (submission) => `
+                        <article class="teacher-submission-item">
+                          <div class="teacher-submission-top">
+                            <span>
+                              <strong>${escapeHtml(submission.studentName)}</strong>
+                              <span>${escapeHtml(submission.taskTitle)}</span>
+                            </span>
+                            <span class="teacher-review-score">${submission.aiScores.overall} 分</span>
+                          </div>
+                          <p>${escapeHtml(submission.aiSummary || submission.diagnosisSummary || "AI 初评已完成，等待老师复评。")}</p>
+                          <div class="teacher-task-meta">
+                            <span>目标：${escapeHtml(submission.targetText)}</span>
+                            <span>听到：${escapeHtml(submission.heardText || "待确认")}</span>
+                            <span>${escapeHtml(submission.status)}</span>
+                          </div>
+                          <div class="teacher-score-strip" aria-label="AI 初评分">
+                            <span>声调 ${submission.aiScores.tone}</span>
+                            <span>清晰度 ${submission.aiScores.clarity}</span>
+                            <span>节奏 ${submission.aiScores.rhythm}</span>
+                          </div>
+                          <button class="teacher-secondary-button" type="button" data-action="teacher-review-placeholder">
+                            听录音并复评
+                          </button>
+                        </article>
+                      `,
+                    )
+                    .join("")}
+                </div>`
+              : `<p class="teacher-empty-copy">学生完成老师布置的录音任务后，会出现在这里，老师再结合 AI 初评补充反馈。</p>`
+          }
         </section>
 
         ${
@@ -1797,6 +1848,11 @@ function handleAction(target) {
 
   if (action === "teacher-task-placeholder") {
     showToast("任务包已生成；发布保存会在下一阶段接入。");
+    return true;
+  }
+
+  if (action === "teacher-review-placeholder") {
+    showToast("已打开 AI 初评摘要；录音复评保存会在下一阶段接入。");
     return true;
   }
 

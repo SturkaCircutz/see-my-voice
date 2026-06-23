@@ -264,6 +264,7 @@ export function createInitialState() {
     teacherDashboard,
     selectedTeacherStudentId: teacherDashboard.students[0]?.id || "",
     publishedTasks: [],
+    taskSubmissions: [],
     ...emptyScores,
   };
 }
@@ -719,9 +720,10 @@ export function getSelectedTeacherStudent(state) {
 
 export function getTeacherDashboardSummary(state) {
   const students = getTeacherStudents(state);
+  const pendingReviewCount = getPendingTeacherSubmissions(state).length;
   return {
     studentCount: students.length,
-    pendingSubmissions: students.reduce((total, student) => total + Number(student.pendingSubmissions || 0), 0),
+    pendingSubmissions: students.reduce((total, student) => total + Number(student.pendingSubmissions || 0), 0) + pendingReviewCount,
     overdueTasks: students.reduce((total, student) => total + Number(student.overdueTasks || 0), 0),
     needsAttention: students.filter((student) => student.trend === "需关注" || Number(student.overdueTasks || 0) > 0).length,
   };
@@ -767,6 +769,14 @@ export function getTodayStudentTask(state) {
   return getPublishedTasks(state).find((task) => task.status === "已发布") || null;
 }
 
+export function getTaskSubmissions(state) {
+  return state.taskSubmissions || [];
+}
+
+export function getPendingTeacherSubmissions(state) {
+  return getTaskSubmissions(state).filter((submission) => submission.status === "待教师复评");
+}
+
 export function getCalendarDays(state, count = 14) {
   const practiced = new Set((state.practiceHistory || []).map((item) => item.date));
   const today = new Date();
@@ -796,21 +806,54 @@ export function getStreak(state) {
   return streak;
 }
 
+function rhythmScoreFromResult(result) {
+  if (result?.tone_timing?.boundary_confidence === "low") return 62;
+  if (result?.tone_timing?.boundary_confidence === "medium") return 78;
+  return 88;
+}
+
+function analysisScoreSnapshot(result) {
+  return {
+    overall: Number(result?.communication_result?.readiness_score ?? 0),
+    tone: Number(result?.tone_timing?.overall_score ?? 0),
+    clarity: Number(result?.asr?.text_similarity ?? 0),
+    rhythm: rhythmScoreFromResult(result),
+  };
+}
+
 function appendPracticeHistory(state, result) {
+  const scores = analysisScoreSnapshot(result);
   const entry = {
     date: todayKey(),
     text: result?.target_text || state.targetText,
-    score: Number(result?.communication_result?.readiness_score ?? 0),
-    toneScore: Number(result?.tone_timing?.overall_score ?? 0),
-    clarityScore: Number(result?.asr?.text_similarity ?? 0),
-    rhythmScore:
-      result?.tone_timing?.boundary_confidence === "low"
-        ? 62
-        : result?.tone_timing?.boundary_confidence === "medium"
-          ? 78
-          : 88,
+    score: scores.overall,
+    toneScore: scores.tone,
+    clarityScore: scores.clarity,
+    rhythmScore: scores.rhythm,
   };
   return [...(state.practiceHistory || []), entry].slice(-40);
+}
+
+function buildTaskSubmission(state, result, recordingUrl) {
+  const task = getTodayStudentTask(state);
+  if (!task) return null;
+  const student = getTeacherStudents(state).find((item) => item.id === task.targetStudentId) || null;
+  return {
+    id: `submission-${task.id}-${todayKey()}-${(state.taskSubmissions || []).length + 1}`,
+    taskId: task.id,
+    taskTitle: task.title,
+    studentId: task.targetStudentId,
+    studentName: student?.name || "学生",
+    submittedAt: todayKey(),
+    targetText: result?.target_text || state.targetText,
+    heardText: result?.asr?.heard_text || "",
+    recordingUrl: recordingUrl || "",
+    aiScores: analysisScoreSnapshot(result),
+    aiSummary: result?.communication_result?.main_feedback || "",
+    diagnosisSummary: result?.pinyin_diagnosis?.summary || "",
+    status: "待教师复评",
+    teacherFeedback: "",
+  };
 }
 
 export function reduceState(state, action) {
@@ -904,15 +947,14 @@ export function reduceState(state, action) {
         score: Number(result?.communication_result?.readiness_score ?? state.score),
         pitchScore: Number(result?.tone_timing?.overall_score ?? state.pitchScore),
         clarityScore: Number(result?.asr?.text_similarity ?? state.clarityScore),
-        rhythmScore:
-          result?.tone_timing?.boundary_confidence === "low"
-            ? 62
-            : result?.tone_timing?.boundary_confidence === "medium"
-              ? 78
-              : 88,
+        rhythmScore: rhythmScoreFromResult(result),
       };
+      const taskSubmission = buildTaskSubmission(nextState, result, nextState.lastRecordingUrl);
       return {
         ...nextState,
+        taskSubmissions: taskSubmission
+          ? [...(state.taskSubmissions || []), taskSubmission].slice(-80)
+          : state.taskSubmissions || [],
         teachingPlan: buildTeachingPlan(nextState, action.clipManifest),
       };
     }

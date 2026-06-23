@@ -6,6 +6,7 @@ import {
   createInitialState,
   buildRecommendedTaskPackage,
   buildTeachingPlan,
+  getPendingTeacherSubmissions,
   getSelectedTeacherStudent,
   getStreak,
   getTeacherDashboardSummary,
@@ -188,6 +189,65 @@ test("teacher can publish a recommended task to the student today task", () => {
   assert.equal(state.publishedTasks.length, 2);
   assert.ok(state.publishedTasks.some((task) => task.targetStudentId === "student-chen"));
   assert.equal(todayTask.status, "已发布");
+});
+
+test("analysis without a published task does not create teacher submission", () => {
+  const result = {
+    target_text: "你好",
+    pinyin_display: ["ni3", "hao3"],
+    communication_result: {
+      readiness_score: 80,
+      main_feedback: "这次整体接近目标。",
+    },
+    asr: { heard_text: "你好", text_similarity: 88 },
+    pinyin_diagnosis: { summary: "拼音基本一致。", issues: [] },
+    tone_timing: {
+      overall_score: 76,
+      boundary_confidence: "medium",
+      syllables: [
+        { index: 0, char: "你", pinyin: "ni3", pinyin_display: "ni3", initial: "n", final: "i", tone: "3", tone_score: 76 },
+      ],
+    },
+  };
+  const state = reduceState(createInitialState(), { type: "APPLY_ANALYSIS", result });
+  assert.equal(getPendingTeacherSubmissions(state).length, 0);
+  assert.equal(getTeacherDashboardSummary(state).pendingSubmissions, 3);
+});
+
+test("published task analysis creates a teacher review submission", () => {
+  const result = {
+    target_text: "我要吃饭",
+    pinyin_display: ["wo3", "yao4", "chi1", "fan4"],
+    communication_result: {
+      readiness_score: 67,
+      main_feedback: "f 的起音比上次清楚，an 的收尾还可以再慢一点。",
+    },
+    asr: { heard_text: "我要吃饭", text_similarity: 82 },
+    pinyin_diagnosis: {
+      summary: "主要关注 fan 的韵母收尾。",
+      issues: [{ index: 3, type: "final", title: "an 收尾", summary: "an 收尾还不够完整。", focus: "韵母 an" }],
+    },
+    tone_timing: {
+      overall_score: 71,
+      boundary_confidence: "low",
+      syllables: [
+        { index: 0, char: "我", pinyin: "wo3", pinyin_display: "wo3", initial: "", final: "uo", tone: "3", tone_score: 75 },
+        { index: 3, char: "饭", pinyin: "fan4", pinyin_display: "fan4", initial: "f", final: "an", tone: "4", tone_score: 62 },
+      ],
+    },
+  };
+  let state = reduceState(createInitialState(), { type: "PUBLISH_RECOMMENDED_TASK" });
+  state = reduceState(state, { type: "APPLY_ANALYSIS", result, recordingUrl: "blob:student-recording" });
+  const submissions = getPendingTeacherSubmissions(state);
+
+  assert.equal(submissions.length, 1);
+  assert.equal(getTeacherDashboardSummary(state).pendingSubmissions, 4);
+  assert.equal(submissions[0].studentId, "student-lin");
+  assert.equal(submissions[0].recordingUrl, "blob:student-recording");
+  assert.equal(submissions[0].targetText, "我要吃饭");
+  assert.equal(submissions[0].aiScores.overall, 67);
+  assert.equal(submissions[0].aiScores.rhythm, 62);
+  assert.match(submissions[0].aiSummary, /f 的起音/);
 });
 
 test("teaching issue selection prefers segmental issues over tone-only issues", () => {
