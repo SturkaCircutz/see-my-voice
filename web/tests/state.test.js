@@ -4,6 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import {
   createInitialState,
+  buildRecommendedTaskPackage,
   buildTeachingPlan,
   getSelectedTeacherStudent,
   getStreak,
@@ -153,6 +154,21 @@ test("teacher view navigation and student selection update teacher profile", () 
   state = reduceState(state, { type: "SELECT_TEACHER_STUDENT", studentId: "student-chen" });
   assert.equal(state.currentView, "teacher");
   assert.equal(getSelectedTeacherStudent(state).name, "陈小禾");
+});
+
+test("recommended task package stays teacher-reviewed before publishing", () => {
+  let state = createInitialState();
+  let taskPackage = buildRecommendedTaskPackage(getSelectedTeacherStudent(state));
+  assert.equal(taskPackage.status, "待教师审核");
+  assert.equal(taskPackage.category, undefined);
+  assert.match(taskPackage.title, /声母专项/);
+  assert.ok(taskPackage.items.some((item) => item.includes("短句录音提交")));
+
+  state = reduceState(state, { type: "SELECT_TEACHER_STUDENT", studentId: "student-chen" });
+  taskPackage = buildRecommendedTaskPackage(getSelectedTeacherStudent(state));
+  assert.match(taskPackage.title, /声调专项/);
+  assert.equal(taskPackage.repeatCount, 5);
+  assert.ok(taskPackage.reviewTags.includes("第三声常读平"));
 });
 
 test("teaching issue selection prefers segmental issues over tone-only issues", () => {

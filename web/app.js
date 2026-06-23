@@ -7,6 +7,7 @@ import {
   getSelectedTeacherStudent,
   getTeacherDashboardSummary,
   getTeacherStudents,
+  buildRecommendedTaskPackage,
   reduceState,
   toneDrills,
   tips,
@@ -773,6 +774,7 @@ function renderTeacherDashboard() {
   const summary = getTeacherDashboardSummary(state);
   const students = getTeacherStudents(state);
   const selectedStudent = getSelectedTeacherStudent(state);
+  const recommendedTask = buildRecommendedTaskPackage(selectedStudent);
   return `
     <section class="screen teacher-screen" data-screen="teacher">
       <header class="app-header teacher-header">
@@ -858,9 +860,21 @@ function renderTeacherDashboard() {
 
               <section class="panel teacher-next-card" aria-label="AI 辅助建议">
                 <span class="model-kicker">AI 辅助建议</span>
-                <strong>先生成任务包，再由老师确认发布</strong>
-                <p>建议围绕“${escapeHtml(selectedStudent.focusTags[0])}”安排 5 分钟跟读任务，并保留教师复评入口。</p>
-                <button class="teacher-primary-button" type="button" data-action="teacher-task-placeholder">生成任务包</button>
+                <strong>${escapeHtml(recommendedTask.title)}</strong>
+                <p>${escapeHtml(recommendedTask.goal)}</p>
+                <div class="teacher-task-meta">
+                  <span>${escapeHtml(recommendedTask.status)}</span>
+                  <span>${escapeHtml(recommendedTask.suggestedDue)}</span>
+                  <span>提交 ${recommendedTask.requiredSubmissions} 次录音</span>
+                </div>
+                <ol class="teacher-task-preview">
+                  ${recommendedTask.items.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
+                </ol>
+                <div class="teacher-tag-list">
+                  ${recommendedTask.reviewTags.map((tag) => `<span>${escapeHtml(tag)}</span>`).join("")}
+                </div>
+                <p>${escapeHtml(recommendedTask.teacherNote)}</p>
+                <button class="teacher-primary-button" type="button" data-action="teacher-task-placeholder">审核并发布</button>
               </section>
             `
             : ""
@@ -1751,7 +1765,7 @@ function handleAction(target) {
   }
 
   if (action === "teacher-task-placeholder") {
-    showToast("下一步会把该学生的问题标签生成可编辑任务包。");
+    showToast("任务包已生成；发布保存会在下一阶段接入。");
     return true;
   }
 

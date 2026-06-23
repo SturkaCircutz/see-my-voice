@@ -1387,6 +1387,54 @@ canvas {
   font-size: 15px;
 }
 
+.teacher-task-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.teacher-task-meta span {
+  padding: 5px 8px;
+  border-radius: 999px;
+  color: var(--green);
+  background: var(--green-soft);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.teacher-task-preview {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: task-step;
+}
+
+.teacher-task-preview li {
+  display: grid;
+  grid-template-columns: 24px 1fr;
+  gap: 8px;
+  align-items: center;
+  color: var(--ink);
+  font-size: 12px;
+  line-height: 1.45;
+  counter-increment: task-step;
+}
+
+.teacher-task-preview li::before {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border-radius: 50%;
+  color: #fff;
+  background: var(--navy);
+  font-size: 10px;
+  font-weight: 800;
+  content: counter(task-step);
+}
+
 .teacher-primary-button {
   width: 100%;
   border-radius: 13px;

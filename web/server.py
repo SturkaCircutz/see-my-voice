@@ -15,6 +15,8 @@ from urllib.parse import parse_qs, urlparse
 
 from pypinyin import Style, lazy_pinyin
 
+from tts_service import cached_tts_url, generate_tts_audio
+
 
 APP_DIR = Path(__file__).resolve().parent
 SEE_MY_VOICE_DIR = Path(
@@ -231,7 +233,7 @@ def standard_audio_url(text: str) -> str:
         path = STANDARD_AUDIO_DIR / f"{clean}{suffix}"
         if path.exists():
             return f"/assets/standard-audio/{path.name}"
-    return ""
+    return cached_tts_url(clean)
 
 
 def text_info(text: str):
@@ -561,7 +563,18 @@ class VoiceHandler(SimpleHTTPRequestHandler):
         super().do_GET()
 
     def do_POST(self):
-        if urlparse(self.path).path != "/api/analyze":
+        path = urlparse(self.path).path
+        if path == "/api/tts":
+            try:
+                content_length = int(self.headers.get("Content-Length", "0"))
+                payload = json.loads(self.rfile.read(content_length) or b"{}")
+                text = normalize_chinese_text(str(payload.get("text") or ""))
+                self.send_json(generate_tts_audio(text))
+            except Exception as exc:
+                self.send_json({"error": str(exc)}, status=500)
+            return
+
+        if path != "/api/analyze":
             self.send_error(404, "Not found")
             return
 

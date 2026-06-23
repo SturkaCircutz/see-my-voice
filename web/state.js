@@ -209,6 +209,33 @@ export const teacherDashboard = {
   ],
 };
 
+const taskPackageTemplates = [
+  {
+    match: /声母|起音|n\/l|zh|ch|sh|f /,
+    category: "声母专项",
+    goal: "先稳定起音动作，再接入词语和短句。",
+    items: ["看口型舌位 1 次", "单音慢速跟读 5 次", "词语跟读 3 组", "短句录音提交 1 次"],
+  },
+  {
+    match: /韵母|收尾|an|ang|鼻音/,
+    category: "韵母完整度",
+    goal: "把韵母过程说完整，尤其注意结尾收住。",
+    items: ["韵母口型观察 1 次", "单字慢读 5 次", "词语延长收尾 3 组", "生活短句录音提交 1 次"],
+  },
+  {
+    match: /声|第二声|第三声|第四声|上扬|读平/,
+    category: "声调专项",
+    goal: "先夸张练清楚声调方向，再回到自然语速。",
+    items: ["标准音听辨 2 次", "单字声调跟读 5 次", "同声调词语练习 3 组", "录音提交 1 次"],
+  },
+  {
+    match: /语速|停顿|节奏/,
+    category: "节奏与停顿",
+    goal: "放慢关键位置，让句子更容易被听懂。",
+    items: ["短句分段跟读 3 次", "停顿标记练习 2 组", "自然语速录音提交 1 次"],
+  },
+];
+
 export function createInitialState() {
   return {
     currentView: "practice",
@@ -696,6 +723,38 @@ export function getTeacherDashboardSummary(state) {
     pendingSubmissions: students.reduce((total, student) => total + Number(student.pendingSubmissions || 0), 0),
     overdueTasks: students.reduce((total, student) => total + Number(student.overdueTasks || 0), 0),
     needsAttention: students.filter((student) => student.trend === "需关注" || Number(student.overdueTasks || 0) > 0).length,
+  };
+}
+
+export function buildRecommendedTaskPackage(student) {
+  if (!student) return null;
+  const focusTags = student.focusTags || [];
+  const matchedTemplates = focusTags
+    .map((tag) => {
+      const template = taskPackageTemplates.find((item) => item.match.test(tag));
+      return template ? { tag, ...template } : null;
+    })
+    .filter(Boolean);
+  const primary = matchedTemplates[0] || {
+    tag: focusTags[0] || "本周发音稳定性",
+    category: "综合巩固",
+    goal: "保持稳定练习，优先关注本周最影响听懂的问题。",
+    items: ["标准音听辨 2 次", "单字跟读 5 次", "短句录音提交 1 次"],
+  };
+  const reviewTags = [...new Set([primary.tag, ...focusTags.slice(1, 3)])];
+  return {
+    id: `task-${student.id}-${primary.category}`,
+    status: "待教师审核",
+    title: `${student.name} · ${primary.category}训练包`,
+    targetStudentId: student.id,
+    focusTag: primary.tag,
+    goal: primary.goal,
+    suggestedDue: "3 天内完成",
+    requiredSubmissions: 1,
+    repeatCount: student.latestScore < 70 ? 5 : 3,
+    items: primary.items,
+    reviewTags,
+    teacherNote: "AI 已完成初步组包，发布前请老师确认练习量和鼓励语。",
   };
 }
 
