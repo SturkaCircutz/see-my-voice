@@ -32,7 +32,6 @@ const STORAGE_KEY = "see-my-voice-practice-state";
 let state = createInitialState();
 let recordingTimer = null;
 let playbackTimer = null;
-let clipPlaybackToken = 0;
 let toastTimer = null;
 let textInfoTimer = null;
 let mediaRecorder = null;
@@ -1390,7 +1389,6 @@ function renderTeachingVideoPanel() {
           ? `
             <div class="clip-progress-row">
               <span>${progress}</span>
-              <span>${state.clipPlaying ? "自动播放中" : "已暂停"}</span>
             </div>
             <div class="clip-progress-track" aria-hidden="true">
               <span style="width:${segments.length ? ((index + 1) / segments.length) * 100 : 0}%"></span>
@@ -1401,13 +1399,16 @@ function renderTeachingVideoPanel() {
       <h3>${escapeHtml(segment.title)}</h3>
       <p>${escapeHtml(segment.guidanceText)}</p>
       ${renderClipSegmentContent(segment, plan)}
-      <div class="clip-controls" aria-label="教学视频控制">
-        ${showSegmentNavigation ? `<button type="button" data-action="clip-prev" ${index <= 0 ? "disabled" : ""}>上一段</button>` : ""}
-        <button type="button" data-action="${state.clipPlaying ? "clip-pause" : "clip-play"}">
-          ${state.clipPlaying ? "暂停" : "播放"}
-        </button>
-        ${showSegmentNavigation ? `<button type="button" data-action="clip-next" ${index >= segments.length - 1 ? "disabled" : ""}>下一段</button>` : ""}
-      </div>
+      ${
+        showSegmentNavigation
+          ? `
+            <div class="clip-controls" aria-label="教学视频控制">
+              <button type="button" data-action="clip-prev" ${index <= 0 ? "disabled" : ""}>上一段</button>
+              <button type="button" data-action="clip-next" ${index >= segments.length - 1 ? "disabled" : ""}>下一段</button>
+            </div>
+          `
+          : ""
+      }
     </section>
   `;
 }
@@ -1464,7 +1465,6 @@ function renderTeachingClip() {
         <section class="panel clip-player" aria-labelledby="clip-segment-title">
           <div class="clip-progress-row">
             <span>${progress}</span>
-            <span>${state.clipPlaying ? "自动播放中" : "已暂停"}</span>
           </div>
           <div class="clip-progress-track" aria-hidden="true">
             <span style="width:${segments.length ? ((index + 1) / segments.length) * 100 : 0}%"></span>
@@ -1476,9 +1476,6 @@ function renderTeachingClip() {
 
         <div class="clip-controls" aria-label="教学短片控制">
           <button type="button" data-action="clip-prev" ${index <= 0 ? "disabled" : ""}>上一段</button>
-          <button type="button" data-action="${state.clipPlaying ? "clip-pause" : "clip-play"}">
-            ${state.clipPlaying ? "暂停" : "播放"}
-          </button>
           <button type="button" data-action="clip-next" ${index >= segments.length - 1 ? "disabled" : ""}>下一段</button>
         </div>
       </div>
@@ -1514,9 +1511,6 @@ function render() {
     if (state.currentView === "progress") drawProgressChart();
     if (state.currentView === "teachingClip" || (state.currentView === "detail" && state.teachingPlan)) {
       drawClipToneChart();
-      if (state.clipPlaying) {
-        playActiveClipVideos();
-      }
     }
   });
 }
@@ -1623,74 +1617,12 @@ function drawClipToneChart() {
   ]);
 }
 
-function getActiveClipPanel() {
-  if (state.currentView === "detail") {
-    return document.querySelector(".detail-teaching-video");
-  }
-  if (state.currentView === "teachingClip") {
-    return document.querySelector('[data-screen="teaching-clip"] .clip-player');
-  }
-  return null;
-}
-
-function getActiveClipVideos() {
-  return Array.from(getActiveClipPanel()?.querySelectorAll(".clip-video") || []);
-}
-
 function pauseAllClipVideos() {
-  clipPlaybackToken += 1;
   document.querySelectorAll(".clip-video").forEach((video) => {
     video.pause?.();
   });
 }
 
-async function playActiveClipVideos() {
-  const videos = getActiveClipVideos();
-  if (!videos.length) {
-    scheduleClipAdvance();
-    return;
-  }
-
-  window.clearTimeout(playbackTimer);
-  const token = (clipPlaybackToken += 1);
-  document.querySelectorAll(".clip-video").forEach((video) => {
-    if (!videos.includes(video)) video.pause?.();
-  });
-
-  for (const video of videos) {
-    if (token !== clipPlaybackToken || !state.clipPlaying) return;
-    video.currentTime = 0;
-    try {
-      await video.play?.();
-    } catch {
-      return;
-    }
-
-    const ended = await new Promise((resolve) => {
-      const cleanup = () => {
-        video.removeEventListener("ended", handleEnded);
-        video.removeEventListener("pause", handlePause);
-      };
-      const handleEnded = () => {
-        cleanup();
-        resolve(true);
-      };
-      const handlePause = () => {
-        cleanup();
-        resolve(false);
-      };
-      video.addEventListener("ended", handleEnded, { once: true });
-      video.addEventListener("pause", handlePause, { once: true });
-    });
-
-    if (!ended || token !== clipPlaybackToken || !state.clipPlaying) return;
-  }
-
-  if (token === clipPlaybackToken && state.clipPlaying) {
-    state = reduceState(state, { type: "SET_CLIP_PLAYING", playing: false });
-    render();
-  }
-}
 function drawProgressChart() {
   const progress = getProgressData(state);
   const min = 50;
@@ -2144,20 +2076,6 @@ function handleAction(target) {
     pauseAllClipVideos();
     clearTimers();
     state = reduceState(state, { type: "NEXT_CLIP_SEGMENT" });
-    state = reduceState(state, { type: "SET_CLIP_PLAYING", playing: false });
-    render();
-    return true;
-  }
-
-  if (action === "clip-play") {
-    state = reduceState(state, { type: "SET_CLIP_PLAYING", playing: true });
-    render();
-    return true;
-  }
-
-  if (action === "clip-pause") {
-    pauseAllClipVideos();
-    clearTimers();
     state = reduceState(state, { type: "SET_CLIP_PLAYING", playing: false });
     render();
     return true;
