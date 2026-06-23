@@ -7,6 +7,8 @@ import {
   getPendingTeacherSubmissions,
   getLatestStudentFeedback,
   getSelectedTeacherStudent,
+  getSelectedTeacherMessages,
+  getStudentTaskMessages,
   getTeacherDashboardSummary,
   getTeacherStudents,
   getTodayStudentTask,
@@ -167,6 +169,7 @@ function loadStoredState() {
       practiceHistory: Array.isArray(stored.practiceHistory) ? stored.practiceHistory : [],
       publishedTasks: Array.isArray(stored.publishedTasks) ? stored.publishedTasks : state.publishedTasks,
       taskSubmissions: Array.isArray(stored.taskSubmissions) ? stored.taskSubmissions : state.taskSubmissions,
+      taskMessages: Array.isArray(stored.taskMessages) ? stored.taskMessages : state.taskMessages,
       selectedToneDrill: stored.selectedToneDrill || state.selectedToneDrill,
     };
   } catch {
@@ -182,6 +185,7 @@ function saveStoredState() {
         practiceHistory: state.practiceHistory || [],
         publishedTasks: state.publishedTasks || [],
         taskSubmissions: state.taskSubmissions || [],
+        taskMessages: state.taskMessages || [],
         selectedToneDrill: state.selectedToneDrill,
       }),
     );
@@ -491,6 +495,7 @@ function brandHeader({ progress = false } = {}) {
 function renderTodayTaskCard() {
   const task = getTodayStudentTask(state);
   const feedback = getLatestStudentFeedback(state);
+  const taskMessages = getStudentTaskMessages(state);
   if (!task) return "";
   return `
     <section class="panel today-task-card" aria-labelledby="today-task-title">
@@ -517,6 +522,23 @@ function renderTodayTaskCard() {
               <span class="model-kicker">老师反馈</span>
               <strong>${feedback.teacherScore} 分 · ${escapeHtml(feedback.status)}</strong>
               <p>${escapeHtml(feedback.teacherFeedback)}</p>
+            </div>`
+          : ""
+      }
+      ${
+        taskMessages.length
+          ? `<div class="student-message-thread" aria-label="任务留言">
+              <span class="model-kicker">任务留言</span>
+              ${taskMessages
+                .map(
+                  (message) => `
+                    <article class="student-message-bubble">
+                      <strong>${escapeHtml(message.senderName)}</strong>
+                      <p>${escapeHtml(message.body)}</p>
+                    </article>
+                  `,
+                )
+                .join("")}
             </div>`
           : ""
       }
@@ -821,6 +843,7 @@ function renderTeacherDashboard() {
   const students = getTeacherStudents(state);
   const pendingSubmissions = getPendingTeacherSubmissions(state);
   const selectedStudent = getSelectedTeacherStudent(state);
+  const selectedMessages = getSelectedTeacherMessages(state);
   const recommendedTask = buildRecommendedTaskPackage(selectedStudent);
   const assessmentReport = buildStudentAssessmentReport(state, selectedStudent);
   const weeklyReport = buildRehabWeeklyReport(state, selectedStudent);
@@ -976,6 +999,33 @@ function renderTeacherDashboard() {
                     </ul>
                   </div>
                 </div>
+              </section>
+
+              <section class="panel teacher-message-card" aria-labelledby="teacher-message-title">
+                <div class="teacher-review-heading">
+                  <div>
+                    <span class="model-kicker">聊天沟通</span>
+                    <strong id="teacher-message-title">任务相关留言</strong>
+                  </div>
+                  <span class="status-pill">${selectedMessages.length} 条</span>
+                </div>
+                ${
+                  selectedMessages.length
+                    ? `<div class="teacher-message-list">
+                        ${selectedMessages
+                          .map(
+                            (message) => `
+                              <article class="teacher-message-item">
+                                <span>${escapeHtml(message.senderName)} · ${escapeHtml(message.createdAt)}</span>
+                                <p>${escapeHtml(message.body)}</p>
+                                <small>关联练习：${escapeHtml(message.relatedText || "本次任务")}</small>
+                              </article>
+                            `,
+                          )
+                          .join("")}
+                      </div>`
+                    : `<p class="teacher-empty-copy">教师复评后会自动沉淀为任务留言，学生可以在今日任务中看到。</p>`
+                }
               </section>
 
               <section class="panel teacher-next-card" aria-label="AI 辅助建议">

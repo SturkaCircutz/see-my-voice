@@ -11,7 +11,9 @@ import {
   getLatestStudentFeedback,
   getPendingTeacherSubmissions,
   getSelectedTeacherStudent,
+  getSelectedTeacherMessages,
   getStreak,
+  getStudentTaskMessages,
   getTeacherDashboardSummary,
   getTodayStudentTask,
   getProgressData,
@@ -286,6 +288,11 @@ test("teacher review completes a submission and exposes student feedback", () =>
   assert.equal(getLatestStudentFeedback(state).teacherScore, 74);
   assert.match(getLatestStudentFeedback(state).teacherFeedback, /下一次/);
   assert.equal(getLatestStudentFeedback(state).status, "教师已复评");
+  assert.equal(getStudentTaskMessages(state).length, 1);
+  assert.equal(getStudentTaskMessages(state)[0].senderRole, "teacher");
+  assert.match(getStudentTaskMessages(state)[0].body, /下一次/);
+  assert.equal(getSelectedTeacherMessages(state).length, 1);
+  assert.equal(getSelectedTeacherMessages(state)[0].relatedText, "我要吃饭");
 });
 
 test("teacher assessment report summarizes profile and reviewed submissions", () => {

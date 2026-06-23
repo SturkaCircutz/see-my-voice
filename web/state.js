@@ -265,6 +265,7 @@ export function createInitialState() {
     selectedTeacherStudentId: teacherDashboard.students[0]?.id || "",
     publishedTasks: [],
     taskSubmissions: [],
+    taskMessages: [],
     ...emptyScores,
   };
 }
@@ -785,6 +786,27 @@ export function getLatestStudentFeedback(state) {
   return getReviewedTaskSubmissions(state).at(-1) || null;
 }
 
+export function getTaskMessages(state, filters = {}) {
+  return (state.taskMessages || []).filter((message) => {
+    if (filters.studentId && message.studentId !== filters.studentId) return false;
+    if (filters.taskId && message.taskId !== filters.taskId) return false;
+    if (filters.submissionId && message.submissionId !== filters.submissionId) return false;
+    return true;
+  });
+}
+
+export function getStudentTaskMessages(state) {
+  const task = getTodayStudentTask(state);
+  if (!task) return [];
+  return getTaskMessages(state, { taskId: task.id, studentId: task.targetStudentId });
+}
+
+export function getSelectedTeacherMessages(state) {
+  const student = getSelectedTeacherStudent(state);
+  if (!student) return [];
+  return getTaskMessages(state, { studentId: student.id }).slice(-6);
+}
+
 export function buildStudentAssessmentReport(state, student = getSelectedTeacherStudent(state)) {
   if (!student) return null;
   const submissions = getTaskSubmissions(state).filter((submission) => submission.studentId === student.id);
@@ -923,6 +945,23 @@ function buildTaskSubmission(state, result, recordingUrl) {
   };
 }
 
+function buildTeacherReviewMessage(state, submission, action) {
+  const feedback = action.feedback || "这次有进步，继续按老师建议练习。";
+  return {
+    id: `message-${submission.id}-${todayKey()}-${(state.taskMessages || []).length + 1}`,
+    taskId: submission.taskId,
+    submissionId: submission.id,
+    studentId: submission.studentId,
+    studentName: submission.studentName,
+    senderRole: "teacher",
+    senderName: state.teacherDashboard?.teacherName || "老师",
+    createdAt: todayKey(),
+    body: feedback,
+    kind: "review-feedback",
+    relatedText: submission.targetText,
+  };
+}
+
 export function reduceState(state, action) {
   switch (action.type) {
     case "NAVIGATE":
@@ -949,19 +988,28 @@ export function reduceState(state, action) {
       };
     }
     case "REVIEW_TASK_SUBMISSION":
-      return {
-        ...state,
-        taskSubmissions: (state.taskSubmissions || []).map((submission) => {
+      {
+        let reviewedSubmission = null;
+        const taskSubmissions = (state.taskSubmissions || []).map((submission) => {
           if (submission.id !== action.submissionId) return submission;
-          return {
+          reviewedSubmission = {
             ...submission,
             status: "教师已复评",
             reviewedAt: todayKey(),
             teacherFeedback: action.feedback || "这次有进步，继续按老师建议练习。",
             teacherScore: Number(action.teacherScore ?? submission.aiScores?.overall ?? 0),
           };
-        }),
-      };
+          return reviewedSubmission;
+        });
+        const reviewMessage = reviewedSubmission ? buildTeacherReviewMessage(state, reviewedSubmission, action) : null;
+        return {
+          ...state,
+          taskSubmissions,
+          taskMessages: reviewMessage
+            ? [...(state.taskMessages || []), reviewMessage].slice(-120)
+            : state.taskMessages || [],
+        };
+      }
     case "SET_TARGET_TEXT":
       return {
         ...state,
