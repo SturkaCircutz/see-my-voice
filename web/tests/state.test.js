@@ -9,6 +9,7 @@ import {
   getSelectedTeacherStudent,
   getStreak,
   getTeacherDashboardSummary,
+  getTodayStudentTask,
   getProgressData,
   reduceState,
   selectPrimaryTeachingIssue,
@@ -169,6 +170,24 @@ test("recommended task package stays teacher-reviewed before publishing", () => 
   assert.match(taskPackage.title, /声调专项/);
   assert.equal(taskPackage.repeatCount, 5);
   assert.ok(taskPackage.reviewTags.includes("第三声常读平"));
+});
+
+test("teacher can publish a recommended task to the student today task", () => {
+  let state = createInitialState();
+  assert.equal(getTodayStudentTask(state), null);
+
+  state = reduceState(state, { type: "PUBLISH_RECOMMENDED_TASK" });
+  let todayTask = getTodayStudentTask(state);
+  assert.equal(todayTask.status, "已发布");
+  assert.equal(todayTask.targetStudentId, "student-lin");
+  assert.match(todayTask.title, /声母专项/);
+
+  state = reduceState(state, { type: "SELECT_TEACHER_STUDENT", studentId: "student-chen" });
+  state = reduceState(state, { type: "PUBLISH_RECOMMENDED_TASK" });
+  todayTask = getTodayStudentTask(state);
+  assert.equal(state.publishedTasks.length, 2);
+  assert.ok(state.publishedTasks.some((task) => task.targetStudentId === "student-chen"));
+  assert.equal(todayTask.status, "已发布");
 });
 
 test("teaching issue selection prefers segmental issues over tone-only issues", () => {

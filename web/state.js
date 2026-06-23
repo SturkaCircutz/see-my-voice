@@ -263,6 +263,7 @@ export function createInitialState() {
     practiceHistory: defaultPracticeHistory(),
     teacherDashboard,
     selectedTeacherStudentId: teacherDashboard.students[0]?.id || "",
+    publishedTasks: [],
     ...emptyScores,
   };
 }
@@ -758,6 +759,14 @@ export function buildRecommendedTaskPackage(student) {
   };
 }
 
+export function getPublishedTasks(state) {
+  return state.publishedTasks || [];
+}
+
+export function getTodayStudentTask(state) {
+  return getPublishedTasks(state).find((task) => task.status === "已发布") || null;
+}
+
 export function getCalendarDays(state, count = 14) {
   const practiced = new Set((state.practiceHistory || []).map((item) => item.date));
   const today = new Date();
@@ -812,6 +821,23 @@ export function reduceState(state, action) {
     case "SELECT_TEACHER_STUDENT":
       if (!getTeacherStudents(state).some((student) => student.id === action.studentId)) return state;
       return { ...state, selectedTeacherStudentId: action.studentId, currentView: "teacher" };
+    case "PUBLISH_RECOMMENDED_TASK": {
+      const student = getSelectedTeacherStudent(state);
+      const taskPackage = buildRecommendedTaskPackage(student);
+      if (!taskPackage) return state;
+      const publishedTask = {
+        ...taskPackage,
+        status: "已发布",
+        publishedAt: todayKey(),
+      };
+      return {
+        ...state,
+        publishedTasks: [
+          ...(state.publishedTasks || []).filter((task) => task.targetStudentId !== publishedTask.targetStudentId),
+          publishedTask,
+        ],
+      };
+    }
     case "SET_TARGET_TEXT":
       return {
         ...state,

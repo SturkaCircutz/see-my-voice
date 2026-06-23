@@ -462,6 +462,37 @@ button:focus-visible {
   line-height: 1.6;
 }
 
+.today-task-card {
+  display: grid;
+  gap: 11px;
+  border-color: rgba(32, 154, 120, 0.28);
+  background: #f6fffb;
+}
+
+.today-task-heading {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: start;
+}
+
+.today-task-heading h2 {
+  margin: 0 0 5px;
+  font-size: 16px;
+}
+
+.today-task-heading p,
+.today-task-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.student-task-steps {
+  padding-top: 2px;
+}
+
 .diagnosis-card {
   display: grid;
   gap: 7px;

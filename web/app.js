@@ -7,6 +7,7 @@ import {
   getSelectedTeacherStudent,
   getTeacherDashboardSummary,
   getTeacherStudents,
+  getTodayStudentTask,
   buildRecommendedTaskPackage,
   reduceState,
   toneDrills,
@@ -479,6 +480,32 @@ function brandHeader({ progress = false } = {}) {
   `;
 }
 
+function renderTodayTaskCard() {
+  const task = getTodayStudentTask(state);
+  if (!task) return "";
+  return `
+    <section class="panel today-task-card" aria-labelledby="today-task-title">
+      <span class="model-kicker">老师布置</span>
+      <div class="today-task-heading">
+        <div>
+          <h2 id="today-task-title">${escapeHtml(task.title)}</h2>
+          <p>${escapeHtml(task.goal)}</p>
+        </div>
+        <span class="status-pill">${escapeHtml(task.status)}</span>
+      </div>
+      <div class="teacher-task-meta">
+        <span>${escapeHtml(task.suggestedDue)}</span>
+        <span>练习 ${task.repeatCount} 次</span>
+        <span>提交 ${task.requiredSubmissions} 次录音</span>
+      </div>
+      <ol class="teacher-task-preview student-task-steps">
+        ${(task.items || []).map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
+      </ol>
+      <p class="today-task-note">完成录音后会作为本次任务提交给老师查看。</p>
+    </section>
+  `;
+}
+
 function renderPractice() {
   const activeSyllables = getSyllables(state);
   const recordCopy = {
@@ -499,6 +526,7 @@ function renderPractice() {
     <section class="screen" data-screen="practice">
       ${brandHeader()}
       <div class="content">
+        ${renderTodayTaskCard()}
         ${
           state.practiceBackView === "toneDrill"
             ? `<button class="practice-back-button" type="button" data-view="toneDrill">返回专项题库</button>`
@@ -775,6 +803,7 @@ function renderTeacherDashboard() {
   const students = getTeacherStudents(state);
   const selectedStudent = getSelectedTeacherStudent(state);
   const recommendedTask = buildRecommendedTaskPackage(selectedStudent);
+  const publishedTask = (state.publishedTasks || []).find((task) => task.targetStudentId === selectedStudent?.id);
   return `
     <section class="screen teacher-screen" data-screen="teacher">
       <header class="app-header teacher-header">
@@ -863,7 +892,7 @@ function renderTeacherDashboard() {
                 <strong>${escapeHtml(recommendedTask.title)}</strong>
                 <p>${escapeHtml(recommendedTask.goal)}</p>
                 <div class="teacher-task-meta">
-                  <span>${escapeHtml(recommendedTask.status)}</span>
+                  <span>${escapeHtml(publishedTask?.status || recommendedTask.status)}</span>
                   <span>${escapeHtml(recommendedTask.suggestedDue)}</span>
                   <span>提交 ${recommendedTask.requiredSubmissions} 次录音</span>
                 </div>
@@ -874,7 +903,9 @@ function renderTeacherDashboard() {
                   ${recommendedTask.reviewTags.map((tag) => `<span>${escapeHtml(tag)}</span>`).join("")}
                 </div>
                 <p>${escapeHtml(recommendedTask.teacherNote)}</p>
-                <button class="teacher-primary-button" type="button" data-action="teacher-task-placeholder">审核并发布</button>
+                <button class="teacher-primary-button" type="button" data-action="publish-recommended-task">
+                  ${publishedTask ? "已发布到学生端" : "审核并发布"}
+                </button>
               </section>
             `
             : ""
@@ -1766,6 +1797,13 @@ function handleAction(target) {
 
   if (action === "teacher-task-placeholder") {
     showToast("任务包已生成；发布保存会在下一阶段接入。");
+    return true;
+  }
+
+  if (action === "publish-recommended-task") {
+    state = reduceState(state, { type: "PUBLISH_RECOMMENDED_TASK" });
+    render();
+    showToast("任务已发布到学生端今日任务。");
     return true;
   }
 
