@@ -10,6 +10,7 @@ import {
   buildStudentAssessmentReport,
   buildTeacherClassProgress,
   buildTeachingPlan,
+  getChatThreads,
   getPendingAssessmentProfiles,
   getLatestStudentFeedback,
   getPendingTeacherSubmissions,
@@ -29,12 +30,33 @@ const generatedClipManifest = JSON.parse(
   fs.readFileSync(path.join(import.meta.dirname, "../assets/pronunciation-clips/manifest.json"), "utf8"),
 );
 
-test("initial state opens practice with cleared scores", () => {
+test("initial state opens role home with cleared scores", () => {
   const state = createInitialState();
-  assert.equal(state.currentView, "practice");
+  assert.equal(state.currentRole, "guest");
+  assert.equal(state.currentView, "home");
   assert.equal(state.recordingState, "idle");
   assert.equal(state.score, 0);
   assert.equal(state.selectedSyllable, "fan");
+});
+
+test("role selection enters student or teacher workspaces", () => {
+  let state = reduceState(createInitialState(), { type: "SELECT_ROLE", role: "student" });
+  assert.equal(state.currentRole, "student");
+  assert.equal(state.currentView, "practice");
+  state = reduceState(state, { type: "NAVIGATE", view: "account" });
+  assert.equal(state.currentRole, "student");
+  assert.equal(state.currentView, "account");
+  state = reduceState(state, { type: "NAVIGATE", view: "tasks" });
+  assert.equal(state.currentView, "tasks");
+
+  state = reduceState(state, { type: "SELECT_ROLE", role: "teacher" });
+  assert.equal(state.currentRole, "teacher");
+  assert.equal(state.currentView, "teacher");
+  assert.equal(state.teacherView, "home");
+  state = reduceState(state, { type: "NAVIGATE_TEACHER", view: "account" });
+  assert.equal(state.currentRole, "teacher");
+  assert.equal(state.currentView, "account");
+  assert.equal(state.teacherView, "home");
 });
 
 test("recording advances from idle to recording to complete", () => {
@@ -184,6 +206,7 @@ test("teacher class progress summarizes completion and attention", () => {
   assert.ok(progress.attentionStudents.some((student) => student.id === "student-chen"));
 
   state = reduceState(state, { type: "PUBLISH_RECOMMENDED_TASK" });
+  state = reduceState(state, { type: "START_TASK_PRACTICE", taskId: getTodayStudentTask(state).id });
   state = reduceState(state, { type: "APPLY_ANALYSIS", result, recordingUrl: "blob:student-recording" });
   progress = buildTeacherClassProgress(state);
   assert.equal(progress.taskCoverageRate, 33);
@@ -193,14 +216,16 @@ test("teacher class progress summarizes completion and attention", () => {
 });
 
 test("teacher view navigation and student selection update teacher profile", () => {
-  let state = reduceState(createInitialState(), { type: "NAVIGATE", view: "teacher" });
+  let state = reduceState(createInitialState(), { type: "SELECT_ROLE", role: "teacher" });
   assert.equal(state.currentView, "teacher");
+  state = reduceState(state, { type: "NAVIGATE_TEACHER", view: "students" });
+  assert.equal(state.teacherView, "students");
   state = reduceState(state, { type: "SELECT_TEACHER_STUDENT", studentId: "student-chen" });
   assert.equal(state.currentView, "teacher");
   assert.equal(getSelectedTeacherStudent(state).name, "陈小禾");
 });
 
-test("parent companion mode summarizes task and teacher advice", () => {
+test("parent companion summary remains internal while parent page is not navigable", () => {
   const result = {
     target_text: "我要吃饭",
     pinyin_display: ["wo3", "yao4", "chi1", "fan4"],
@@ -219,8 +244,9 @@ test("parent companion mode summarizes task and teacher advice", () => {
     },
   };
   let state = reduceState(createInitialState(), { type: "NAVIGATE", view: "parent" });
-  assert.equal(state.currentView, "parent");
+  assert.equal(state.currentView, "home");
   state = reduceState(state, { type: "PUBLISH_RECOMMENDED_TASK" });
+  state = reduceState(state, { type: "START_TASK_PRACTICE", taskId: getTodayStudentTask(state).id });
   state = reduceState(state, { type: "APPLY_ANALYSIS", result, recordingUrl: "blob:student-recording" });
   state = reduceState(state, {
     type: "REVIEW_TASK_SUBMISSION",
@@ -272,6 +298,8 @@ test("student entry assessment creates a teacher-confirmed initial task", () => 
   let state = createInitialState();
   state = reduceState(state, { type: "COMPLETE_ENTRY_ASSESSMENT" });
 
+  assert.equal(state.assessmentSession.active, false);
+  assert.equal(state.account.entryAssessmentCompleted, true);
   assert.equal(getPendingAssessmentProfiles(state).length, 1);
   assert.equal(getTeacherDashboardSummary(state).pendingAssessments, 1);
   assert.equal(getSelectedAssessmentProfile(state).studentName, "林一一");
@@ -333,12 +361,21 @@ test("published task analysis creates a teacher review submission", () => {
     },
   };
   let state = reduceState(createInitialState(), { type: "PUBLISH_RECOMMENDED_TASK" });
+  const task = getTodayStudentTask(state);
+  state = reduceState(state, { type: "START_TASK_PRACTICE", taskId: task.id });
+  assert.equal(state.currentView, "taskDetail");
+  assert.equal(state.activeTaskPracticeId, task.id);
+  assert.ok(task.exerciseSet.some((exercise) => exercise.requiresSubmission));
+  assert.equal(state.targetText, task.practiceText);
   state = reduceState(state, { type: "APPLY_ANALYSIS", result, recordingUrl: "blob:student-recording" });
   const submissions = getPendingTeacherSubmissions(state);
 
   assert.equal(submissions.length, 1);
+  assert.equal(state.activeTaskPracticeId, "");
+  assert.equal(state.currentView, "taskDetail");
   assert.equal(getTeacherDashboardSummary(state).pendingSubmissions, 4);
   assert.equal(submissions[0].studentId, "student-lin");
+  assert.equal(submissions[0].exerciseTitle, "短句录音提交");
   assert.equal(submissions[0].recordingUrl, "blob:student-recording");
   assert.equal(submissions[0].targetText, "我要吃饭");
   assert.equal(submissions[0].aiScores.overall, 67);
@@ -365,12 +402,13 @@ test("teacher review completes a submission and exposes student feedback", () =>
     },
   };
   let state = reduceState(createInitialState(), { type: "PUBLISH_RECOMMENDED_TASK" });
+  state = reduceState(state, { type: "START_TASK_PRACTICE", taskId: getTodayStudentTask(state).id });
   state = reduceState(state, { type: "APPLY_ANALYSIS", result, recordingUrl: "blob:student-recording" });
   const submissionId = getPendingTeacherSubmissions(state)[0].id;
   state = reduceState(state, {
     type: "REVIEW_TASK_SUBMISSION",
     submissionId,
-    teacherScore: 74,
+    teacherScore: "74",
     feedback: "这次更清楚了，下一次把 an 的收尾再放慢一点。",
   });
 
@@ -412,6 +450,7 @@ test("teacher assessment report summarizes profile and reviewed submissions", ()
   assert.ok(report.focusAreas.includes("f 起音不稳定"));
 
   state = reduceState(state, { type: "PUBLISH_RECOMMENDED_TASK" });
+  state = reduceState(state, { type: "START_TASK_PRACTICE", taskId: getTodayStudentTask(state).id });
   state = reduceState(state, { type: "APPLY_ANALYSIS", result, recordingUrl: "blob:student-recording" });
   state = reduceState(state, {
     type: "REVIEW_TASK_SUBMISSION",
@@ -634,7 +673,8 @@ test("analysis automatically generates teaching clip state without navigating aw
       ],
     },
   };
-  let state = reduceState(createInitialState(), { type: "APPLY_ANALYSIS", result, clipManifest: {} });
+  let state = reduceState(createInitialState(), { type: "SELECT_ROLE", role: "student" });
+  state = reduceState(state, { type: "APPLY_ANALYSIS", result, clipManifest: {} });
   assert.equal(state.currentView, "practice");
   assert.ok(state.teachingPlan);
   state = reduceState(state, { type: "RESET_PRACTICE" });
@@ -655,7 +695,8 @@ test("analysis without diagnosis issues generates a review teaching clip", () =>
       ],
     },
   };
-  let state = reduceState(createInitialState(), { type: "APPLY_ANALYSIS", result, clipManifest: {} });
+  let state = reduceState(createInitialState(), { type: "SELECT_ROLE", role: "student" });
+  state = reduceState(state, { type: "APPLY_ANALYSIS", result, clipManifest: {} });
   assert.equal(state.currentView, "practice");
   assert.ok(state.teachingPlan);
   assert.equal(state.teachingPlan.focusIssue.type, "review");
@@ -780,4 +821,39 @@ test("clip segment navigation clamps to valid segment range", () => {
   assert.equal(state.selectedClipSegmentIndex, state.teachingPlan.segments.length - 1);
   state = reduceState(state, { type: "SET_CLIP_SEGMENT", index: -10 });
   assert.equal(state.selectedClipSegmentIndex, 0);
+});
+
+test("deleting selected chat thread removes it and returns to chat list", () => {
+  let state = createInitialState();
+  const [firstThread, secondThread] = state.chatThreads;
+  state = {
+    ...state,
+    currentRole: "student",
+    selectedChatThreadId: firstThread.id,
+    chatMode: "thread",
+  };
+
+  state = reduceState(state, { type: "DELETE_CHAT_THREAD", threadId: firstThread.id });
+
+  assert.equal(state.chatThreads.some((thread) => thread.id === firstThread.id), false);
+  assert.equal(state.selectedChatThreadId, secondThread.id);
+  assert.equal(state.chatMode, "list");
+});
+
+test("hiding a chat thread removes it only from the current participant list", () => {
+  let state = createInitialState();
+  const classThread = state.chatThreads.find((thread) => thread.type === "class");
+  state = {
+    ...state,
+    currentRole: "student",
+    selectedChatThreadId: classThread.id,
+    chatMode: "thread",
+  };
+
+  state = reduceState(state, { type: "HIDE_CHAT_THREAD", threadId: classThread.id });
+
+  assert.equal(state.chatThreads.some((thread) => thread.id === classThread.id), true);
+  assert.equal(getChatThreads(state, "student").some((thread) => thread.id === classThread.id), false);
+  assert.equal(getChatThreads(state, "teacher").some((thread) => thread.id === classThread.id), true);
+  assert.equal(state.chatMode, "list");
 });

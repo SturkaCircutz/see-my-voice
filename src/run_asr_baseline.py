@@ -4,6 +4,7 @@ import argparse
 import csv
 import json
 import re
+import subprocess
 import tempfile
 from pathlib import Path
 from typing import Any
@@ -106,19 +107,39 @@ def extract_asr_text(result: Any) -> str:
     return str(result)
 
 
+def check_output_with_ffmpeg_permission_fallback(original_check_output, *args, **kwargs):
+    """Treat blocked ffmpeg probes like missing ffmpeg so FunASR can fall back."""
+    try:
+        return original_check_output(*args, **kwargs)
+    except PermissionError as exc:
+        command = args[0] if args else kwargs.get("args")
+        if isinstance(command, (list, tuple)) and command and command[0] == "ffmpeg":
+            raise FileNotFoundError("ffmpeg is not executable in this environment") from exc
+        raise
+
+
 def build_model(model_name: str, device: str):
     """Load the Chinese ASR model.
 
     We start with FunASR Paraformer Chinese because it is designed for Chinese
     ASR and is a practical baseline for checking whether speech is understood.
     """
+    original_check_output = subprocess.check_output
+
     try:
+        subprocess.check_output = lambda *args, **kwargs: check_output_with_ffmpeg_permission_fallback(
+            original_check_output,
+            *args,
+            **kwargs,
+        )
         from funasr import AutoModel
     except ImportError as exc:
         raise RuntimeError(
             "FunASR is not installed yet. Install it with:\n"
             "python3 -m pip install funasr"
         ) from exc
+    finally:
+        subprocess.check_output = original_check_output
 
     # We intentionally skip the punctuation model here.
     # Reason: punctuation does not help us decide whether "你好" was understood,

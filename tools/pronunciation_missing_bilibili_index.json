@@ -1,0 +1,221 @@
+{
+  "sourcePage": "https://www.bilibili.com/video/BV1Dt411R7iQ/",
+  "title": "普通话 汉语拼音 声韵调 动程图",
+  "bvid": "BV1Dt411R7iQ",
+  "aid": 34464551,
+  "note": "Public page metadata only. Do not download or add third-party video files unless the user provides an authorized local source.",
+  "coverage": {
+    "existingFinals": [
+      "a",
+      "o",
+      "e",
+      "i",
+      "u",
+      "v",
+      "i_z",
+      "i_zh",
+      "er",
+      "ai",
+      "ia",
+      "ueng",
+      "uang",
+      "iong"
+    ],
+    "missingFinals": [
+      "ei",
+      "ao",
+      "ou",
+      "iu",
+      "iao",
+      "ui",
+      "uai",
+      "ie",
+      "uo",
+      "ua",
+      "ve",
+      "an",
+      "en",
+      "ian",
+      "uan",
+      "van",
+      "in",
+      "un",
+      "vn",
+      "ang",
+      "eng",
+      "iang",
+      "ing",
+      "ong"
+    ]
+  },
+  "pagesForMissingFinals": [
+    {
+      "unit": "ei",
+      "page": 31,
+      "cid": 60375192,
+      "duration": 3,
+      "title": "31 前响复韵母 ei"
+    },
+    {
+      "unit": "ao",
+      "page": 32,
+      "cid": 60375195,
+      "duration": 3,
+      "title": "32 前响复韵母 ao"
+    },
+    {
+      "unit": "ou",
+      "page": 33,
+      "cid": 60375199,
+      "duration": 3,
+      "title": "33 前响复韵母 ou"
+    },
+    {
+      "unit": "iu",
+      "page": 35,
+      "cid": 60375210,
+      "duration": 3,
+      "title": "35 中响复韵母 iu"
+    },
+    {
+      "unit": "iao",
+      "page": 36,
+      "cid": 60375212,
+      "duration": 3,
+      "title": "36 中响复韵母 iao"
+    },
+    {
+      "unit": "ui",
+      "page": 37,
+      "cid": 60375216,
+      "duration": 3,
+      "title": "37 中响复韵母 ui"
+    },
+    {
+      "unit": "uai",
+      "page": 38,
+      "cid": 60375219,
+      "duration": 3,
+      "title": "38 中响复韵母 uai"
+    },
+    {
+      "unit": "ie",
+      "page": 40,
+      "cid": 60375224,
+      "duration": 3,
+      "title": "40 后响复韵母 ie"
+    },
+    {
+      "unit": "uo",
+      "page": 41,
+      "cid": 60375226,
+      "duration": 3,
+      "title": "41 后响复韵母 uo"
+    },
+    {
+      "unit": "ua",
+      "page": 42,
+      "cid": 60375228,
+      "duration": 3,
+      "title": "42 后响复韵母 ua"
+    },
+    {
+      "unit": "ve",
+      "page": 43,
+      "cid": 60375232,
+      "duration": 3,
+      "title": "43 后响复韵母 ve"
+    },
+    {
+      "unit": "an",
+      "page": 44,
+      "cid": 60375237,
+      "duration": 3,
+      "title": "44 前鼻音韵母 an"
+    },
+    {
+      "unit": "en",
+      "page": 45,
+      "cid": 60375240,
+      "duration": 3,
+      "title": "45 前鼻音韵母 en"
+    },
+    {
+      "unit": "ian",
+      "page": 46,
+      "cid": 60375243,
+      "duration": 3,
+      "title": "46 前鼻音韵母 ian"
+    },
+    {
+      "unit": "uan",
+      "page": 47,
+      "cid": 60375248,
+      "duration": 3,
+      "title": "47 前鼻音韵母 uan"
+    },
+    {
+      "unit": "van",
+      "page": 48,
+      "cid": 60375250,
+      "duration": 3,
+      "title": "48 前鼻音韵母 van"
+    },
+    {
+      "unit": "in",
+      "page": 49,
+      "cid": 60375251,
+      "duration": 3,
+      "title": "49 前鼻音韵母 in"
+    },
+    {
+      "unit": "un",
+      "page": 50,
+      "cid": 60375259,
+      "duration": 3,
+      "title": "50 前鼻音韵母 un"
+    },
+    {
+      "unit": "vn",
+      "page": 51,
+      "cid": 60375263,
+      "duration": 3,
+      "title": "51 前鼻音韵母 vn"
+    },
+    {
+      "unit": "ang",
+      "page": 52,
+      "cid": 60375266,
+      "duration": 3,
+      "title": "52 后鼻音韵母 ang"
+    },
+    {
+      "unit": "eng",
+      "page": 53,
+      "cid": 60375268,
+      "duration": 3,
+      "title": "53 后鼻音韵母 eng"
+    },
+    {
+      "unit": "iang",
+      "page": 54,
+      "cid": 60375273,
+      "duration": 3,
+      "title": "54 后鼻音韵母 iang"
+    },
+    {
+      "unit": "ing",
+      "page": 56,
+      "cid": 60375277,
+      "duration": 3,
+      "title": "56 后鼻音韵母 ing"
+    },
+    {
+      "unit": "ong",
+      "page": 58,
+      "cid": 60375283,
+      "duration": 3,
+      "title": "58 后鼻音韵母 ong"
+    }
+  ]
+}

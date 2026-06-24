@@ -1,0 +1,695 @@
+{
+  "source": "C:\\Users\\21628\\Desktop\\6月17日 (4)(2).mp4",
+  "generatedAt": "2026-06-22T09:24:02.479471+00:00",
+  "clips": {
+    "initial": {
+      "b": {
+        "unit": "b",
+        "type": "initial",
+        "title": "声母 b 发音示范",
+        "notes": "双唇闭合后突然打开，气流较弱，注意不要读成 p。",
+        "url": "./assets/pronunciation-clips/initial-b.mp4",
+        "start": "00:00:00.600",
+        "end": "00:00:02.200"
+      },
+      "p": {
+        "unit": "p",
+        "type": "initial",
+        "title": "声母 p 发音示范",
+        "notes": "双唇闭合后送气打开，气流要明显。",
+        "url": "./assets/pronunciation-clips/initial-p.mp4",
+        "start": "00:00:03.600",
+        "end": "00:00:04.700"
+      },
+      "m": {
+        "unit": "m",
+        "type": "initial",
+        "title": "声母 m 发音示范",
+        "notes": "双唇闭合后让气流从鼻腔出来，注意不要把开头读成 b 或 p。",
+        "url": "./assets/pronunciation-clips/initial-m.mp4",
+        "start": "00:00:05.420",
+        "end": "00:00:06.200"
+      },
+      "f": {
+        "unit": "f",
+        "type": "initial",
+        "title": "声母 f 发音示范",
+        "notes": "上齿轻触下唇，气流从唇齿间摩擦送出。",
+        "url": "./assets/pronunciation-clips/initial-f.mp4",
+        "start": "00:00:07.500",
+        "end": "00:00:08.600"
+      },
+      "z": {
+        "unit": "z",
+        "type": "initial",
+        "title": "声母 z 发音示范",
+        "notes": "舌尖抵住上齿背后轻轻放开，不要明显送气。",
+        "url": "./assets/pronunciation-clips/initial-z.mp4",
+        "start": "00:00:10.600",
+        "end": "00:00:12.200"
+      },
+      "c": {
+        "unit": "c",
+        "type": "initial",
+        "title": "声母 c 发音示范",
+        "notes": "舌尖抵住上齿背后送气放开，气流要清楚。",
+        "url": "./assets/pronunciation-clips/initial-c.mp4",
+        "start": "00:00:13.500",
+        "end": "00:00:14.700"
+      },
+      "s": {
+        "unit": "s",
+        "type": "initial",
+        "title": "声母 s 发音示范",
+        "notes": "舌尖靠近上齿背形成窄缝，让气流摩擦通过。",
+        "url": "./assets/pronunciation-clips/initial-s.mp4",
+        "start": "00:00:15.500",
+        "end": "00:00:16.700"
+      },
+      "d": {
+        "unit": "d",
+        "type": "initial",
+        "title": "声母 d 发音示范",
+        "notes": "舌尖抵住上齿龈后放开，起音短而不送气。",
+        "url": "./assets/pronunciation-clips/initial-d.mp4",
+        "start": "00:00:17.500",
+        "end": "00:00:18.700"
+      },
+      "t": {
+        "unit": "t",
+        "type": "initial",
+        "title": "声母 t 发音示范",
+        "notes": "舌尖抵住上齿龈后送气放开，气流要有力度。",
+        "url": "./assets/pronunciation-clips/initial-t.mp4",
+        "start": "00:00:20.600",
+        "end": "00:00:22.200"
+      },
+      "n": {
+        "unit": "n",
+        "type": "initial",
+        "title": "声母 n 发音示范",
+        "notes": "舌尖轻触上齿龈，气流从鼻腔出来，起音要清楚。",
+        "url": "./assets/pronunciation-clips/initial-n.mp4",
+        "start": "00:00:22.880",
+        "end": "00:00:23.820"
+      },
+      "l": {
+        "unit": "l",
+        "type": "initial",
+        "title": "声母 l 发音示范",
+        "notes": "舌尖抵住上齿龈后放开，让气流从舌头两侧通过。",
+        "url": "./assets/pronunciation-clips/initial-l.mp4",
+        "start": "00:00:25.400",
+        "end": "00:00:26.320"
+      },
+      "zh": {
+        "unit": "zh",
+        "type": "initial",
+        "title": "声母 zh 发音示范",
+        "notes": "舌尖稍向后卷抵住硬腭前部，放开时不要送气太强。",
+        "url": "./assets/pronunciation-clips/initial-zh.mp4",
+        "start": "00:00:27.500",
+        "end": "00:00:28.700"
+      },
+      "ch": {
+        "unit": "ch",
+        "type": "initial",
+        "title": "声母 ch 发音示范",
+        "notes": "舌尖后卷并明显送气，保持卷舌位置稳定。",
+        "url": "./assets/pronunciation-clips/initial-ch.mp4",
+        "start": "00:00:45.500",
+        "end": "00:00:46.700"
+      },
+      "sh": {
+        "unit": "sh",
+        "type": "initial",
+        "title": "声母 sh 发音示范",
+        "notes": "舌尖后卷形成窄缝，让气流摩擦通过。",
+        "url": "./assets/pronunciation-clips/initial-sh.mp4",
+        "start": "00:00:47.500",
+        "end": "00:00:48.700"
+      },
+      "r": {
+        "unit": "r",
+        "type": "initial",
+        "title": "声母 r 发音示范",
+        "notes": "舌尖稍向后卷，声带振动，声音要柔和不要读成 l。",
+        "url": "./assets/pronunciation-clips/initial-r.mp4",
+        "start": "00:00:50.300",
+        "end": "00:00:50.860"
+      },
+      "j": {
+        "unit": "j",
+        "type": "initial",
+        "title": "声母 j 发音示范",
+        "notes": "舌面前部贴近硬腭后放开，不要明显送气。",
+        "url": "./assets/pronunciation-clips/initial-j.mp4",
+        "start": "00:00:30.600",
+        "end": "00:00:32.200"
+      },
+      "q": {
+        "unit": "q",
+        "type": "initial",
+        "title": "声母 q 发音示范",
+        "notes": "舌面前部贴近硬腭并送气放开，气流要清楚。",
+        "url": "./assets/pronunciation-clips/initial-q.mp4",
+        "start": "00:00:33.500",
+        "end": "00:00:34.700"
+      },
+      "x": {
+        "unit": "x",
+        "type": "initial",
+        "title": "声母 x 发音示范",
+        "notes": "舌面前部接近硬腭形成窄缝，气流轻轻摩擦。",
+        "url": "./assets/pronunciation-clips/initial-x.mp4",
+        "start": "00:00:35.500",
+        "end": "00:00:36.700"
+      },
+      "g": {
+        "unit": "g",
+        "type": "initial",
+        "title": "声母 g 发音示范",
+        "notes": "舌根抬起抵住软腭后放开，起音短而不送气。",
+        "url": "./assets/pronunciation-clips/initial-g.mp4",
+        "start": "00:00:37.500",
+        "end": "00:00:38.700"
+      },
+      "k": {
+        "unit": "k",
+        "type": "initial",
+        "title": "声母 k 发音示范",
+        "notes": "舌根抬起抵住软腭后送气放开，气流要有力度。",
+        "url": "./assets/pronunciation-clips/initial-k.mp4",
+        "start": "00:00:40.600",
+        "end": "00:00:42.200"
+      },
+      "h": {
+        "unit": "h",
+        "type": "initial",
+        "title": "声母 h 发音示范",
+        "notes": "舌根靠近软腭形成摩擦，声音从喉后部轻轻送出。",
+        "url": "./assets/pronunciation-clips/initial-h.mp4",
+        "start": "00:00:43.500",
+        "end": "00:00:44.700"
+      }
+    },
+    "final": {
+      "a": {
+        "unit": "a",
+        "type": "final",
+        "title": "韵母 a 发音示范",
+        "notes": "口腔打开，舌位自然放低，声音要饱满。",
+        "url": "./assets/pronunciation-clips/final-a.mp4",
+        "start": "00:00:52.920",
+        "end": "00:00:53.740"
+      },
+      "o": {
+        "unit": "o",
+        "type": "final",
+        "title": "韵母 o 发音示范",
+        "notes": "双唇收圆，口腔保持圆形空间。",
+        "url": "./assets/pronunciation-clips/final-o.mp4",
+        "start": "00:00:55.300",
+        "end": "00:00:56.080"
+      },
+      "e": {
+        "unit": "e",
+        "type": "final",
+        "title": "韵母 e 发音示范",
+        "notes": "嘴角自然展开，舌位略靠后，保持稳定的口腔空间。",
+        "url": "./assets/pronunciation-clips/final-e.mp4",
+        "start": "00:00:57.640",
+        "end": "00:00:58.580"
+      },
+      "i": {
+        "unit": "i",
+        "type": "final",
+        "title": "韵母 i 发音示范",
+        "notes": "嘴角向两侧展开，舌面抬高，声音要集中。",
+        "url": "./assets/pronunciation-clips/final-i.mp4",
+        "start": "00:01:00.360",
+        "end": "00:01:01.040"
+      },
+      "u": {
+        "unit": "u",
+        "type": "final",
+        "title": "韵母 u 发音示范",
+        "notes": "双唇收圆向前，舌位后缩，声音不要散。",
+        "url": "./assets/pronunciation-clips/final-u.mp4",
+        "start": "00:01:02.660",
+        "end": "00:01:03.360"
+      },
+      "v": {
+        "unit": "v",
+        "type": "final",
+        "title": "韵母 ü 发音示范",
+        "notes": "保持 i 的舌位同时把嘴唇收圆，避免读成 u。",
+        "url": "./assets/pronunciation-clips/final-v.mp4",
+        "start": "00:01:05.300",
+        "end": "00:01:06.120"
+      },
+      "i_z": {
+        "unit": "i_z",
+        "type": "final",
+        "title": "韵母 -i(z/c/s) 发音示范",
+        "notes": "用于 zi、ci、si，舌尖靠近上齿背，声音不要读成普通 i。",
+        "url": "./assets/pronunciation-clips/final-i_z.mp4",
+        "start": "00:01:07.700",
+        "end": "00:01:08.400"
+      },
+      "i_zh": {
+        "unit": "i_zh",
+        "type": "final",
+        "title": "韵母 -i(zh/ch/sh/r) 发音示范",
+        "notes": "用于 zhi、chi、shi、ri，保持卷舌位置，声音不要读成普通 i。",
+        "url": "./assets/pronunciation-clips/final-i_zh.mp4",
+        "start": "00:01:09.820",
+        "end": "00:01:10.620"
+      },
+      "er": {
+        "unit": "er",
+        "type": "final",
+        "title": "韵母 er 发音示范",
+        "notes": "舌尖轻轻卷起，声音自然卷舌，不要用力过猛。",
+        "url": "./assets/pronunciation-clips/final-er.mp4",
+        "start": "00:01:12.300",
+        "end": "00:01:13.160"
+      },
+      "ai": {
+        "unit": "ai",
+        "type": "final",
+        "title": "韵母 ai 发音示范",
+        "notes": "从 a 的开口滑向 i 的收窄，口型变化要连贯。",
+        "url": "./assets/pronunciation-clips/final-ai.mp4",
+        "start": "00:01:14.740",
+        "end": "00:01:15.400"
+      },
+      "ia": {
+        "unit": "ia",
+        "type": "final",
+        "title": "韵母 ia 发音示范",
+        "notes": "先做 i 的高舌位，再迅速打开到 a。",
+        "url": "./assets/pronunciation-clips/final-ia.mp4",
+        "start": "00:01:17.160",
+        "end": "00:01:18.060"
+      },
+      "ueng": {
+        "unit": "ueng",
+        "type": "final",
+        "title": "韵母 ueng 发音示范",
+        "notes": "先圆唇发 u，再过渡到 eng 的后鼻音。",
+        "url": "./assets/pronunciation-clips/final-ueng.mp4",
+        "start": "00:01:19.720",
+        "end": "00:01:20.640"
+      },
+      "uang": {
+        "unit": "uang",
+        "type": "final",
+        "title": "韵母 uang 发音示范",
+        "notes": "先圆唇发 u，再打开到 ang，结尾后鼻音要收住。",
+        "url": "./assets/pronunciation-clips/final-uang.mp4",
+        "start": "00:01:22.160",
+        "end": "00:01:23.120"
+      },
+      "iong": {
+        "unit": "iong",
+        "type": "final",
+        "title": "韵母 iong 发音示范",
+        "notes": "舌面较高并圆唇，最后收到 ong 的后鼻音。",
+        "url": "./assets/pronunciation-clips/final-iong.mp4",
+        "start": "00:01:24.500",
+        "end": "00:01:25.460"
+      },
+      "ei": {
+        "unit": "ei",
+        "type": "final",
+        "title": "韵母 ei 发音示范",
+        "notes": "从 e 滑向 i，口型由半开逐渐收窄，声音保持连贯。",
+        "url": "./assets/pronunciation-clips/final-ei.mp4",
+        "source": {
+          "kind": "bilibili",
+          "bvid": "BV1Dt411R7iQ",
+          "page": 31,
+          "cid": 60375192,
+          "title": "31 前响复韵母 ei",
+          "localFile": "web/assets/pronunciation-clips/bilibili-source/31-ei.mp4"
+        }
+      },
+      "ao": {
+        "unit": "ao",
+        "type": "final",
+        "title": "韵母 ao 发音示范",
+        "notes": "从 a 滑向 o，先打开口腔，再自然收圆。",
+        "url": "./assets/pronunciation-clips/final-ao.mp4",
+        "source": {
+          "kind": "bilibili",
+          "bvid": "BV1Dt411R7iQ",
+          "page": 32,
+          "cid": 60375195,
+          "title": "32 前响复韵母 ao",
+          "localFile": "web/assets/pronunciation-clips/bilibili-source/32-普通话 汉语拼音 声韵调 动程图 p32 32 前响复韵母 ao.mp4"
+        }
+      },
+      "ou": {
+        "unit": "ou",
+        "type": "final",
+        "title": "韵母 ou 发音示范",
+        "notes": "从 o 滑向 u，双唇逐渐收圆，结尾不要拖散。",
+        "url": "./assets/pronunciation-clips/final-ou.mp4",
+        "source": {
+          "kind": "bilibili",
+          "bvid": "BV1Dt411R7iQ",
+          "page": 33,
+          "cid": 60375199,
+          "title": "33 前响复韵母 ou",
+          "localFile": "web/assets/pronunciation-clips/bilibili-source/33-普通话 汉语拼音 声韵调 动程图 p33 33 前响复韵母 ou.mp4"
+        }
+      },
+      "iu": {
+        "unit": "iu",
+        "type": "final",
+        "title": "韵母 iu 发音示范",
+        "notes": "实际读作 iou，先发 i，再过渡到 ou，注意中间滑动。",
+        "url": "./assets/pronunciation-clips/final-iu.mp4",
+        "source": {
+          "kind": "bilibili",
+          "bvid": "BV1Dt411R7iQ",
+          "page": 35,
+          "cid": 60375210,
+          "title": "35 中响复韵母 iu",
+          "localFile": "web/assets/pronunciation-clips/bilibili-source/35-普通话 汉语拼音 声韵调 动程图 p35 35 中响复韵母 iu.mp4"
+        }
+      },
+      "iao": {
+        "unit": "iao",
+        "type": "final",
+        "title": "韵母 iao 发音示范",
+        "notes": "先做 i 的高舌位，再打开到 a，最后收到 o。",
+        "url": "./assets/pronunciation-clips/final-iao.mp4",
+        "source": {
+          "kind": "bilibili",
+          "bvid": "BV1Dt411R7iQ",
+          "page": 36,
+          "cid": 60375212,
+          "title": "36 中响复韵母 iao",
+          "localFile": "web/assets/pronunciation-clips/bilibili-source/36-普通话 汉语拼音 声韵调 动程图 p36 36 中响复韵母 iao.mp4"
+        }
+      },
+      "ui": {
+        "unit": "ui",
+        "type": "final",
+        "title": "韵母 ui 发音示范",
+        "notes": "实际读作 uei，先圆唇发 u，再滑向 ei。",
+        "url": "./assets/pronunciation-clips/final-ui.mp4",
+        "source": {
+          "kind": "bilibili",
+          "bvid": "BV1Dt411R7iQ",
+          "page": 37,
+          "cid": 60375216,
+          "title": "37 中响复韵母 ui",
+          "localFile": "web/assets/pronunciation-clips/bilibili-source/37-普通话 汉语拼音 声韵调 动程图 p37 37 中响复韵母 ui.mp4"
+        }
+      },
+      "uai": {
+        "unit": "uai",
+        "type": "final",
+        "title": "韵母 uai 发音示范",
+        "notes": "先圆唇发 u，再打开到 a，最后收向 i。",
+        "url": "./assets/pronunciation-clips/final-uai.mp4",
+        "source": {
+          "kind": "bilibili",
+          "bvid": "BV1Dt411R7iQ",
+          "page": 38,
+          "cid": 60375219,
+          "title": "38 中响复韵母 uai",
+          "localFile": "web/assets/pronunciation-clips/bilibili-source/38-普通话 汉语拼音 声韵调 动程图 p38 38 中响复韵母 uai.mp4"
+        }
+      },
+      "ie": {
+        "unit": "ie",
+        "type": "final",
+        "title": "韵母 ie 发音示范",
+        "notes": "从 i 快速滑向 e，嘴角放松展开。",
+        "url": "./assets/pronunciation-clips/final-ie.mp4",
+        "source": {
+          "kind": "bilibili",
+          "bvid": "BV1Dt411R7iQ",
+          "page": 40,
+          "cid": 60375224,
+          "title": "40 后响复韵母 ie",
+          "localFile": "web/assets/pronunciation-clips/bilibili-source/40-普通话 汉语拼音 声韵调 动程图 p40 40 后响复韵母 ie.mp4"
+        }
+      },
+      "uo": {
+        "unit": "uo",
+        "type": "final",
+        "title": "韵母 uo 发音示范",
+        "notes": "先圆唇发 u，再打开到 o，适合“我/锅/多”等音节。",
+        "url": "./assets/pronunciation-clips/final-uo.mp4",
+        "source": {
+          "kind": "bilibili",
+          "bvid": "BV1Dt411R7iQ",
+          "page": 41,
+          "cid": 60375226,
+          "title": "41 后响复韵母 uo",
+          "localFile": "web/assets/pronunciation-clips/bilibili-source/41-普通话 汉语拼音 声韵调 动程图 p41 41 后响复韵母 uo.mp4"
+        }
+      },
+      "ua": {
+        "unit": "ua",
+        "type": "final",
+        "title": "韵母 ua 发音示范",
+        "notes": "先圆唇发 u，再迅速打开到 a。",
+        "url": "./assets/pronunciation-clips/final-ua.mp4",
+        "source": {
+          "kind": "bilibili",
+          "bvid": "BV1Dt411R7iQ",
+          "page": 42,
+          "cid": 60375228,
+          "title": "42 后响复韵母 ua",
+          "localFile": "web/assets/pronunciation-clips/bilibili-source/42-普通话 汉语拼音 声韵调 动程图 p42 42 后响复韵母 ua.mp4"
+        }
+      },
+      "ve": {
+        "unit": "ve",
+        "type": "final",
+        "title": "韵母 ve 发音示范",
+        "notes": "保持 ü 的舌位和圆唇，再滑向 e，用于 yue、jue、que、xue 等音节。",
+        "url": "./assets/pronunciation-clips/final-ve.mp4",
+        "source": {
+          "kind": "bilibili",
+          "bvid": "BV1Dt411R7iQ",
+          "page": 43,
+          "cid": 60375232,
+          "title": "43 后响复韵母 ve",
+          "localFile": "web/assets/pronunciation-clips/bilibili-source/43-普通话 汉语拼音 声韵调 动程图 p43 43 后响复韵母 ve.mp4"
+        }
+      },
+      "an": {
+        "unit": "an",
+        "type": "final",
+        "title": "韵母 an 发音示范",
+        "notes": "先发 a，再舌尖抵上齿龈收成前鼻音 n。",
+        "url": "./assets/pronunciation-clips/final-an.mp4",
+        "source": {
+          "kind": "bilibili",
+          "bvid": "BV1Dt411R7iQ",
+          "page": 44,
+          "cid": 60375237,
+          "title": "44 前鼻音韵母 an",
+          "localFile": "web/assets/pronunciation-clips/bilibili-source/44-普通话 汉语拼音 声韵调 动程图 p44 44 前鼻音韵母 an.mp4"
+        }
+      },
+      "en": {
+        "unit": "en",
+        "type": "final",
+        "title": "韵母 en 发音示范",
+        "notes": "先发 e，再舌尖抵上齿龈收成前鼻音 n。",
+        "url": "./assets/pronunciation-clips/final-en.mp4",
+        "source": {
+          "kind": "bilibili",
+          "bvid": "BV1Dt411R7iQ",
+          "page": 45,
+          "cid": 60375240,
+          "title": "45 前鼻音韵母 en",
+          "localFile": "web/assets/pronunciation-clips/bilibili-source/45-普通话 汉语拼音 声韵调 动程图 p45 45 前鼻音韵母 en.mp4"
+        }
+      },
+      "ian": {
+        "unit": "ian",
+        "type": "final",
+        "title": "韵母 ian 发音示范",
+        "notes": "先发 i，再过渡到 an，结尾前鼻音要收住。",
+        "url": "./assets/pronunciation-clips/final-ian.mp4",
+        "source": {
+          "kind": "bilibili",
+          "bvid": "BV1Dt411R7iQ",
+          "page": 46,
+          "cid": 60375243,
+          "title": "46 前鼻音韵母 ian",
+          "localFile": "web/assets/pronunciation-clips/bilibili-source/46-普通话 汉语拼音 声韵调 动程图 p46 46 前鼻音韵母 ian.mp4"
+        }
+      },
+      "uan": {
+        "unit": "uan",
+        "type": "final",
+        "title": "韵母 uan 发音示范",
+        "notes": "先发 u，再过渡到 an，圆唇起音要清楚。",
+        "url": "./assets/pronunciation-clips/final-uan.mp4",
+        "source": {
+          "kind": "bilibili",
+          "bvid": "BV1Dt411R7iQ",
+          "page": 47,
+          "cid": 60375248,
+          "title": "47 前鼻音韵母 uan",
+          "localFile": "web/assets/pronunciation-clips/bilibili-source/47-普通话 汉语拼音 声韵调 动程图 p47 47 前鼻音韵母 uan.mp4"
+        }
+      },
+      "van": {
+        "unit": "van",
+        "type": "final",
+        "title": "韵母 van 发音示范",
+        "notes": "先发 ü，再过渡到 an，用于 yuan、juan、quan、xuan 等音节。",
+        "url": "./assets/pronunciation-clips/final-van.mp4",
+        "source": {
+          "kind": "bilibili",
+          "bvid": "BV1Dt411R7iQ",
+          "page": 48,
+          "cid": 60375250,
+          "title": "48 前鼻音韵母 van",
+          "localFile": "web/assets/pronunciation-clips/bilibili-source/48-普通话 汉语拼音 声韵调 动程图 p48 48 前鼻音韵母 van.mp4"
+        }
+      },
+      "in": {
+        "unit": "in",
+        "type": "final",
+        "title": "韵母 in 发音示范",
+        "notes": "先发 i，再舌尖抵上齿龈收成前鼻音 n。",
+        "url": "./assets/pronunciation-clips/final-in.mp4",
+        "source": {
+          "kind": "bilibili",
+          "bvid": "BV1Dt411R7iQ",
+          "page": 49,
+          "cid": 60375251,
+          "title": "49 前鼻音韵母 in",
+          "localFile": "web/assets/pronunciation-clips/bilibili-source/49-普通话 汉语拼音 声韵调 动程图 p49 49 前鼻音韵母 in.mp4"
+        }
+      },
+      "un": {
+        "unit": "un",
+        "type": "final",
+        "title": "韵母 un 发音示范",
+        "notes": "实际读作 uen，先圆唇起音，再收成前鼻音 n。",
+        "url": "./assets/pronunciation-clips/final-un.mp4",
+        "source": {
+          "kind": "bilibili",
+          "bvid": "BV1Dt411R7iQ",
+          "page": 50,
+          "cid": 60375259,
+          "title": "50 前鼻音韵母 un",
+          "localFile": "web/assets/pronunciation-clips/bilibili-source/50-普通话 汉语拼音 声韵调 动程图 p50 50 前鼻音韵母 un.mp4"
+        }
+      },
+      "vn": {
+        "unit": "vn",
+        "type": "final",
+        "title": "韵母 vn 发音示范",
+        "notes": "先发 ü，再收成前鼻音 n，用于 yun、jun、qun、xun 等音节。",
+        "url": "./assets/pronunciation-clips/final-vn.mp4",
+        "source": {
+          "kind": "bilibili",
+          "bvid": "BV1Dt411R7iQ",
+          "page": 51,
+          "cid": 60375263,
+          "title": "51 前鼻音韵母 vn",
+          "localFile": "web/assets/pronunciation-clips/bilibili-source/51-普通话 汉语拼音 声韵调 动程图 p51 51 前鼻音韵母 vn.mp4"
+        }
+      },
+      "ang": {
+        "unit": "ang",
+        "type": "final",
+        "title": "韵母 ang 发音示范",
+        "notes": "先发 a，再舌根抬起收成后鼻音 ng。",
+        "url": "./assets/pronunciation-clips/final-ang.mp4",
+        "source": {
+          "kind": "bilibili",
+          "bvid": "BV1Dt411R7iQ",
+          "page": 52,
+          "cid": 60375266,
+          "title": "52 后鼻音韵母 ang",
+          "localFile": "web/assets/pronunciation-clips/bilibili-source/52-普通话 汉语拼音 声韵调 动程图 p52 52 后鼻音韵母 ang.mp4"
+        }
+      },
+      "eng": {
+        "unit": "eng",
+        "type": "final",
+        "title": "韵母 eng 发音示范",
+        "notes": "先发 e，再舌根抬起收成后鼻音 ng。",
+        "url": "./assets/pronunciation-clips/final-eng.mp4",
+        "source": {
+          "kind": "bilibili",
+          "bvid": "BV1Dt411R7iQ",
+          "page": 53,
+          "cid": 60375268,
+          "title": "53 后鼻音韵母 eng",
+          "localFile": "web/assets/pronunciation-clips/bilibili-source/53-普通话 汉语拼音 声韵调 动程图 p53 53 后鼻音韵母 eng.mp4"
+        }
+      },
+      "iang": {
+        "unit": "iang",
+        "type": "final",
+        "title": "韵母 iang 发音示范",
+        "notes": "先发 i，再过渡到 ang，后鼻音要完整。",
+        "url": "./assets/pronunciation-clips/final-iang.mp4",
+        "source": {
+          "kind": "bilibili",
+          "bvid": "BV1Dt411R7iQ",
+          "page": 54,
+          "cid": 60375273,
+          "title": "54 后鼻音韵母 iang",
+          "localFile": "web/assets/pronunciation-clips/bilibili-source/54-普通话 汉语拼音 声韵调 动程图 p54 54 后鼻音韵母 iang.mp4"
+        }
+      },
+      "ing": {
+        "unit": "ing",
+        "type": "final",
+        "title": "韵母 ing 发音示范",
+        "notes": "先发 i，再舌根抬起收成后鼻音 ng。",
+        "url": "./assets/pronunciation-clips/final-ing.mp4",
+        "source": {
+          "kind": "bilibili",
+          "bvid": "BV1Dt411R7iQ",
+          "page": 56,
+          "cid": 60375277,
+          "title": "56 后鼻音韵母 ing",
+          "localFile": "web/assets/pronunciation-clips/bilibili-source/56-普通话 汉语拼音 声韵调 动程图 p56 56 后鼻音韵母 ing.mp4"
+        }
+      },
+      "ong": {
+        "unit": "ong",
+        "type": "final",
+        "title": "韵母 ong 发音示范",
+        "notes": "圆唇发 o，再收成后鼻音 ng，口腔后部保持稳定。",
+        "url": "./assets/pronunciation-clips/final-ong.mp4",
+        "source": {
+          "kind": "bilibili",
+          "bvid": "BV1Dt411R7iQ",
+          "page": 58,
+          "cid": 60375283,
+          "title": "58 后鼻音韵母 ong",
+          "localFile": "web/assets/pronunciation-clips/bilibili-source/58-普通话 汉语拼音 声韵调 动程图 p58 58 后鼻音韵母 ong.mp4"
+        }
+      }
+    }
+  },
+  "sources": {
+    "bilibiliSupplement": {
+      "page": "https://www.bilibili.com/video/BV1Dt411R7iQ/",
+      "title": "普通话 汉语拼音 声韵调 动程图",
+      "bvid": "BV1Dt411R7iQ",
+      "aid": 34464551,
+      "importedAt": "2026-06-22T09:24:02.448686+00:00",
+      "note": "User confirmed they have permission to download and use these local teaching clips."
+    }
+  }
+}

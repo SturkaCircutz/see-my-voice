@@ -9,6 +9,7 @@ import re
 import shutil
 import sys
 import tempfile
+import traceback
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
@@ -114,6 +115,16 @@ except Exception as exc:  # pragma: no cover - keeps the web UI available locall
 
 ASR_MODEL = None
 STANDARD_AUDIO_DIR = APP_DIR / "assets" / "standard-audio"
+
+
+def write_debug_error(exc: Exception) -> None:
+    """Persist server-side analysis errors for local development."""
+    debug_dir = APP_DIR / ".analysis_debug"
+    debug_dir.mkdir(exist_ok=True)
+    (debug_dir / "latest_error.txt").write_text(
+        "".join(traceback.format_exception(type(exc), exc, exc.__traceback__)),
+        encoding="utf-8",
+    )
 
 
 INITIAL_PRACTICE_WORDS = {
@@ -581,6 +592,7 @@ class VoiceHandler(SimpleHTTPRequestHandler):
         try:
             result = self.handle_analyze()
         except Exception as exc:
+            write_debug_error(exc)
             self.send_json({"error": str(exc)}, status=500)
             return
 
