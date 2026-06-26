@@ -7,6 +7,7 @@ import json
 import os
 import re
 import shutil
+import socket
 import sys
 import tempfile
 import traceback
@@ -664,10 +665,22 @@ def main():
     display_host = "127.0.0.1" if host == "0.0.0.0" else host
     print(f"绘声发音训练已启动：http://{display_host}:{port}")
     if host == "0.0.0.0":
+        lan_ip = get_lan_ip()
+        if lan_ip:
+            print(f"局域网访问：http://{lan_ip}:{port}")
         print(f"外部访问：http://seemyvoice.ddns.net:{port}")
     print(f"项目路径：{SEE_MY_VOICE_DIR}")
     print("按 Control + C 停止服务。")
     server.serve_forever()
+
+
+def get_lan_ip() -> str | None:
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+            sock.connect(("8.8.8.8", 80))
+            return sock.getsockname()[0]
+    except OSError:
+        return None
 
 
 if __name__ == "__main__":
