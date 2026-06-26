@@ -33,6 +33,7 @@ import {
 const app = document.querySelector("#app");
 const toast = document.querySelector("#toast");
 const nav = document.querySelector(".app-nav");
+const API_BASE = String(window.SEE_MY_VOICE_API_BASE || "").replace(/\/$/, "");
 const STORAGE_KEY = "see-my-voice-practice-state";
 const STUDENT_NAV_ITEMS = [
   { view: "practice", label: "\u7ec3\u4e60", index: "01" },
@@ -66,6 +67,14 @@ let standardAudio = null;
 let pronunciationClipManifest = { clips: { initial: {}, final: {} } };
 let clockTimer = null;
 let chatSwipeState = null;
+
+function backendUrl(path) {
+  if (!path || /^(?:[a-z]+:)?\/\//i.test(path) || path.startsWith("data:") || path.startsWith("blob:")) {
+    return path;
+  }
+  const normalized = path.startsWith("/") ? path : `/${path}`;
+  return `${API_BASE}${normalized}`;
+}
 
 function blobToDataUrl(blob) {
   return new Promise((resolve, reject) => {
@@ -3134,7 +3143,7 @@ function stopCameraPreview() {
 async function refreshTextInfo(text) {
   const trimmed = text.trim();
   if (!trimmed) return;
-  const response = await fetch(`/api/text-info?text=${encodeURIComponent(trimmed)}`);
+  const response = await fetch(backendUrl(`/api/text-info?text=${encodeURIComponent(trimmed)}`));
   if (!response.ok) return;
   const info = await response.json();
   if (state.targetText.trim() !== trimmed) return;
@@ -3193,7 +3202,7 @@ async function analyzeRecording(blob, persistentRecordingUrl = "") {
   state = reduceState(state, { type: "ANALYZE_START" });
   render();
 
-  const response = await fetch("/api/analyze", { method: "POST", body: form });
+  const response = await fetch(backendUrl("/api/analyze"), { method: "POST", body: form });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
     throw new Error(payload.error || "分析失败，请确认后端已经启动。 ");
@@ -3302,7 +3311,7 @@ function speakStandard(copy) {
   }
 
   if (state.standardAudioUrl) {
-    standardAudio = new Audio(state.standardAudioUrl);
+    standardAudio = new Audio(backendUrl(state.standardAudioUrl));
     state = reduceState(state, { type: "SET_PLAYING", playing: true });
     render();
     showToast(`${copy}（真人标准音）`);
@@ -3325,7 +3334,7 @@ function speakStandard(copy) {
 }
 
 async function fetchAiStandardAudio(text) {
-  const response = await fetch("/api/tts", {
+  const response = await fetch(backendUrl("/api/tts"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ text }),
@@ -3334,7 +3343,7 @@ async function fetchAiStandardAudio(text) {
   if (!response.ok) {
     throw new Error(payload.error || "AI standard audio failed.");
   }
-  return payload.audioUrl;
+  return backendUrl(payload.audioUrl);
 }
 
 function speakStandardWithAi(copy, text) {
