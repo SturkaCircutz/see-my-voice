@@ -7,6 +7,8 @@ The current checkout is on branch `seemyvoice-4.0` and tracks `origin/seemyvoice
 ## Current Capabilities
 
 - Student and teacher prototype workspaces in a vanilla HTML/CSS/JavaScript web app.
+- New Next.js + React + TypeScript frontend workspace for account-based practice flows.
+- New Express + TypeScript backend workspace with MongoDB-backed users and login events.
 - Browser microphone recording through `MediaRecorder`.
 - Local Python backend for `/api/analyze`, `/api/text-info`, `/api/tts`, and `/api/health`.
 - FunASR Paraformer Mandarin ASR to estimate whether the target text was understood.
@@ -24,8 +26,11 @@ This is a prototype, not a clinical speech assessment product. The Stage 2B scor
 .
 ├── .github/workflows/pages.yml        # GitHub Pages deployment workflow
 ├── index.html                         # Redirects to web/
+├── package.json                       # Node workspace scripts
 ├── requirements.txt                   # Python dependencies
 ├── run-web.cmd                        # Windows launcher for web/server.py
+├── backend/                           # Express, JWT auth, MongoDB, API proxy
+├── frontend/                          # Next.js, React, TypeScript app
 ├── samples/                           # Sample/evaluation manifests
 ├── src/                               # Pronunciation and ASR analysis scripts
 ├── tests/                             # Python unit tests
@@ -356,6 +361,92 @@ SEE_MY_VOICE_DIR=/path/to/see-my-voice HOST=0.0.0.0 PORT=4173 python web/server.
 Put HTTPS in front of it with a reverse proxy such as Caddy, Nginx, a cloud load balancer, or a managed tunnel, then set `web/config.js` to that HTTPS origin.
 
 Because GitHub Pages is served over HTTPS, browsers may block calls to a plain `http://` backend as mixed content. Use an `https://` backend URL for the hosted Pages site.
+
+## Next.js, React, and MongoDB App
+
+The merged `frontend-backend` work adds a separate TypeScript app path while keeping the existing Python and `web/` prototype available.
+
+```text
+frontend/ Next.js + React + TypeScript UI
+  -> backend/ Express + TypeScript API
+      -> MongoDB users + login_events
+      -> optional pronunciation API via PRONUNCIATION_API_URL
+
+src/ Python analysis code remains available for local experiments.
+web/ Legacy local prototype remains available for the current FunASR path.
+```
+
+The Next.js frontend handles register/login, the practice screen, microphone recording, score display, and typed calls to the backend. The Express backend stores users in MongoDB, logs register/login events, issues JWTs, and exposes a pronunciation proxy endpoint.
+
+MongoDB collections:
+
+- `users` stores username, display name, password hash, creation time, last login time, and login count.
+- `login_events` stores register/login events with user id, username, action, timestamp, IP, and user agent.
+
+Passwords are hashed with bcrypt before storage. API responses do not return `passwordHash`.
+
+Run the TypeScript app:
+
+```bash
+npm install
+cp backend/.env.example backend/.env
+```
+
+Edit `backend/.env` and set:
+
+```text
+MONGODB_URI=your mongodb connection string
+JWT_SECRET=a long random secret
+SEED_USERNAME=jiawen
+SEED_PASSWORD=123
+SEED_NAME=Jiawen
+```
+
+Start the backend:
+
+```bash
+npm run dev:backend
+```
+
+Start the Next.js frontend in another terminal:
+
+```bash
+npm run dev:frontend
+```
+
+Open:
+
+```text
+http://127.0.0.1:3000
+```
+
+The example env seeds a local user:
+
+```text
+username: jiawen
+password: 123
+```
+
+When a real pronunciation API is available, set:
+
+```text
+PRONUNCIATION_API_URL=https://your-api-host
+```
+
+The Next.js app sends recordings to:
+
+```text
+POST /api/pronunciation/analyze
+```
+
+The backend returns `501` for that endpoint until `PRONUNCIATION_API_URL` is configured.
+
+Build and typecheck:
+
+```bash
+npm run typecheck
+npm run build
+```
 
 Official GitHub references:
 

@@ -8,6 +8,15 @@ __pycache__/
 .venv/
 .matplotlib_cache/
 web/.analysis_debug/
+node_modules/
+*.tsbuildinfo
+frontend/dist/
+.next/
+frontend/.next/
+frontend/out/
+backend/dist/
+backend/.env
+frontend/.env
 
 # Generated Stage 1 / Stage 1.5 / Stage 2A outputs
 stage1_feedback.json
