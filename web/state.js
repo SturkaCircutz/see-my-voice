@@ -319,7 +319,7 @@ const taskPackageTemplates = [
   {
     match: /声母|起音|n\/l|zh|ch|sh|f /,
     category: "声母专项",
-    goal: "先稳定起音动作，再接入词语和短句。",
+    goal: "",
     items: ["看口型舌位 1 次", "单音慢速跟读 5 次", "词语跟读 3 组", "短句录音提交 1 次"],
   },
   {
@@ -341,6 +341,95 @@ const taskPackageTemplates = [
     items: ["短句分段跟读 3 次", "停顿标记练习 2 组", "自然语速录音提交 1 次"],
   },
 ];
+
+export const questionBankPackages = [
+  {
+    id: "initial-f",
+    title: "f 起音训练包",
+    category: "声母",
+    focusTags: ["f 起音不稳定", "唇齿音不清楚"],
+    description: "上齿轻触下唇，气流从唇齿之间送出。",
+    items: ["饭", "飞", "风", "发音", "我要吃饭。", "风很大。"],
+    targetText: "我要吃饭",
+  },
+  {
+    id: "final-an",
+    title: "an 收尾训练包",
+    category: "韵母",
+    focusTags: ["an 韵母收尾不完整", "鼻音弱"],
+    description: "an 结尾要收住，舌尖靠近上齿龈，不要太快滑走。",
+    items: ["饭", "看", "慢", "安静", "我想吃饭。", "请你慢一点。"],
+    targetText: "我想吃饭",
+  },
+  {
+    id: "final-ang",
+    title: "ang 收尾训练包",
+    category: "韵母",
+    focusTags: ["ang/an 混淆", "后鼻音不稳定"],
+    description: "后鼻音 ang 要打开口腔，声音往后收，不要说成 an。",
+    items: ["忙", "放", "长", "上课", "我很忙。", "请放这里。"],
+    targetText: "我很忙",
+  },
+  {
+    id: "tone-three",
+    title: "第三声训练包",
+    category: "声调",
+    focusTags: ["第三声常读平", "低点不明显"],
+    description: "先降后升，中间要有低点，不要读成平的。",
+    items: ["我", "你", "好", "可以", "你好吗？", "我可以。"],
+    targetText: "你好吗",
+  },
+  {
+    id: "tone-four",
+    title: "第四声训练包",
+    category: "声调",
+    focusTags: ["第四声下降不明显", "结尾拖长"],
+    description: "从高处快速下降，声音短而有力，结尾不要拖长。",
+    items: ["饭", "去", "看", "要", "我要去。", "我想吃饭。"],
+    targetText: "我要去",
+  },
+  {
+    id: "initial-nl",
+    title: "n/l 区分训练包",
+    category: "声母",
+    focusTags: ["n/l 混淆", "鼻音和边音区分"],
+    description: "n 是鼻音，l 是边音，重点感受舌尖位置和气流方向。",
+    items: ["你", "来", "年", "蓝色", "你来这里。", "明年再来。"],
+    targetText: "你来这里",
+  },
+  {
+    id: "retroflex",
+    title: "zh/ch/sh 卷舌训练包",
+    category: "声母",
+    focusTags: ["卷舌音不清楚", "zh/ch/sh 不稳定"],
+    description: "舌尖轻轻向后卷，位置比 z/c/s 更靠后。",
+    items: ["知", "吃", "书", "老师", "我想吃饭。", "这是我的书。"],
+    targetText: "这是我的书",
+  },
+  {
+    id: "sentence-rhythm",
+    title: "短句节奏训练包",
+    category: "节奏",
+    focusTags: ["停顿不自然", "语速偏快", "句子清晰度"],
+    description: "不要一口气说太快，注意停顿、清晰度和完整表达。",
+    items: ["你好。", "我要喝水。", "我想吃饭。", "请你慢一点。", "我明天上课。", "老师，我听懂了。"],
+    targetText: "我要喝水",
+  },
+];
+
+function findQuestionBankPackage(tags = []) {
+  const joined = tags.join(" ");
+  return questionBankPackages.find((pack) => pack.focusTags.some((tag) => joined.includes(tag) || tag.includes(joined)))
+    || (/(^|[^a-z])f([^a-z]|$)|唇齿/.test(joined) ? questionBankPackages.find((pack) => pack.id === "initial-f") : null)
+    || (/ang|后鼻/.test(joined) ? questionBankPackages.find((pack) => pack.id === "final-ang") : null)
+    || (/an|鼻音|收尾/.test(joined) ? questionBankPackages.find((pack) => pack.id === "final-an") : null)
+    || (/第三声|读平|低点/.test(joined) ? questionBankPackages.find((pack) => pack.id === "tone-three") : null)
+    || (/第四声|下降|拖长/.test(joined) ? questionBankPackages.find((pack) => pack.id === "tone-four") : null)
+    || (/n\/l|n和l|n l/.test(joined) ? questionBankPackages.find((pack) => pack.id === "initial-nl") : null)
+    || (/zh|ch|sh|卷舌/.test(joined) ? questionBankPackages.find((pack) => pack.id === "retroflex") : null)
+    || (/语速|停顿|节奏|短句/.test(joined) ? questionBankPackages.find((pack) => pack.id === "sentence-rhythm") : null)
+    || questionBankPackages[0];
+}
 
 export function createInitialState() {
   return {
@@ -367,10 +456,14 @@ export function createInitialState() {
     lastRecordingUrl: "",
     standardAudioUrl: "",
     selectedToneDrill: "3",
+    selectedProgressDate: todayKey(),
     practiceBackView: "",
     selectedTaskId: "",
     activeTaskPracticeId: "",
     activeTaskExerciseId: "",
+    activeTaskItemIndex: 0,
+    taskPracticeSnapshot: null,
+    taskDetailMode: false,
     selectedChatThreadId: "chat-direct-chen",
     chatMode: "list",
     assessmentSession: defaultAssessmentSession(),
@@ -379,8 +472,13 @@ export function createInitialState() {
     practiceHistory: defaultPracticeHistory(),
     teacherDashboard,
     selectedTeacherStudentId: teacherDashboard.students[0]?.id || "",
+    teacherTaskMode: "recommended",
+    teacherStudentFilter: "all",
+    editingTeacherStudentSummaryId: "",
+    selectedReviewSubmissionId: "",
     publishedTasks: [],
     taskSubmissions: [],
+    taskStepProgress: {},
     taskMessages: [],
     assessmentProfiles: [],
     chatThreads: defaultChatThreads(),
@@ -535,6 +633,20 @@ function teachingRowsFor(state, options = {}) {
       || selectTeachingIssues(state?.pinyinDiagnosis?.issues || [])
         .find((issue) => Number(issue.index) === Number(preferredSyllable.index));
     return [{ issue: preferredIssue || reviewIssueFor(preferredSyllable, state.targetText), syllable: preferredSyllable }];
+  }
+
+  const shouldShowEverySyllable = options.includeAllSyllables
+    || (state.currentView === "taskDetail" && state.activeTaskPracticeId && state.activeTaskExerciseId);
+  if (shouldShowEverySyllable) {
+    return Object.values(syllables)
+      .sort((left, right) => Number(left.index) - Number(right.index))
+      .map((syllable) => ({
+        issue: syllable.issue || reviewIssueFor(
+          syllable,
+          state.analysisResult?.target_text || state.targetText,
+        ),
+        syllable,
+      }));
   }
 
   const rowsBySyllable = new Map();
@@ -837,13 +949,28 @@ export function getSelectedTeacherStudent(state) {
   return students.find((student) => student.id === state.selectedTeacherStudentId) || students[0] || null;
 }
 
+export function getTeacherStudentAttentionReasons(student) {
+  const reasons = [];
+  if (Number(student?.overdueTasks || 0) > 0) reasons.push("任务未完成");
+  if (Number(student?.latestScore || 0) < 70) reasons.push("最近分数偏低");
+  if (student?.trend === "需关注") reasons.push("趋势需关注");
+  if (Number(student?.pendingSubmissions || 0) > 0) reasons.push("有录音待批改");
+  return reasons;
+}
+
+export function getFilteredTeacherStudents(state) {
+  const students = getTeacherStudents(state);
+  if (state.teacherStudentFilter !== "attention") return students;
+  return students.filter((student) => getTeacherStudentAttentionReasons(student).length > 0);
+}
+
 export function getTeacherDashboardSummary(state) {
   const students = getTeacherStudents(state);
   const pendingReviewCount = getPendingTeacherSubmissions(state).length;
   const pendingAssessmentCount = getPendingAssessmentProfiles(state).length;
   return {
     studentCount: students.length,
-    pendingSubmissions: students.reduce((total, student) => total + Number(student.pendingSubmissions || 0), 0) + pendingReviewCount,
+    pendingSubmissions: pendingReviewCount,
     pendingAssessments: pendingAssessmentCount,
     overdueTasks: students.reduce((total, student) => total + Number(student.overdueTasks || 0), 0),
     needsAttention: students.filter((student) => student.trend === "需关注" || Number(student.overdueTasks || 0) > 0).length,
@@ -866,39 +993,52 @@ export function buildRecommendedTaskPackage(student) {
     items: ["标准音听辨 2 次", "单字跟读 5 次", "短句录音提交 1 次"],
   };
   const reviewTags = [...new Set([primary.tag, ...focusTags.slice(1, 3)])];
+  const bankPackage = findQuestionBankPackage(reviewTags);
   const exerciseSet = [
     {
       id: "watch",
       type: "示范",
       title: "看口型与舌位",
       instruction: `先观察“${primary.tag}”相关的发音动作，确认舌位、口型和气流。`,
-      targetText: primary.practiceText || "我要吃饭",
+      targetText: bankPackage.targetText || primary.practiceText || "我要吃饭",
       requiredCount: 1,
+      sourceMode: "bank",
+      bankPackageId: bankPackage.id,
+      practiceItems: bankPackage.items,
     },
     {
       id: "sound",
       type: "单音",
       title: "重点音慢速跟读",
       instruction: `围绕“${primary.tag}”做慢速跟读，先把动作做完整。`,
-      targetText: primary.practiceText || "我要吃饭",
+      targetText: bankPackage.targetText || primary.practiceText || "我要吃饭",
       requiredCount: student.latestScore < 70 ? 5 : 3,
+      sourceMode: "bank",
+      bankPackageId: bankPackage.id,
+      practiceItems: bankPackage.items,
     },
     {
       id: "word",
       type: "词语",
       title: "词语衔接练习",
       instruction: "把重点音放进词语里练，注意不要为了速度牺牲清晰度。",
-      targetText: primary.practiceText || "我要吃饭",
+      targetText: bankPackage.targetText || primary.practiceText || "我要吃饭",
       requiredCount: 3,
+      sourceMode: "bank",
+      bankPackageId: bankPackage.id,
+      practiceItems: bankPackage.items,
     },
     {
       id: "sentence",
       type: "提交",
       title: "短句录音提交",
       instruction: "读完整个短句，系统会生成 AI 初评并提交给老师复评。",
-      targetText: primary.practiceText || "我要吃饭",
+      targetText: bankPackage.targetText || primary.practiceText || "我要吃饭",
       requiredCount: 1,
       requiresSubmission: true,
+      sourceMode: "bank",
+      bankPackageId: bankPackage.id,
+      practiceItems: bankPackage.items,
     },
   ];
   return {
@@ -911,11 +1051,78 @@ export function buildRecommendedTaskPackage(student) {
     suggestedDue: "3 天内完成",
     requiredSubmissions: 1,
     repeatCount: student.latestScore < 70 ? 5 : 3,
-    practiceText: primary.practiceText || "我要吃饭",
+    practiceText: bankPackage.targetText || primary.practiceText || "我要吃饭",
     items: primary.items,
     exerciseSet,
     reviewTags,
     teacherNote: "AI 已完成初步组包，发布前请老师确认练习量和鼓励语。",
+  };
+}
+
+function applyRecommendedTaskEdits(taskPackage, edits = {}) {
+  if (!taskPackage) return null;
+  const cleanText = (value, fallback) => {
+    const text = String(value ?? "").trim();
+    return text || fallback;
+  };
+  const cleanNumber = (value, fallback) => {
+    const number = Number.parseInt(value, 10);
+    return Number.isFinite(number) && number > 0 ? number : fallback;
+  };
+  const practiceText = cleanText(edits.practiceText, taskPackage.practiceText || "我要吃饭");
+  const repeatCount = cleanNumber(edits.repeatCount, taskPackage.repeatCount || 3);
+  const requiredSubmissions = cleanNumber(edits.requiredSubmissions, taskPackage.requiredSubmissions || 1);
+  const hasEditedItems = Array.isArray(edits.items) && edits.items.length > 0;
+  const items = hasEditedItems
+    ? edits.items.map((item) => String(item).trim()).filter(Boolean)
+    : taskPackage.items;
+  const editedExerciseSet = Array.isArray(edits.exerciseSet)
+    ? edits.exerciseSet.map((exercise, index) => ({
+        id: exercise.id || `custom-${Date.now()}-${index}`,
+        type: cleanText(exercise.type, index === 0 ? "听辨" : index === 1 ? "跟读" : "录音"),
+        title: cleanText(exercise.title, `任务步骤 ${index + 1}`),
+        instruction: cleanText(exercise.instruction, "按老师要求完成这一小步。"),
+        targetText: cleanText(exercise.targetText, practiceText),
+        requiredCount: cleanNumber(exercise.requiredCount, index === 1 ? repeatCount : 1),
+        requiresSubmission: Boolean(exercise.requiresSubmission),
+        sourceMode: exercise.sourceMode === "bank" ? "bank" : "custom",
+        bankPackageId: exercise.bankPackageId || "",
+        practiceItems: Array.isArray(exercise.practiceItems)
+          ? exercise.practiceItems.map((item) => String(item).trim()).filter(Boolean)
+          : [],
+      })).filter((exercise) => exercise.title)
+    : null;
+  const exerciseSet = editedExerciseSet?.length ? editedExerciseSet : (taskPackage.exerciseSet || []).map((exercise, index) => {
+    const editedTitle = hasEditedItems ? items[index] || exercise.title : exercise.title;
+    const requiredCount = exercise.requiresSubmission
+      ? requiredSubmissions
+      : exercise.id === "sound"
+        ? repeatCount
+        : exercise.requiredCount;
+    return {
+      ...exercise,
+      title: editedTitle,
+      targetText: practiceText,
+      requiredCount,
+    };
+  });
+  if (exerciseSet.length && !exerciseSet.some((exercise) => exercise.requiresSubmission)) {
+    exerciseSet[exerciseSet.length - 1] = {
+      ...exerciseSet[exerciseSet.length - 1],
+      requiresSubmission: true,
+    };
+  }
+  return {
+    ...taskPackage,
+    title: cleanText(edits.title, taskPackage.title),
+    goal: cleanText(edits.goal, taskPackage.goal),
+    suggestedDue: cleanText(edits.suggestedDue, taskPackage.suggestedDue),
+    practiceText,
+    repeatCount,
+    requiredSubmissions,
+    items,
+    exerciseSet,
+    teacherNote: cleanText(edits.teacherNote, taskPackage.teacherNote),
   };
 }
 
@@ -945,54 +1152,91 @@ export function buildAssessmentProfile(student, existingCount = 0) {
   };
 }
 
-export function buildInitialTaskFromAssessment(profile) {
+export function buildInitialTaskFromAssessment(profile, edits = {}) {
   if (!profile) return null;
-  const practiceText = "我要喝水";
+  const practiceText = String(edits.practiceText || "我要喝水").trim() || "我要喝水";
+  const teacherItems = Array.isArray(edits.items)
+    ? edits.items.map((item) => String(item || "").trim()).filter(Boolean)
+    : [];
+  const items = teacherItems.length
+    ? teacherItems
+    : [
+        "听辨标准音 2 次",
+        "重点音慢速跟读 5 次",
+        "生活短句录音提交 1 次",
+      ];
+  const repeatCount = Number(edits.repeatCount || 0) > 0
+    ? Number(edits.repeatCount)
+    : profile.overallScore < 70 ? 5 : 3;
+  const requiredSubmissions = Number(edits.requiredSubmissions || 0) > 0
+    ? Number(edits.requiredSubmissions)
+    : 1;
+  const editedExerciseSet = Array.isArray(edits.exerciseSet)
+    ? edits.exerciseSet.map((exercise, index) => ({
+        id: exercise.id || `assessment-step-${index + 1}`,
+        type: String(exercise.type || (index === 0 ? "听辨" : index === 1 ? "跟读" : "提交")).trim(),
+        title: String(exercise.title || items[index] || `任务步骤 ${index + 1}`).trim(),
+        instruction: String(exercise.instruction || "按老师要求完成这一小步。").trim(),
+        targetText: String(exercise.targetText || practiceText).trim(),
+        requiredCount: Number(exercise.requiredCount || 0) > 0 ? Number(exercise.requiredCount) : (index === 1 ? repeatCount : 1),
+        requiresSubmission: Boolean(exercise.requiresSubmission),
+        sourceMode: exercise.sourceMode === "bank" ? "bank" : "custom",
+        bankPackageId: exercise.bankPackageId || "",
+        practiceItems: Array.isArray(exercise.practiceItems)
+          ? exercise.practiceItems.map((item) => String(item).trim()).filter(Boolean)
+          : [],
+      })).filter((exercise) => exercise.title)
+    : [];
+  const exerciseSet = editedExerciseSet.length
+    ? editedExerciseSet
+    : [
+        {
+          id: "listen",
+          type: "听辨",
+          title: items[0] || "听辨标准音",
+          instruction: "先听标准音，确认目标发音和节奏。",
+          targetText: practiceText,
+          requiredCount: 2,
+        },
+        {
+          id: "focus",
+          type: "跟读",
+          title: items[1] || "重点音慢速跟读",
+          instruction: `围绕“${profile.issueTags[0] || "重点音"}”慢速跟读，优先做完整动作。`,
+          targetText: practiceText,
+          requiredCount: repeatCount,
+        },
+        {
+          id: "sentence",
+          type: "提交",
+          title: items[2] || "生活短句录音提交",
+          instruction: "读完整个短句，提交后老师会在批改中心听音复评。",
+          targetText: practiceText,
+          requiredCount: requiredSubmissions,
+          requiresSubmission: true,
+        },
+      ];
+  if (exerciseSet.length && !exerciseSet.some((exercise) => exercise.requiresSubmission)) {
+    exerciseSet[exerciseSet.length - 1] = {
+      ...exerciseSet[exerciseSet.length - 1],
+      requiresSubmission: true,
+    };
+  }
   return {
     id: `initial-task-${profile.id}`,
     status: "已发布",
-    title: `${profile.studentName} · 入门测评训练包`,
+    title: String(edits.title || `${profile.studentName} · 入门测评训练包`).trim() || `${profile.studentName} · 入门测评训练包`,
     targetStudentId: profile.studentId,
     focusTag: profile.issueTags[0] || "入门测评巩固",
-    goal: profile.recommendation,
-    suggestedDue: "本周内完成",
-    requiredSubmissions: 1,
-    repeatCount: profile.overallScore < 70 ? 5 : 3,
+    goal: String(edits.recommendation || profile.recommendation || "").trim() || profile.recommendation,
+    suggestedDue: String(edits.suggestedDue || "本周内完成").trim() || "本周内完成",
+    requiredSubmissions,
+    repeatCount,
     practiceText,
-    items: [
-      "听辨标准音 2 次",
-      "重点音慢速跟读 5 次",
-      "生活短句录音提交 1 次",
-    ],
-    exerciseSet: [
-      {
-        id: "listen",
-        type: "听辨",
-        title: "听辨标准音",
-        instruction: "先听标准音，确认目标发音和节奏。",
-        targetText: practiceText,
-        requiredCount: 2,
-      },
-      {
-        id: "focus",
-        type: "跟读",
-        title: "重点音慢速跟读",
-        instruction: `围绕“${profile.issueTags[0] || "重点音"}”慢速跟读，优先做完整动作。`,
-        targetText: practiceText,
-        requiredCount: profile.overallScore < 70 ? 5 : 3,
-      },
-      {
-        id: "sentence",
-        type: "提交",
-        title: "生活短句录音提交",
-        instruction: "读完整个短句，提交后老师会在批改中心听音复评。",
-        targetText: practiceText,
-        requiredCount: 1,
-        requiresSubmission: true,
-      },
-    ],
+    items,
+    exerciseSet,
     reviewTags: profile.issueTags.slice(0, 3),
-    teacherNote: "该任务由入门测评画像生成，已等待教师确认后发布。",
+    teacherNote: String(edits.teacherNote || "该任务由入门测评画像生成，已由教师确认后发布。").trim(),
     sourceAssessmentId: profile.id,
   };
 }
@@ -1125,7 +1369,6 @@ export function getChatThreads(state, role = state.currentRole) {
   const participantId = role === "teacher" ? "teacher-main" : "student-chen";
   return (state.chatThreads || []).filter((thread) => (
     (thread.memberIds || []).includes(participantId)
-      && !(thread.hiddenBy || []).includes(participantId)
   ));
 }
 
@@ -1241,6 +1484,7 @@ export function buildParentCompanionSummary(state, student = getSelectedTeacherS
 
 export function getCalendarDays(state, count = 14) {
   const practiced = new Set((state.practiceHistory || []).map((item) => item.date));
+  const selectedDate = state.selectedProgressDate || todayKey();
   const today = new Date();
   return Array.from({ length: count }, (_, offset) => {
     const date = new Date(today);
@@ -1251,6 +1495,7 @@ export function getCalendarDays(state, count = 14) {
       label: dateLabel(key),
       practiced: practiced.has(key),
       today: key === todayKey(),
+      selected: key === selectedDate,
     };
   });
 }
@@ -1309,6 +1554,10 @@ function buildTaskSubmission(state, result, recordingUrl) {
     id: `submission-${task.id}-${todayKey()}-${(state.taskSubmissions || []).length + 1}`,
     taskId: task.id,
     taskTitle: task.title,
+    taskGoal: task.goal,
+    taskFocusTag: task.focusTag,
+    taskReviewTags: task.reviewTags || [],
+    taskTeacherNote: task.teacherNote || "",
     exerciseId: exercise?.id || "",
     exerciseTitle: exercise?.title || "短句录音提交",
     exerciseInstruction: exercise?.instruction || "",
@@ -1321,8 +1570,64 @@ function buildTaskSubmission(state, result, recordingUrl) {
     aiScores: analysisScoreSnapshot(result),
     aiSummary: result?.communication_result?.main_feedback || "",
     diagnosisSummary: result?.pinyin_diagnosis?.summary || "",
+    analysisResult: result,
+    pinyinDiagnosis: result?.pinyin_diagnosis ?? null,
+    syllables: toSyllableMap(result),
+    pinyinText: pinyinDisplay(result?.pinyin_display || result?.pinyin) || "",
+    rhythmScore: rhythmScoreFromResult(result),
     status: SUBMISSION_STATUS_PENDING,
     teacherFeedback: "",
+  };
+}
+
+function taskPracticeItemsForExercise(exercise, task, fallbackText = "") {
+  if (Array.isArray(exercise?.practiceItems) && exercise.practiceItems.length) {
+    return exercise.practiceItems.map((item) => String(item).trim()).filter(Boolean);
+  }
+  if (exercise?.targetText) return [String(exercise.targetText).trim()].filter(Boolean);
+  if (task?.practiceText) return [String(task.practiceText).trim()].filter(Boolean);
+  return [String(fallbackText || "").trim()].filter(Boolean);
+}
+
+function buildTaskStepProgress(state, existingProgress = {}, exercise, task, action = {}) {
+  const practiceItems = taskPracticeItemsForExercise(exercise, task, state.targetText);
+  const activeItemIndex = Math.min(
+    Math.max(Number(action.itemIndex ?? state.activeTaskItemIndex ?? 0), 0),
+    Math.max(practiceItems.length - 1, 0),
+  );
+  const result = action.result || state.analysisResult || {};
+  const itemRecord = {
+    completed: true,
+    completedAt: todayKey(),
+    itemIndex: activeItemIndex,
+    targetText: practiceItems[activeItemIndex] || exercise.targetText || task.practiceText,
+    analysisResult: result,
+    recordingUrl: action.recordingUrl || state.lastRecordingUrl || "",
+    aiScores: analysisScoreSnapshot(result),
+    aiSummary: result?.communication_result?.main_feedback || "",
+    pinyinDiagnosis: result?.pinyin_diagnosis || null,
+    syllables: toSyllableMap(result),
+  };
+  const itemRecords = [...(existingProgress.items || [])];
+  itemRecords[activeItemIndex] = itemRecord;
+  const completedItems = itemRecords.filter((item) => item?.completed).length;
+  const lastCompletedItem = itemRecords.filter((item) => item?.completed).at(-1) || itemRecord;
+  return {
+    ...existingProgress,
+    completed: practiceItems.length > 0 && completedItems >= practiceItems.length,
+    completedAt: completedItems >= practiceItems.length ? todayKey() : existingProgress.completedAt || "",
+    exerciseId: exercise.id,
+    exerciseTitle: exercise.title,
+    targetText: lastCompletedItem.targetText,
+    items: itemRecords,
+    totalItems: practiceItems.length,
+    completedItems,
+    analysisResult: lastCompletedItem.analysisResult,
+    recordingUrl: lastCompletedItem.recordingUrl,
+    aiScores: lastCompletedItem.aiScores,
+    aiSummary: lastCompletedItem.aiSummary,
+    pinyinDiagnosis: lastCompletedItem.pinyinDiagnosis,
+    syllables: lastCompletedItem.syllables,
   };
 }
 
@@ -1402,12 +1707,17 @@ export function reduceState(state, action) {
       if (action.view === "account") {
         return { ...state, currentRole: "teacher", currentView: "account", playing: false, clipPlaying: false };
       }
-      if (!["home", "students", "tasks", "reviews", "chat"].includes(action.view)) return state;
+      if (!["home", "students", "tasks", "assessmentEditor", "taskPackageEditor", "reviews", "reviewEditor", "chat"].includes(action.view)) return state;
       return {
         ...state,
         currentRole: "teacher",
         currentView: "teacher",
         teacherView: action.view,
+        selectedReviewSubmissionId: action.submissionId || (action.view === "reviews" ? "" : state.selectedReviewSubmissionId),
+        teacherStudentFilter: action.view === "students"
+          ? (["all", "attention"].includes(action.studentFilter) ? action.studentFilter : "all")
+          : state.teacherStudentFilter,
+        teacherTaskMode: action.view === "tasks" ? (action.taskMode || state.teacherTaskMode || "recommended") : state.teacherTaskMode,
         chatMode: action.view === "chat" ? "list" : state.chatMode,
         playing: false,
         clipPlaying: false,
@@ -1421,15 +1731,67 @@ export function reduceState(state, action) {
         selectedTaskId: action.taskId,
         activeTaskPracticeId: "",
         activeTaskExerciseId: "",
+        activeTaskItemIndex: 0,
         playing: false,
         clipPlaying: false,
       };
+    case "RESTORE_CUSTOM_PRACTICE": {
+      const snapshot = state.taskPracticeSnapshot;
+      if (!snapshot) return {
+        ...state,
+        taskDetailMode: false,
+        activeTaskPracticeId: "",
+        activeTaskExerciseId: "",
+        activeTaskItemIndex: 0,
+      };
+      return {
+        ...state,
+        ...snapshot,
+        currentRole: "student",
+        currentView: "practice",
+        taskDetailMode: false,
+        activeTaskPracticeId: "",
+        activeTaskExerciseId: "",
+        activeTaskItemIndex: 0,
+        taskPracticeSnapshot: null,
+      };
+    }
     case "START_TASK_PRACTICE": {
       const task = getPublishedTasks(state).find((item) => item.id === action.taskId && isPublishedTask(item));
       if (!task) return state;
       const activeExercise = (task.exerciseSet || []).find((exercise) => exercise.id === action.exerciseId)
         || (task.exerciseSet || []).find((exercise) => exercise.requiresSubmission)
         || (task.exerciseSet || [])[0];
+      const practiceItems = Array.isArray(activeExercise?.practiceItems) && activeExercise.practiceItems.length
+        ? activeExercise.practiceItems
+        : activeExercise?.targetText
+          ? [activeExercise.targetText]
+          : [task.practiceText || state.targetText].filter(Boolean);
+      const activeItemIndex = Math.min(Math.max(Number(action.itemIndex || 0), 0), Math.max(practiceItems.length - 1, 0));
+      const taskTargetText = practiceItems[activeItemIndex] || activeExercise?.targetText || task.practiceText || state.targetText;
+      const taskPracticeSnapshot = state.activeTaskPracticeId
+        ? state.taskPracticeSnapshot
+        : {
+            targetText: state.targetText,
+            pinyinText: state.pinyinText,
+            asrHeard: state.asrHeard,
+            modelSummary: state.modelSummary,
+            recordingError: state.recordingError,
+            analysisResult: state.analysisResult,
+            pinyinDiagnosis: state.pinyinDiagnosis,
+            analysisSyllables: state.analysisSyllables,
+            teachingPlan: state.teachingPlan,
+            selectedSyllable: state.selectedSyllable,
+            lastRecordingUrl: state.lastRecordingUrl,
+            standardAudioUrl: state.standardAudioUrl,
+            recordingState: state.recordingState,
+            modelStatus: state.modelStatus,
+            score: state.score,
+            pitchScore: state.pitchScore,
+            clarityScore: state.clarityScore,
+            rhythmScore: state.rhythmScore,
+            practiceHistory: state.practiceHistory,
+          };
       return {
         ...state,
         currentRole: "student",
@@ -1437,7 +1799,9 @@ export function reduceState(state, action) {
         selectedTaskId: task.id,
         activeTaskPracticeId: task.id,
         activeTaskExerciseId: activeExercise?.id || "",
-        targetText: activeExercise?.targetText || task.practiceText || state.targetText,
+        activeTaskItemIndex: activeItemIndex,
+        targetText: taskTargetText,
+        taskPracticeSnapshot,
         recordingState: "idle",
         modelStatus: "idle",
         recordingError: "",
@@ -1455,12 +1819,74 @@ export function reduceState(state, action) {
         ...emptyScores,
       };
     }
+    case "SAVE_TASK_STEP": {
+      const task = getPublishedTasks(state).find((item) => item.id === action.taskId && isPublishedTask(item));
+      if (!task) return state;
+      const exercise = (task.exerciseSet || []).find((item) => item.id === action.exerciseId)
+        || (task.exerciseSet || [])[0];
+      if (!exercise) return state;
+      const taskProgress = state.taskStepProgress?.[task.id] || {};
+      const updatedStepProgress = buildTaskStepProgress(state, taskProgress[exercise.id], exercise, task, action);
+      const nextItemIndex = Math.min(
+        Number(action.nextItemIndex ?? 0),
+        Math.max((updatedStepProgress.totalItems || 1) - 1, 0),
+      );
+      return {
+        ...state,
+        currentRole: "student",
+        currentView: "taskDetail",
+        selectedTaskId: task.id,
+        activeTaskPracticeId: updatedStepProgress.completed ? "" : (action.keepExerciseActive ? task.id : ""),
+        activeTaskExerciseId: updatedStepProgress.completed ? "" : (action.keepExerciseActive ? exercise.id : ""),
+        activeTaskItemIndex: updatedStepProgress.completed ? 0 : nextItemIndex,
+        taskStepProgress: {
+          ...(state.taskStepProgress || {}),
+          [task.id]: {
+            ...taskProgress,
+            [exercise.id]: updatedStepProgress,
+          },
+        },
+        modelStatus: "complete",
+        recordingState: "idle",
+        modelSummary: `已保存“${exercise.title}”，可以继续完成下一步。`,
+      };
+    }
     case "SELECT_TEACHER_STUDENT":
       if (!getTeacherStudents(state).some((student) => student.id === action.studentId)) return state;
       return { ...state, selectedTeacherStudentId: action.studentId, currentRole: "teacher", currentView: "teacher" };
+    case "EDIT_TEACHER_STUDENT_SUMMARY": {
+      const studentId = action.studentId || state.selectedTeacherStudentId;
+      if (!getTeacherStudents(state).some((student) => student.id === studentId)) return state;
+      return { ...state, editingTeacherStudentSummaryId: studentId };
+    }
+    case "UPDATE_TEACHER_STUDENT_SUMMARY": {
+      const studentId = action.studentId || state.selectedTeacherStudentId;
+      const summary = String(action.summary || "").trim();
+      if (!studentId || !summary) return state;
+      return {
+        ...state,
+        teacherDashboard: {
+          ...state.teacherDashboard,
+          students: getTeacherStudents(state).map((student) => (
+            student.id === studentId
+              ? { ...student, assessmentSummary: summary }
+              : student
+          )),
+        },
+        editingTeacherStudentSummaryId: "",
+      };
+    }
+    case "START_NEW_TEACHER_TASK":
+      return {
+        ...state,
+        currentRole: "teacher",
+        currentView: "teacher",
+        teacherView: "taskPackageEditor",
+        teacherTaskMode: "new",
+      };
     case "PUBLISH_RECOMMENDED_TASK": {
       const student = getSelectedTeacherStudent(state);
-      const taskPackage = buildRecommendedTaskPackage(student);
+      const taskPackage = applyRecommendedTaskEdits(buildRecommendedTaskPackage(student), action.edits || {});
       if (!taskPackage) return state;
       const publishedTask = {
         ...taskPackage,
@@ -1473,6 +1899,66 @@ export function reduceState(state, action) {
           ...(state.publishedTasks || []).filter((task) => task.targetStudentId !== publishedTask.targetStudentId),
           publishedTask,
         ],
+        teacherTaskMode: "recommended",
+      };
+    }
+    case "SUBMIT_TASK_TO_TEACHER": {
+      const task = getPublishedTasks(state).find((item) => item.id === action.taskId && isPublishedTask(item));
+      if (!task) return state;
+      const exerciseSet = task.exerciseSet || [];
+      const taskProgress = state.taskStepProgress?.[task.id] || {};
+      const completedSteps = exerciseSet.filter((exercise) => taskProgress[exercise.id]?.completed);
+      const requiredSubmitExercise = exerciseSet.find((exercise) => exercise.requiresSubmission) || exerciseSet.at(-1);
+      const savedSubmitStep = requiredSubmitExercise ? taskProgress[requiredSubmitExercise.id] : Object.values(taskProgress).at(-1);
+      if (!exerciseSet.length || completedSteps.length < exerciseSet.length || !savedSubmitStep) return state;
+      const result = savedSubmitStep.analysisResult || {};
+      const student = getTeacherStudents(state).find((item) => item.id === task.targetStudentId) || null;
+      const taskSubmission = {
+        id: `submission-${task.id}-${todayKey()}-${(state.taskSubmissions || []).length + 1}`,
+        taskId: task.id,
+        taskTitle: task.title,
+        taskGoal: task.goal,
+        taskFocusTag: task.focusTag,
+        taskReviewTags: task.reviewTags || [],
+        taskTeacherNote: task.teacherNote || "",
+        exerciseId: savedSubmitStep.exerciseId || requiredSubmitExercise?.id || "",
+        exerciseTitle: savedSubmitStep.exerciseTitle || requiredSubmitExercise?.title || "任务录音提交",
+        exerciseInstruction: requiredSubmitExercise?.instruction || "",
+        studentId: task.targetStudentId,
+        studentName: student?.name || "学生",
+        submittedAt: todayKey(),
+        targetText: savedSubmitStep.targetText || task.practiceText,
+        heardText: result?.asr?.heard_text || "",
+        recordingUrl: savedSubmitStep.recordingUrl || "",
+        aiScores: savedSubmitStep.aiScores || analysisScoreSnapshot(result),
+        aiSummary: savedSubmitStep.aiSummary || result?.communication_result?.main_feedback || "",
+        diagnosisSummary: result?.pinyin_diagnosis?.summary || savedSubmitStep.pinyinDiagnosis?.summary || "",
+        analysisResult: result,
+        pinyinDiagnosis: savedSubmitStep.pinyinDiagnosis || result?.pinyin_diagnosis || null,
+        syllables: savedSubmitStep.syllables || toSyllableMap(result),
+        pinyinText: pinyinDisplay(result?.pinyin_display || result?.pinyin) || "",
+        rhythmScore: rhythmScoreFromResult(result),
+        completedSteps: completedSteps.map((exercise) => ({
+          id: exercise.id,
+          title: exercise.title,
+          requiredCount: exercise.requiredCount,
+          targetText: taskProgress[exercise.id]?.targetText || exercise.targetText || task.practiceText,
+          items: (taskProgress[exercise.id]?.items || []).filter((item) => item?.completed).map((item) => ({
+            targetText: item.targetText,
+            recordingUrl: item.recordingUrl,
+            aiScores: item.aiScores,
+            aiSummary: item.aiSummary,
+          })),
+        })),
+        status: SUBMISSION_STATUS_PENDING,
+        teacherFeedback: "",
+      };
+      return {
+        ...state,
+        currentRole: "student",
+        currentView: "taskDetail",
+        selectedTaskId: task.id,
+        taskSubmissions: [...(state.taskSubmissions || []), taskSubmission].slice(-80),
       };
     }
     case "START_ENTRY_ASSESSMENT":
@@ -1556,13 +2042,22 @@ export function reduceState(state, action) {
     }
     case "PUBLISH_ASSESSMENT_TASK": {
       const profile = getSelectedAssessmentProfile(state);
-      const task = buildInitialTaskFromAssessment(profile);
+      const edits = action.edits || {};
+      const updatedProfile = profile
+        ? {
+            ...profile,
+            recommendation: String(edits.recommendation || profile.recommendation || "").trim() || profile.recommendation,
+            profileSummary: String(edits.profileSummary || profile.profileSummary || "").trim() || profile.profileSummary,
+            teacherEditedAt: todayKey(),
+          }
+        : null;
+      const task = buildInitialTaskFromAssessment(updatedProfile, edits);
       if (!profile || !task) return state;
       return {
         ...state,
         assessmentProfiles: (state.assessmentProfiles || []).map((item) => (
           item.id === profile.id
-            ? { ...item, status: ASSESSMENT_STATUS_CONFIRMED, confirmedAt: todayKey() }
+            ? { ...updatedProfile, status: ASSESSMENT_STATUS_CONFIRMED, confirmedAt: todayKey() }
             : item
         )),
         publishedTasks: [
@@ -1592,6 +2087,8 @@ export function reduceState(state, action) {
           taskMessages: reviewMessage
             ? [...(state.taskMessages || []), reviewMessage].slice(-120)
             : state.taskMessages || [],
+          teacherView: "reviews",
+          selectedReviewSubmissionId: "",
         };
       }
     case "LOGIN_ACCOUNT":
@@ -1656,23 +2153,6 @@ export function reduceState(state, action) {
         chatMode: deletedSelectedThread ? "list" : state.chatMode,
       };
     }
-    case "HIDE_CHAT_THREAD": {
-      const threadId = action.threadId;
-      const participantId = currentParticipantId(state);
-      const chatThreads = (state.chatThreads || []).map((thread) => (
-        thread.id === threadId
-          ? { ...thread, hiddenBy: Array.from(new Set([...(thread.hiddenBy || []), participantId])) }
-          : thread
-      ));
-      const hiddenSelectedThread = state.selectedChatThreadId === threadId;
-      const nextVisibleThread = getChatThreads({ ...state, chatThreads }, state.currentRole)[0];
-      return {
-        ...state,
-        chatThreads,
-        selectedChatThreadId: hiddenSelectedThread ? nextVisibleThread?.id || "" : state.selectedChatThreadId,
-        chatMode: hiddenSelectedThread ? "list" : state.chatMode,
-      };
-    }
     case "SEND_CHAT_MESSAGE": {
       const body = String(action.body || "").trim();
       if (!body) return state;
@@ -1704,7 +2184,13 @@ export function reduceState(state, action) {
       };
     }
     case "CREATE_CLASS_CHAT": {
-      const title = action.title || "新的班级群聊";
+      const title = String(action.title || "新的班级群聊").trim() || "新的班级群聊";
+      const selectedIds = Array.isArray(action.memberIds) ? action.memberIds : [];
+      const validStudentIds = getTeacherStudents(state).map((student) => student.id);
+      const memberIds = selectedIds.length
+        ? selectedIds.filter((id) => validStudentIds.includes(id))
+        : validStudentIds;
+      if (!memberIds.length) return state;
       const id = `chat-class-${Date.now()}`;
       return {
         ...state,
@@ -1719,7 +2205,7 @@ export function reduceState(state, action) {
             id,
             type: "class",
             title,
-            memberIds: ["teacher-main", ...getTeacherStudents(state).map((student) => student.id)],
+            memberIds: ["teacher-main", ...memberIds],
             createdAt: todayKey(),
             messages: [],
           },
@@ -1748,6 +2234,41 @@ export function reduceState(state, action) {
             memberIds: ["teacher-main", student.id],
             createdAt: todayKey(),
             messages: [],
+          },
+        ],
+      };
+    }
+    case "CREATE_STUDENT_DIRECT_CHAT": {
+      const studentId = "student-chen";
+      const studentName = state.account?.displayName || "陈小禾";
+      const existing = (state.chatThreads || []).find((thread) => thread.type === "direct" && (thread.memberIds || []).includes(studentId));
+      if (existing) return { ...state, selectedChatThreadId: existing.id, chatMode: "thread", currentRole: "student", currentView: "chat" };
+      const id = `chat-direct-${studentId}-${Date.now()}`;
+      return {
+        ...state,
+        currentRole: "student",
+        currentView: "chat",
+        selectedChatThreadId: id,
+        chatMode: "thread",
+        chatThreads: [
+          ...(state.chatThreads || []),
+          {
+            id,
+            type: "direct",
+            title: "王老师",
+            memberIds: ["teacher-main", studentId],
+            createdAt: todayKey(),
+            messages: [
+              {
+                id: `msg-${id}-hello`,
+                senderId: studentId,
+                senderRole: "student",
+                senderName: studentName,
+                body: "老师您好，我想请您看看我的练习。",
+                createdAt: todayKey(),
+                readBy: [studentId],
+              },
+            ],
           },
         ],
       };
@@ -1837,15 +2358,56 @@ export function reduceState(state, action) {
         );
       }
       const taskSubmission = buildTaskSubmission(nextState, result, nextState.lastRecordingUrl);
+      if (taskSubmission) {
+        const snapshot = state.taskPracticeSnapshot || {};
+        const restoredTaskState = {
+          ...nextState,
+          ...snapshot,
+          currentRole: "student",
+          currentView: "taskDetail",
+          taskDetailMode: false,
+          selectedTaskId: taskSubmission.taskId,
+          activeTaskPracticeId: state.activeTaskPracticeId,
+          activeTaskExerciseId: state.activeTaskExerciseId,
+          taskPracticeSnapshot: null,
+          recordingState: "idle",
+          modelStatus: "complete",
+          teachingPlan: snapshot.teachingPlan || nextState.teachingPlan,
+          lastRecordingUrl: nextState.lastRecordingUrl,
+          analysisResult: result,
+          pinyinDiagnosis: result?.pinyin_diagnosis ?? null,
+          analysisSyllables: toSyllableMap(result),
+          teachingPlan: buildTeachingPlan(
+            {
+              ...nextState,
+              currentView: "taskDetail",
+              activeTaskPracticeId: state.activeTaskPracticeId,
+              activeTaskExerciseId: state.activeTaskExerciseId,
+            },
+            action.clipManifest,
+            { includeAllSyllables: true },
+          ),
+          score: nextState.score,
+          pitchScore: nextState.pitchScore,
+          clarityScore: nextState.clarityScore,
+          rhythmScore: nextState.rhythmScore,
+        };
+        return reduceState(restoredTaskState, {
+          type: "SAVE_TASK_STEP",
+          taskId: state.activeTaskPracticeId,
+          exerciseId: state.activeTaskExerciseId,
+          itemIndex: state.activeTaskItemIndex,
+          keepExerciseActive: true,
+          nextItemIndex: state.activeTaskItemIndex,
+          result,
+          recordingUrl: nextState.lastRecordingUrl,
+        });
+      }
       return {
         ...nextState,
-        currentView: taskSubmission ? "taskDetail" : nextState.currentView,
-        selectedTaskId: taskSubmission?.taskId || nextState.selectedTaskId,
-        taskSubmissions: taskSubmission
-          ? [...(state.taskSubmissions || []), taskSubmission].slice(-80)
-          : state.taskSubmissions || [],
-        activeTaskPracticeId: taskSubmission ? "" : nextState.activeTaskPracticeId,
-        activeTaskExerciseId: taskSubmission ? "" : nextState.activeTaskExerciseId,
+        taskSubmissions: state.taskSubmissions || [],
+        activeTaskPracticeId: nextState.activeTaskPracticeId,
+        activeTaskExerciseId: nextState.activeTaskExerciseId,
         teachingPlan: buildTeachingPlan(nextState, action.clipManifest),
       };
     }
@@ -1944,6 +2506,13 @@ export function reduceState(state, action) {
       };
     case "SET_CLIP_PLAYING":
       return { ...state, clipPlaying: Boolean(action.playing), playing: false };
+    case "SELECT_PROGRESS_DATE":
+      return {
+        ...state,
+        selectedProgressDate: action.date || todayKey(),
+        currentRole: "student",
+        currentView: "progress",
+      };
     default:
       return state;
   }
@@ -1951,6 +2520,8 @@ export function reduceState(state, action) {
 
 export function getProgressData(state) {
   const history = state.practiceHistory || [];
+  const selectedDate = state.selectedProgressDate || todayKey();
+  const selectedHistory = history.filter((item) => item.date === selectedDate);
   const dateKeys = recentDateKeys(7);
   const labels = dateKeys.map(dateLabel);
   const scoreByDate = history.reduce((items, item) => {
@@ -1962,7 +2533,8 @@ export function getProgressData(state) {
 
   if (!history.length) {
     return {
-      label: "最近练习",
+      label: "当日",
+      selectedDate,
       labels,
       scores,
       words: [],
@@ -1975,8 +2547,8 @@ export function getProgressData(state) {
     };
   }
 
-  const words = history
-    .slice(-6)
+  const words = selectedHistory
+    .slice(-8)
     .reverse()
     .map((item) => ({
       word: item.text,
@@ -1988,7 +2560,8 @@ export function getProgressData(state) {
     history.reduce((total, item) => total + item.toneScore, 0) / history.length,
   );
   return {
-    label: "最近练习",
+    label: "当日",
+    selectedDate,
     labels,
     scores,
     words,

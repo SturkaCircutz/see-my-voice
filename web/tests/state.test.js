@@ -30,6 +30,30 @@ const generatedClipManifest = JSON.parse(
   fs.readFileSync(path.join(import.meta.dirname, "../assets/pronunciation-clips/manifest.json"), "utf8"),
 );
 
+function completeAllTaskStepsAndSubmit(state, result, recordingUrl = "blob:student-recording") {
+  const task = getTodayStudentTask(state);
+  for (const exercise of task.exerciseSet || []) {
+    const items = exercise.practiceItems?.length ? exercise.practiceItems : [exercise.targetText || task.practiceText];
+    for (let itemIndex = 0; itemIndex < items.length; itemIndex += 1) {
+      const itemResult = { ...result, target_text: items[itemIndex] };
+      state = reduceState(state, { type: "START_TASK_PRACTICE", taskId: task.id, exerciseId: exercise.id, itemIndex });
+      if (exercise.requiresSubmission || !/听|示范/.test(`${exercise.type} ${exercise.title}`)) {
+        state = reduceState(state, { type: "APPLY_ANALYSIS", result: itemResult, recordingUrl });
+      } else {
+        state = reduceState(state, {
+          type: "SAVE_TASK_STEP",
+          taskId: task.id,
+          exerciseId: exercise.id,
+          itemIndex,
+          keepExerciseActive: true,
+          nextItemIndex: itemIndex + 1,
+        });
+      }
+    }
+  }
+  return reduceState(state, { type: "SUBMIT_TASK_TO_TEACHER", taskId: task.id });
+}
+
 test("initial state opens role home with cleared scores", () => {
   const state = createInitialState();
   assert.equal(state.currentRole, "guest");
@@ -176,7 +200,7 @@ test("teacher dashboard starts with student profiles and review workload", () =>
   const state = createInitialState();
   const summary = getTeacherDashboardSummary(state);
   assert.equal(summary.studentCount, 3);
-  assert.equal(summary.pendingSubmissions, 3);
+  assert.equal(summary.pendingSubmissions, 0);
   assert.equal(summary.overdueTasks, 1);
   assert.equal(getSelectedTeacherStudent(state).name, "林一一");
 });
@@ -206,8 +230,7 @@ test("teacher class progress summarizes completion and attention", () => {
   assert.ok(progress.attentionStudents.some((student) => student.id === "student-chen"));
 
   state = reduceState(state, { type: "PUBLISH_RECOMMENDED_TASK" });
-  state = reduceState(state, { type: "START_TASK_PRACTICE", taskId: getTodayStudentTask(state).id });
-  state = reduceState(state, { type: "APPLY_ANALYSIS", result, recordingUrl: "blob:student-recording" });
+  state = completeAllTaskStepsAndSubmit(state, result);
   progress = buildTeacherClassProgress(state);
   assert.equal(progress.taskCoverageRate, 33);
   assert.equal(progress.completionRate, 33);
@@ -223,6 +246,22 @@ test("teacher view navigation and student selection update teacher profile", () 
   state = reduceState(state, { type: "SELECT_TEACHER_STUDENT", studentId: "student-chen" });
   assert.equal(state.currentView, "teacher");
   assert.equal(getSelectedTeacherStudent(state).name, "陈小禾");
+});
+
+test("teacher can edit selected student stage profile comment", () => {
+  let state = reduceState(createInitialState(), { type: "SELECT_TEACHER_STUDENT", studentId: "student-chen" });
+  state = reduceState(state, { type: "EDIT_TEACHER_STUDENT_SUMMARY" });
+  assert.equal(state.editingTeacherStudentSummaryId, "student-chen");
+  state = reduceState(state, {
+    type: "UPDATE_TEACHER_STUDENT_SUMMARY",
+    summary: "第三声比上周稳定，短句停顿仍需要老师继续观察。",
+  });
+  const student = getSelectedTeacherStudent(state);
+  const report = buildStudentAssessmentReport(state, student);
+
+  assert.equal(student.assessmentSummary, "第三声比上周稳定，短句停顿仍需要老师继续观察。");
+  assert.equal(report.conclusion, "第三声比上周稳定，短句停顿仍需要老师继续观察。");
+  assert.equal(state.editingTeacherStudentSummaryId, "");
 });
 
 test("parent companion summary remains internal while parent page is not navigable", () => {
@@ -246,8 +285,7 @@ test("parent companion summary remains internal while parent page is not navigab
   let state = reduceState(createInitialState(), { type: "NAVIGATE", view: "parent" });
   assert.equal(state.currentView, "home");
   state = reduceState(state, { type: "PUBLISH_RECOMMENDED_TASK" });
-  state = reduceState(state, { type: "START_TASK_PRACTICE", taskId: getTodayStudentTask(state).id });
-  state = reduceState(state, { type: "APPLY_ANALYSIS", result, recordingUrl: "blob:student-recording" });
+  state = completeAllTaskStepsAndSubmit(state, result);
   state = reduceState(state, {
     type: "REVIEW_TASK_SUBMISSION",
     submissionId: getPendingTeacherSubmissions(state)[0].id,
@@ -335,7 +373,7 @@ test("analysis without a published task does not create teacher submission", () 
   };
   const state = reduceState(createInitialState(), { type: "APPLY_ANALYSIS", result });
   assert.equal(getPendingTeacherSubmissions(state).length, 0);
-  assert.equal(getTeacherDashboardSummary(state).pendingSubmissions, 3);
+  assert.equal(getTeacherDashboardSummary(state).pendingSubmissions, 0);
 });
 
 test("published task analysis creates a teacher review submission", () => {
@@ -366,18 +404,24 @@ test("published task analysis creates a teacher review submission", () => {
   assert.equal(state.currentView, "taskDetail");
   assert.equal(state.activeTaskPracticeId, task.id);
   assert.ok(task.exerciseSet.some((exercise) => exercise.requiresSubmission));
-  assert.equal(state.targetText, task.practiceText);
+  assert.equal(state.targetText, task.exerciseSet[0].practiceItems[0]);
+  const activeExerciseId = state.activeTaskExerciseId;
   state = reduceState(state, { type: "APPLY_ANALYSIS", result, recordingUrl: "blob:student-recording" });
+  assert.equal(getPendingTeacherSubmissions(state).length, 0);
+  assert.equal(state.taskStepProgress[task.id][activeExerciseId]?.completedItems, 1);
+  assert.equal(state.taskStepProgress[task.id][activeExerciseId]?.completed, false);
+  state = completeAllTaskStepsAndSubmit(state, result);
   const submissions = getPendingTeacherSubmissions(state);
 
   assert.equal(submissions.length, 1);
+  assert.ok(submissions[0].completedSteps.every((step) => step.items.length > 0));
   assert.equal(state.activeTaskPracticeId, "");
   assert.equal(state.currentView, "taskDetail");
-  assert.equal(getTeacherDashboardSummary(state).pendingSubmissions, 4);
+  assert.equal(getTeacherDashboardSummary(state).pendingSubmissions, 1);
   assert.equal(submissions[0].studentId, "student-lin");
   assert.equal(submissions[0].exerciseTitle, "短句录音提交");
   assert.equal(submissions[0].recordingUrl, "blob:student-recording");
-  assert.equal(submissions[0].targetText, "我要吃饭");
+  assert.equal(submissions[0].targetText, "风很大。");
   assert.equal(submissions[0].aiScores.overall, 67);
   assert.equal(submissions[0].aiScores.rhythm, 62);
   assert.match(submissions[0].aiSummary, /f 的起音/);
@@ -402,8 +446,7 @@ test("teacher review completes a submission and exposes student feedback", () =>
     },
   };
   let state = reduceState(createInitialState(), { type: "PUBLISH_RECOMMENDED_TASK" });
-  state = reduceState(state, { type: "START_TASK_PRACTICE", taskId: getTodayStudentTask(state).id });
-  state = reduceState(state, { type: "APPLY_ANALYSIS", result, recordingUrl: "blob:student-recording" });
+  state = completeAllTaskStepsAndSubmit(state, result);
   const submissionId = getPendingTeacherSubmissions(state)[0].id;
   state = reduceState(state, {
     type: "REVIEW_TASK_SUBMISSION",
@@ -413,7 +456,7 @@ test("teacher review completes a submission and exposes student feedback", () =>
   });
 
   assert.equal(getPendingTeacherSubmissions(state).length, 0);
-  assert.equal(getTeacherDashboardSummary(state).pendingSubmissions, 3);
+  assert.equal(getTeacherDashboardSummary(state).pendingSubmissions, 0);
   assert.equal(getLatestStudentFeedback(state).teacherScore, 74);
   assert.match(getLatestStudentFeedback(state).teacherFeedback, /下一次/);
   assert.equal(getLatestStudentFeedback(state).status, "教师已复评");
@@ -421,7 +464,7 @@ test("teacher review completes a submission and exposes student feedback", () =>
   assert.equal(getStudentTaskMessages(state)[0].senderRole, "teacher");
   assert.match(getStudentTaskMessages(state)[0].body, /下一次/);
   assert.equal(getSelectedTeacherMessages(state).length, 1);
-  assert.equal(getSelectedTeacherMessages(state)[0].relatedText, "我要吃饭");
+  assert.equal(getSelectedTeacherMessages(state)[0].relatedText, "风很大。");
 });
 
 test("teacher assessment report summarizes profile and reviewed submissions", () => {
@@ -450,8 +493,7 @@ test("teacher assessment report summarizes profile and reviewed submissions", ()
   assert.ok(report.focusAreas.includes("f 起音不稳定"));
 
   state = reduceState(state, { type: "PUBLISH_RECOMMENDED_TASK" });
-  state = reduceState(state, { type: "START_TASK_PRACTICE", taskId: getTodayStudentTask(state).id });
-  state = reduceState(state, { type: "APPLY_ANALYSIS", result, recordingUrl: "blob:student-recording" });
+  state = completeAllTaskStepsAndSubmit(state, result);
   state = reduceState(state, {
     type: "REVIEW_TASK_SUBMISSION",
     submissionId: getPendingTeacherSubmissions(state)[0].id,
@@ -658,6 +700,30 @@ test("teaching plan falls back to articulation segment when clip is missing", ()
   assert.deepEqual(plan.segments.at(-1).practiceWords, ["饭"]);
 });
 
+test("task sentence teaching plan keeps one video segment for every character", () => {
+  const result = {
+    target_text: "风很大",
+    pinyin_display: ["fēng", "hěn", "dà"],
+    communication_result: { readiness_score: 80 },
+    asr: { heard_text: "风很大", text_similarity: 100 },
+    pinyin_diagnosis: {
+      issues: [
+        { index: 1, type: "tone", title: "第三声需要观察", summary: "很的第三声需要放慢练。", focus: "很" },
+      ],
+    },
+    tone_timing: {
+      syllables: [
+        { index: 0, char: "风", pinyin: "feng1", pinyin_display: "fēng", initial: "f", final: "eng", tone: "1", tone_score: 86 },
+        { index: 1, char: "很", pinyin: "hen3", pinyin_display: "hěn", initial: "h", final: "en", tone: "3", tone_score: 62 },
+        { index: 2, char: "大", pinyin: "da4", pinyin_display: "dà", initial: "d", final: "a", tone: "4", tone_score: 90 },
+      ],
+    },
+  };
+  const state = reduceState(createInitialState(), { type: "APPLY_ANALYSIS", result, clipManifest: generatedClipManifest });
+  const plan = buildTeachingPlan(state, generatedClipManifest, { includeAllSyllables: true });
+  assert.deepEqual(plan.segments.map((segment) => segment.character), ["风", "很", "大"]);
+});
+
 test("analysis automatically generates teaching clip state without navigating away", () => {
   const result = {
     target_text: "饭",
@@ -840,7 +906,7 @@ test("deleting selected chat thread removes it and returns to chat list", () => 
   assert.equal(state.chatMode, "list");
 });
 
-test("hiding a chat thread removes it only from the current participant list", () => {
+test("chat threads no longer support hiding from one participant list", () => {
   let state = createInitialState();
   const classThread = state.chatThreads.find((thread) => thread.type === "class");
   state = {
@@ -853,7 +919,7 @@ test("hiding a chat thread removes it only from the current participant list", (
   state = reduceState(state, { type: "HIDE_CHAT_THREAD", threadId: classThread.id });
 
   assert.equal(state.chatThreads.some((thread) => thread.id === classThread.id), true);
-  assert.equal(getChatThreads(state, "student").some((thread) => thread.id === classThread.id), false);
+  assert.equal(getChatThreads(state, "student").some((thread) => thread.id === classThread.id), true);
   assert.equal(getChatThreads(state, "teacher").some((thread) => thread.id === classThread.id), true);
-  assert.equal(state.chatMode, "list");
+  assert.equal(state.chatMode, "thread");
 });

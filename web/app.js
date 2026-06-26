@@ -5,26 +5,27 @@ import {
   getSyllables,
   getProgressData,
   getPendingTeacherSubmissions,
-  getLatestStudentFeedback,
   getPendingAssessmentProfiles,
   getSelectedChatThread,
   getSelectedStudentTask,
   getSelectedAssessmentProfile,
   getSelectedTeacherStudent,
   getSelectedTeacherMessages,
-  getStudentTaskMessages,
   getChatThreads,
   getEntryAssessmentItems,
   getTotalUnreadChatCount,
   getUnreadChatCount,
   getTeacherDashboardSummary,
   getTeacherStudents,
+  getFilteredTeacherStudents,
+  getTeacherStudentAttentionReasons,
   getTodayStudentTask,
   buildTeacherClassProgress,
   buildRehabWeeklyReport,
   buildRecommendedTaskPackage,
   buildStudentAssessmentReport,
   reduceState,
+  questionBankPackages,
   toneDrills,
   tips,
 } from "./state.js?v=20260624-tasks-nav-1";
@@ -228,6 +229,14 @@ function threadLastMessage(thread) {
   return (thread?.messages || []).at(-1) || null;
 }
 
+function chatThreadDisplayTitle(thread, role, appState = state) {
+  if (!thread || thread.type === "class") return thread?.title || "班级群聊";
+  if (role === "student") return appState.teacherDashboard?.teacherName || "王老师";
+  const studentId = (thread.memberIds || []).find((id) => id !== "teacher-main");
+  const student = getTeacherStudents(appState).find((item) => item.id === studentId);
+  return student?.name || thread.title || "学生私聊";
+}
+
 function loadStoredState() {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
@@ -238,6 +247,7 @@ function loadStoredState() {
       practiceHistory: Array.isArray(stored.practiceHistory) ? stored.practiceHistory : [],
       publishedTasks: Array.isArray(stored.publishedTasks) ? stored.publishedTasks : state.publishedTasks,
       taskSubmissions: Array.isArray(stored.taskSubmissions) ? stored.taskSubmissions : state.taskSubmissions,
+      taskStepProgress: stored.taskStepProgress && typeof stored.taskStepProgress === "object" ? stored.taskStepProgress : state.taskStepProgress,
       taskMessages: Array.isArray(stored.taskMessages) ? stored.taskMessages : state.taskMessages,
       assessmentProfiles: Array.isArray(stored.assessmentProfiles) ? stored.assessmentProfiles : state.assessmentProfiles,
       chatThreads: Array.isArray(stored.chatThreads) ? stored.chatThreads : state.chatThreads,
@@ -251,13 +261,15 @@ function loadStoredState() {
         : state.assessmentSession,
         chatMode: ["list", "thread"].includes(stored.chatMode) ? stored.chatMode : state.chatMode,
         selectedToneDrill: stored.selectedToneDrill || state.selectedToneDrill,
+        selectedProgressDate: stored.selectedProgressDate || state.selectedProgressDate,
         currentRole: ["guest", "student", "teacher"].includes(stored.currentRole) ? stored.currentRole : state.currentRole,
         currentView: ["home", "practice", "tasks", "detail", "progress", "toneDrill", "teachingClip", "teacher", "account", "chat", "taskDetail", "entryAssessment"].includes(stored.currentView)
           ? stored.currentView
           : state.currentView,
-        teacherView: ["home", "students", "tasks", "reviews", "chat", "account"].includes(stored.teacherView)
+        teacherView: ["home", "students", "tasks", "assessmentEditor", "taskPackageEditor", "reviews", "reviewEditor", "chat", "account"].includes(stored.teacherView)
           ? stored.teacherView
           : state.teacherView,
+        selectedReviewSubmissionId: stored.selectedReviewSubmissionId || "",
       };
   } catch {
     window.localStorage.removeItem(STORAGE_KEY);
@@ -272,6 +284,7 @@ function saveStoredState() {
         practiceHistory: state.practiceHistory || [],
         publishedTasks: state.publishedTasks || [],
         taskSubmissions: state.taskSubmissions || [],
+        taskStepProgress: state.taskStepProgress || {},
         taskMessages: state.taskMessages || [],
         assessmentProfiles: state.assessmentProfiles || [],
         chatThreads: state.chatThreads || [],
@@ -283,6 +296,7 @@ function saveStoredState() {
         chatMode: state.chatMode || "list",
         assessmentSession: state.assessmentSession || {},
         selectedToneDrill: state.selectedToneDrill,
+        selectedProgressDate: state.selectedProgressDate,
         currentRole: state.currentRole,
         currentView: state.currentView,
         teacherView: state.teacherView,
@@ -294,6 +308,12 @@ function saveStoredState() {
 }
 
 function standardPronunciationText() {
+  if (state.currentView === "taskDetail" && state.activeTaskPracticeId && state.activeTaskExerciseId) {
+    const task = getSelectedStudentTask(state);
+    const exercise = (task?.exerciseSet || []).find((item) => item.id === state.activeTaskExerciseId);
+    const items = practiceItemsForExercise(exercise);
+    return (items[state.activeTaskItemIndex] || exercise?.targetText || task?.practiceText || state.targetText).trim();
+  }
   if (state.currentView === "teachingClip" || (state.currentView === "detail" && state.teachingPlan)) {
     const segment = state.teachingPlan?.segments?.[state.selectedClipSegmentIndex];
     return segment?.practiceWords?.[0]
@@ -520,6 +540,79 @@ const scoreItems = () => [
   { name: "节奏", value: state.rhythmScore },
 ];
 
+const taskScoreItems = (submission) => [
+  { name: "综合", value: submission?.aiScores?.overall ?? 0 },
+  { name: "声调", value: submission?.aiScores?.tone ?? 0 },
+  { name: "清晰度", value: submission?.aiScores?.clarity ?? 0 },
+  { name: "节奏", value: submission?.aiScores?.rhythm ?? submission?.rhythmScore ?? 0 },
+];
+
+const taskGoalMarkup = (goal) => {
+  const text = String(goal || "").trim();
+  if (text === "先稳定起音动作，再接入词语和短句。") return "";
+  return text ? `<p>${escapeHtml(text)}</p>` : "";
+};
+
+const splitDiagnosisSummary = (summary) => {
+  const text = String(summary || "").trim();
+  const marker = "。声母和韵母接近";
+  if (!text.includes(marker)) return [text].filter(Boolean);
+  const [first, rest] = text.split(marker);
+  return [`${first}。`, `声母和韵母接近${rest}`].filter(Boolean);
+};
+
+const trimDiagnosisDetail = (detail) => {
+  const text = String(detail || "").trim();
+  const firstSentence = text.match(/^[^。！？]+[。！？]/);
+  return firstSentence ? firstSentence[0] : text;
+};
+
+const toneNumberFromSyllable = (syllable, issue) => {
+  const toneMatch = String(syllable?.tone || issue?.focus || issue?.title || "").match(/T([1-5])/);
+  return toneMatch ? toneMatch[1] : "";
+};
+
+const heardCharacterForIssue = (diagnosis, issue) => {
+  const heardText = String(diagnosis?.heard_text || diagnosis?.heardText || state.asrHeard || "").trim();
+  return Array.from(heardText)[Number(issue.index)] || "";
+};
+
+const diagnosisDetailLines = (issue, diagnosis) => {
+  const syllable = Object.values(getSyllables(state)).find((item) => Number(item.index) === Number(issue.index));
+  const summaryLines = splitDiagnosisSummary(issue.summary);
+  const targetCharacter = syllable?.character || issue.practice?.[0] || "这个音";
+  const targetPinyin = syllable?.pinyinDisplay || syllable?.pinyin || diagnosis?.target_pinyin?.[issue.index] || "";
+  const heardCharacter = heardCharacterForIssue(diagnosis, issue) || "这个音";
+  const heardPinyin = diagnosis?.heard_pinyin?.[issue.index] || "";
+  const toneNumber = toneNumberFromSyllable(syllable, issue);
+  const isToneIssue = issue.type === "tone" || issue.type === "syllable" || /整音节|声调|T[1-5]/.test(String(issue.focus || issue.title || ""));
+
+  if (isToneIssue && targetPinyin && heardPinyin) {
+    return [
+      `目标是 ${targetCharacter} / ${targetPinyin}，系统听成了 ${heardCharacter} / ${heardPinyin}。`,
+      "声母和韵母接近，主要差异在声调",
+      "对照声调趋势线练习高低变化。",
+    ];
+  }
+
+  if (summaryLines.length) {
+    return [
+      ...summaryLines,
+      trimDiagnosisDetail(issue.detail),
+    ].filter(Boolean);
+  }
+
+  return [
+    toneNumber ? `第${toneNumber}声调可能存在问题。` : `${issue.focus || issue.title || "这个音"}可能存在问题。`,
+    trimDiagnosisDetail(issue.detail),
+  ].filter(Boolean);
+};
+
+function getLatestTaskSubmission(appState = state) {
+  const task = getSelectedStudentTask(appState);
+  return (appState.taskSubmissions || []).filter((submission) => submission.taskId === task?.id).at(-1) || null;
+}
+
 function getFocusSyllable(activeSyllables) {
   const weight = { focus: 0, warn: 1, good: 2 };
   return Object.values(activeSyllables).sort(
@@ -604,6 +697,27 @@ function getPracticeInsight(activeSyllables, focusSyllable) {
   };
 }
 
+function diagnosisIssueSummary(issue) {
+  const syllable = Object.values(getSyllables(state)).find((item) => Number(item.index) === Number(issue.index));
+  const character = syllable?.character || issue.practice?.[0] || "这个音";
+  const toneNumber = toneNumberFromSyllable(syllable, issue);
+  const toneText = toneNumber ? `第${toneNumber}声调` : "";
+  const typeText = issue.type === "initial"
+    ? "声母"
+    : issue.type === "final"
+      ? "韵母"
+      : issue.type === "tone"
+        ? "声调"
+        : "发音";
+  return {
+    character,
+    shortIssue: toneText
+      ? `${toneText}可能存在问题`
+      : `${issue.focus || typeText}可能存在问题`,
+    label: toneText || issue.focus || issue.title || "发音重点",
+  };
+}
+
 function renderPinyinDiagnosis() {
   const diagnosis = state.pinyinDiagnosis;
   if (!diagnosis) {
@@ -620,9 +734,8 @@ function renderPinyinDiagnosis() {
   return `
     <section class="panel diagnosis-card" aria-label="拼音诊断">
       <span class="model-kicker">拼音诊断</span>
-      <strong>${escapeHtml(diagnosis.summary)}</strong>
-      <p>目标：${escapeHtml((diagnosis.target_pinyin || []).join(" "))}</p>
-      <p>系统听到：${escapeHtml((diagnosis.heard_pinyin || []).join(" ") || "未稳定听清")}</p>
+      <strong>${issues.length ? `发现 ${issues.length} 个需要关注的音` : escapeHtml(diagnosis.summary)}</strong>
+      <p>目标：${escapeHtml((diagnosis.target_pinyin || []).join(" "))}　听到：${escapeHtml((diagnosis.heard_pinyin || []).join(" ") || "未稳定听清")}</p>
       ${
         issues.length
           ? `<button class="teaching-clip-entry" type="button" data-action="generate-teaching-clip">
@@ -631,12 +744,20 @@ function renderPinyinDiagnosis() {
             <div class="drill-list">
               ${issues
                 .map(
-                  (issue) => `
-                    <div class="drill-card">
-                      <span class="status-pill">${escapeHtml(issue.focus)}</span>
-                      <strong>${escapeHtml(issue.title)}</strong>
-                      <p>${escapeHtml(issue.summary)}</p>
-                      <p class="drill-detail">${escapeHtml(issue.detail)}</p>
+                  (issue) => {
+                    const summary = diagnosisIssueSummary(issue);
+                    const detailLines = diagnosisDetailLines(issue, diagnosis);
+                    return `
+                    <details class="drill-card diagnosis-compact-card">
+                      <summary>
+                        <span class="diagnosis-character">${escapeHtml(summary.character)}</span>
+                        <span>
+                          <strong>${escapeHtml(summary.shortIssue)}</strong>
+                          <small>${escapeHtml(summary.label)}</small>
+                        </span>
+                      </summary>
+                      <div class="diagnosis-detail-body">
+                        ${detailLines.map((line) => `<p class="diagnosis-detail-line">${escapeHtml(line)}</p>`).join("")}
                       ${
                         issue.practice?.length
                           ? `<div class="drill-words">${issue.practice
@@ -644,14 +765,189 @@ function renderPinyinDiagnosis() {
                               .join("")}</div>`
                           : ""
                       }
-                    </div>
-                  `,
+                      </div>
+                    </details>
+                  `;
+                  },
                 )
                 .join("")}
             </div>`
           : ""
       }
     </section>
+  `;
+}
+
+function renderTaskPinyinDiagnosis(submission) {
+  const diagnosis = submission?.pinyinDiagnosis;
+  if (!diagnosis) return "";
+  return `
+    <section class="panel diagnosis-card task-ai-diagnosis-card" aria-label="任务拼音诊断">
+      <span class="model-kicker">拼音诊断</span>
+      <strong>${escapeHtml(diagnosis.summary || submission.diagnosisSummary || "系统已完成本次拼音诊断。")}</strong>
+      <p>目标：${escapeHtml(submission.pinyinText || (diagnosis.target_pinyin || []).join(" "))}</p>
+      <p>系统听到：${escapeHtml((diagnosis.heard_pinyin || []).join(" ") || submission.heardText || "未稳定听清")}</p>
+    </section>
+  `;
+}
+
+function renderTaskAiFeedback(submission) {
+  if (!submission) return "";
+  const syllables = Object.values(submission.syllables || {});
+  const focusSyllable = syllables.length ? getFocusSyllable(submission.syllables) : null;
+  return `
+    <section aria-label="任务 AI 反馈" class="task-ai-feedback-block">
+      <div class="score-heading">
+        <div>
+          <span class="model-kicker">本轮分数</span>
+          <strong>${submission.aiScores?.overall ?? "--"} 分</strong>
+        </div>
+        <span>${focusSyllable ? `重点：${escapeHtml(focusSyllable.character)}` : "声调 · 清晰度 · 节奏"}</span>
+      </div>
+      <div class="score-grid">
+        ${taskScoreItems(submission)
+          .map(
+            (item) => `
+              <div class="score-cell">
+                <strong class="score-value">${item.value}</strong>
+                <span class="score-name">${item.name}</span>
+              </div>
+            `,
+          )
+          .join("")}
+      </div>
+      ${renderTaskPinyinDiagnosis(submission)}
+      ${
+        syllables.length
+          ? `<section aria-labelledby="task-feedback-title">
+              <p class="section-label" id="task-feedback-title">音节反馈</p>
+              <div class="syllable-list">
+                ${syllables
+                  .map(
+                    (item) => `
+                      <button class="syllable-card level-${item.level}" type="button" data-task-syllable="${escapeHtml(item.id)}">
+                        <span>
+                          <strong class="syllable-character">${escapeHtml(item.character)}</strong>
+                          <span class="syllable-meta">${escapeHtml(item.pinyinDisplay || item.pinyin)} · ${escapeHtml(item.tone)} · ${item.score}分</span>
+                          <span class="syllable-feedback">${escapeHtml(item.feedback)}</span>
+                        </span>
+                        <span class="status-pill">${escapeHtml(item.status)}</span>
+                      </button>
+                    `,
+                  )
+                  .join("")}
+              </div>
+            </section>`
+          : ""
+      }
+    </section>
+  `;
+}
+
+function renderTaskStepVisualFeedback(activeItemText, completedItem) {
+  const hasAnalysis = state.modelStatus === "complete" && (state.analysisResult || completedItem?.analysisResult);
+  return `
+    <section class="task-step-action-panel task-step-visual-feedback" aria-label="任务视觉化反馈">
+      <span class="model-kicker">视觉化反馈</span>
+      <strong>${hasAnalysis ? "本题发音反馈与示范视频" : "录音后生成视频反馈"}</strong>
+      <p>${escapeHtml(hasAnalysis ? (state.modelSummary || "系统已完成本题分析。") : `先听标准发音，再录“${activeItemText}”。完成后这里会直接显示本题的示范视频和发音建议。`)}</p>
+      ${
+        hasAnalysis
+          ? `${renderPinyinDiagnosis()}
+             ${renderTeachingVideoPanel()}`
+          : ""
+      }
+    </section>
+  `;
+}
+
+function taskFocusTags(task) {
+  return [...new Set([task?.focusTag, ...(task?.reviewTags || [])].filter(Boolean))];
+}
+
+function lowestScoredSyllable(submission) {
+  const syllables = Object.values(submission?.syllables || {});
+  return syllables.length
+    ? syllables.sort((a, b) => Number(a.score || 0) - Number(b.score || 0))[0]
+    : null;
+}
+
+function buildTaskSpecificFeedback(task, submission) {
+  const tags = taskFocusTags(task);
+  const focusText = tags.length ? tags.join("、") : "本次训练重点";
+  const targetText = submission?.targetText || task?.practiceText || "这句话";
+  const score = Number(submission?.aiScores?.overall || 0);
+  const weakSyllable = lowestScoredSyllable(submission);
+
+  if (!submission) {
+    return {
+      title: "等待第一次录音",
+      body: `这个任务主要练“${focusText}”。先按上面的步骤慢慢读“${targetText}”，完成录音后这里会显示和本任务对应的反馈。`,
+      next: `建议先看口型和舌位，再用慢速跟读把“${targetText}”说完整。`,
+    };
+  }
+
+  if (submission.teacherFeedback) {
+    return {
+      title: `${submission.teacherScore ?? submission.aiScores?.overall ?? "--"} 分 · 老师已反馈`,
+      body: submission.teacherFeedback,
+      next: `下一次练习仍然围绕“${focusText}”，先按老师建议调整，再重新录音。`,
+    };
+  }
+
+  const levelText = score >= 85
+    ? "这次任务完成比较稳定"
+    : score >= 70
+      ? "这次任务已经基本完成，但重点音还需要再稳一点"
+      : "这次任务还需要继续练习，建议先放慢速度";
+  const scoreText = submission.aiScores
+    ? `本次综合 ${submission.aiScores.overall ?? "--"} 分，声调 ${submission.aiScores.tone ?? "--"} 分，清晰度 ${submission.aiScores.clarity ?? "--"} 分，节奏 ${submission.aiScores.rhythm ?? "--"} 分。`
+    : "系统已收到这次录音。";
+  const weakText = weakSyllable
+    ? `目前最需要注意的是“${weakSyllable.character}”（${weakSyllable.pinyinDisplay || weakSyllable.pinyin}），${weakSyllable.feedback}`
+    : submission.aiSummary || submission.diagnosisSummary || "可以继续围绕本任务重点练习。";
+
+  return {
+    title: levelText,
+    body: `这个任务要求练“${focusText}”，练习句子是“${targetText}”。${scoreText}${weakText}`,
+    next: `下一次建议先单独练“${tags[0] || weakSyllable?.character || targetText}”，再读完整句；录音时放慢一点，优先保证发音动作清楚。`,
+  };
+}
+
+function questionBankById(id) {
+  return questionBankPackages.find((pack) => pack.id === id) || questionBankPackages[0];
+}
+
+function practiceItemsForExercise(exercise) {
+  if (Array.isArray(exercise?.practiceItems) && exercise.practiceItems.length) return exercise.practiceItems;
+  if (exercise?.bankPackageId) return questionBankById(exercise.bankPackageId)?.items || [];
+  return exercise?.targetText ? [exercise.targetText] : [];
+}
+
+function taskPackageUiState(task) {
+  const exerciseSet = task.exerciseSet?.length ? task.exerciseSet : (task.items || []);
+  const taskProgress = state.taskStepProgress?.[task.id] || {};
+  const completedCount = exerciseSet.filter((exercise) => taskProgress[exercise.id]?.completed).length;
+  const latestSubmission = (state.taskSubmissions || []).filter((submission) => submission.taskId === task.id).at(-1);
+  const totalCount = exerciseSet.length || 1;
+  if (latestSubmission?.teacherFeedback || latestSubmission?.status === "教师已复评") {
+    return { label: "已完成", level: "done", completedCount, totalCount };
+  }
+  if (latestSubmission) {
+    return { label: "待老师反馈", level: "pending", completedCount: totalCount, totalCount };
+  }
+  if (completedCount >= totalCount) {
+    return { label: "待提交", level: "pending", completedCount, totalCount };
+  }
+  return { label: "待完成", level: "todo", completedCount, totalCount };
+}
+
+function renderPracticeItemChips(items, className = "practice-item-list") {
+  if (!items?.length) return "";
+  return `
+    <div class="${className}">
+      ${items.map((item) => `<span>${escapeHtml(item)}</span>`).join("")}
+    </div>
   `;
 }
 
@@ -755,12 +1051,6 @@ function renderAccount() {
           </div>
         </section>
 
-        <section class="panel account-card account-guide-card" aria-label="账号说明">
-          <span class="model-kicker">学习档案</span>
-          <strong>${todayTask ? "今天有老师布置的练习" : "今天可以自由练习"}</strong>
-          <p>${todayTask ? `当前任务：${escapeHtml(todayTask.title)}。完成录音后老师可以在批改中心查看。` : "你可以先完成一轮自定义录音，再从聊天页联系老师确认练习重点。"}</p>
-        </section>
-
         <section class="panel account-card account-settings-card" aria-labelledby="account-login-title">
           <div class="account-section-heading">
             <div>
@@ -772,7 +1062,7 @@ function renderAccount() {
           <div class="account-form">
             <div class="account-role-picker" role="radiogroup" aria-label="选择登录身份">
               <label class="${state.currentRole === "student" ? "is-selected" : ""}">
-                <input type="radio" name="login-role" value="student" ${state.currentRole !== "teacher" ? "checked" : ""}>
+                <input type="radio" name="login-role" value="student" ${state.currentRole === "student" ? "checked" : ""}>
                 <span>学生</span>
               </label>
               <label class="${state.currentRole === "teacher" ? "is-selected" : ""}">
@@ -797,61 +1087,6 @@ function renderAccount() {
           本页只是本地演示账号，不会连接真实认证系统。清除浏览器数据会同时清除头像、账号和聊天记录。
         </section>
       </div>
-    </section>
-  `;
-}
-
-function renderTodayTaskCard() {
-  const task = getTodayStudentTask(state);
-  const feedback = getLatestStudentFeedback(state);
-  const taskMessages = getStudentTaskMessages(state);
-  if (!task) return "";
-  return `
-    <section class="panel today-task-card" aria-labelledby="today-task-title">
-      <span class="model-kicker">老师布置</span>
-      <div class="today-task-heading">
-        <div>
-          <h2 id="today-task-title">${escapeHtml(task.title)}</h2>
-          <p>${escapeHtml(task.goal)}</p>
-        </div>
-        <span class="status-pill">${escapeHtml(task.status)}</span>
-      </div>
-      <div class="teacher-task-meta">
-        <span>${escapeHtml(task.suggestedDue)}</span>
-        <span>练习 ${task.repeatCount} 次</span>
-        <span>提交 ${task.requiredSubmissions} 次录音</span>
-      </div>
-      <ol class="teacher-task-preview student-task-steps">
-        ${(task.items || []).map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
-      </ol>
-      <p class="today-task-note">完成录音后会作为本次任务提交给老师查看。</p>
-      <button class="teacher-primary-button" type="button" data-student-task="${escapeHtml(task.id)}">开始完成任务</button>
-      ${
-        feedback
-          ? `<div class="student-feedback-card">
-              <span class="model-kicker">老师反馈</span>
-              <strong>${feedback.teacherScore} 分 · ${escapeHtml(feedback.status)}</strong>
-              <p>${escapeHtml(feedback.teacherFeedback)}</p>
-            </div>`
-          : ""
-      }
-      ${
-        taskMessages.length
-          ? `<div class="student-message-thread" aria-label="任务留言">
-              <span class="model-kicker">任务留言</span>
-              ${taskMessages
-                .map(
-                  (message) => `
-                    <article class="student-message-bubble">
-                      <strong>${escapeHtml(message.senderName)}</strong>
-                      <p>${escapeHtml(message.body)}</p>
-                    </article>
-                  `,
-                )
-                .join("")}
-            </div>`
-          : ""
-      }
     </section>
   `;
 }
@@ -891,8 +1126,6 @@ function renderAssessmentEntryCard() {
 function renderPractice() {
   const activeSyllables = getSyllables(state);
   const focusSyllable = getFocusSyllable(activeSyllables);
-  const practiceSteps = getPracticeSteps();
-  const practiceInsight = getPracticeInsight(activeSyllables, focusSyllable);
   const recordCopy = {
     idle: "开始录音",
     recording: "正在录音… 点击完成",
@@ -912,16 +1145,6 @@ function renderPractice() {
       ${brandHeader()}
       <div class="content">
         ${renderAssessmentEntryCard()}
-        ${renderTodayTaskCard()}
-        ${
-          state.activeTaskPracticeId
-            ? `<section class="panel task-focus-box active-task-practice-banner">
-                <span class="model-kicker">任务录音</span>
-                <strong>正在完成老师布置的训练包</strong>
-                <p>完成本次录音分析后，系统会自动把结果提交到批改中心。</p>
-              </section>`
-            : ""
-        }
         ${
           state.practiceBackView === "toneDrill"
             ? `<button class="practice-back-button" type="button" data-view="toneDrill">返回专项题库</button>`
@@ -933,29 +1156,14 @@ function renderPractice() {
           <p class="pinyin">${state.pinyinText}</p>
         </section>
 
-        <ol class="practice-steps" aria-label="本次练习步骤">
-          ${practiceSteps
-            .map(
-              (step) => `
-                <li class="practice-step is-${step.state}">
-                  <span class="practice-step-dot" aria-hidden="true"></span>
-                  <strong>${step.label}</strong>
-                  <span>${step.detail}</span>
-                </li>
-              `,
-            )
-            .join("")}
-        </ol>
-
         <section class="model-card level-${state.modelStatus === "error" ? "focus" : "good"}" aria-label="发音反馈状态">
           <div>
             <span class="model-kicker">发音反馈</span>
             <strong>${statusCopy}</strong>
-            <span>系统听到：${state.asrHeard}</span>
+            <span>${state.recordingError ? escapeHtml(state.recordingError) : `系统听到：${state.asrHeard}`}</span>
           </div>
           <span class="status-pill">${state.modelStatus === "complete" ? "已完成" : "准备中"}</span>
         </section>
-        <p class="model-summary ${state.recordingError ? "is-error" : ""}">${state.recordingError || state.modelSummary}</p>
 
         <div class="record-row" aria-label="练习操作">
           <button class="record-button" type="button" data-action="record" data-state="${state.recordingState}" ${state.modelStatus === "analyzing" ? "disabled" : ""}>
@@ -969,21 +1177,6 @@ function renderPractice() {
           </button>
           <button class="square-button" type="button" data-action="reset">重来</button>
         </div>
-
-        <section class="practice-insight level-${practiceInsight.tone}" aria-label="本轮练习建议">
-          <div>
-            <span class="model-kicker">下一步</span>
-            <strong>${escapeHtml(practiceInsight.title)}</strong>
-            <p>${escapeHtml(practiceInsight.body)}</p>
-          </div>
-          ${
-            state.modelStatus === "complete" && focusSyllable
-              ? `<button class="insight-action" type="button" data-syllable="${focusSyllable.id}">
-                  ${escapeHtml(practiceInsight.action)}
-                </button>`
-              : `<span class="insight-action is-static">${escapeHtml(practiceInsight.action)}</span>`
-          }
-        </section>
 
         <section aria-label="发音评分">
           <div class="score-heading">
@@ -1067,6 +1260,10 @@ function renderStudentTaskContent({ embedded = false } = {}) {
   const activeExercise = exerciseSet.find((exercise) => exercise.id === state.activeTaskExerciseId)
     || exerciseSet.find((exercise) => exercise.requiresSubmission)
     || exerciseSet[0];
+  const taskProgress = state.taskStepProgress?.[task.id] || {};
+  const completedCount = exerciseSet.filter((exercise) => taskProgress[exercise.id]?.completed).length;
+  const allStepsCompleted = exerciseSet.length > 0 && completedCount === exerciseSet.length;
+  const isStepMode = Boolean(state.activeTaskExerciseId);
   const isActiveTask = state.activeTaskPracticeId === task.id;
   const taskRecordCopy = state.modelStatus === "analyzing"
     ? "正在分析并提交..."
@@ -1079,99 +1276,178 @@ function renderStudentTaskContent({ embedded = false } = {}) {
   const reviewedCount = allTaskSubmissions.filter((submission) => submission.status === "教师已复评").length;
   const pendingCount = allTaskSubmissions.filter((submission) => submission.status === "待教师复评").length;
   const taskStatus = latestSubmission?.status || (submissions.length ? "待教师复评" : "待提交");
-  const feedbackCopy = latestSubmission
-    ? latestSubmission.teacherFeedback || latestSubmission.aiSummary || "已提交给老师，等待复评。"
-    : "完成录音后，老师会在批改中心听音并给出反馈。";
-  const recentSubmissions = submissions.slice(-2).reverse();
+  const packageState = taskPackageUiState(task);
+  const isCompletedPackage = packageState.label === "已完成";
+  const teacherFeedbackTitle = latestSubmission?.teacherFeedback
+    ? `${latestSubmission.teacherScore ?? "--"} 分 · 老师已反馈`
+    : "老师还在批阅中";
+  const teacherFeedbackBody = latestSubmission?.teacherFeedback
+    || (latestSubmission ? "老师已经收到你的任务录音，批阅完成后会在这里同步显示具体反馈。" : "完成任务并提交后，老师会在这里给出本任务反馈。");
+  if (isStepMode) {
+    const stepProgress = taskProgress[activeExercise?.id] || {};
+    const activePracticeItems = practiceItemsForExercise(activeExercise);
+    const activeItemIndex = Math.min(Math.max(Number(state.activeTaskItemIndex || 0), 0), Math.max(activePracticeItems.length - 1, 0));
+    const activeItemText = activePracticeItems[activeItemIndex] || activeExercise?.targetText || task.practiceText || "我要吃饭";
+    const completedItems = stepProgress.items || [];
+    const completedItem = completedItems[activeItemIndex] || null;
+    const allItemsDone = activePracticeItems.length > 0 && activePracticeItems.every((_, index) => completedItems[index]?.completed);
+    const currentItemDone = Boolean(completedItems[activeItemIndex]?.completed);
+    const itemRecordCopy = currentItemDone && state.recordingState !== "recording" && state.modelStatus !== "analyzing"
+      ? "重新录音提交"
+      : taskRecordCopy;
+    return `
+        <section class="panel task-simple-card">
+          <button class="teacher-secondary-button task-back-button" type="button" data-action="return-task-steps">返回任务</button>
+          <span class="model-kicker">第 ${exerciseSet.findIndex((exercise) => exercise.id === activeExercise?.id) + 1} 步</span>
+          <div class="today-task-heading">
+            <div>
+              <h2>${escapeHtml(activeExercise?.title || "任务步骤")}</h2>
+              <p>${escapeHtml(activeExercise?.instruction || "按老师要求完成这一小步。")}</p>
+            </div>
+            <span class="status-pill">${stepProgress.completed ? "已保存" : "进行中"}</span>
+          </div>
+          <div class="task-primary-target">
+            <span>${escapeHtml(activeExercise?.type || "练习")}</span>
+            <strong>${escapeHtml(activeItemText)}</strong>
+            <p>第 ${activeItemIndex + 1}/${activePracticeItems.length || 1} 题。${activeExercise?.requiresSubmission ? "这些录音会作为最后提交给老师的作业。" : "每个题目都需要单独录音保存。"}</p>
+            <div class="practice-item-list task-item-list">
+              ${activePracticeItems.map((item, index) => `
+                <button class="${index === activeItemIndex ? "is-active" : ""} ${completedItems[index]?.completed ? "is-complete" : ""}" type="button" data-task-practice="${escapeHtml(task.id)}" data-task-exercise="${escapeHtml(activeExercise?.id || "")}" data-task-item-index="${index}">
+                  ${escapeHtml(item)}
+                </button>
+              `).join("")}
+            </div>
+          </div>
+          <div class="task-step-action-panel">
+            <span class="model-kicker">标准音与录音</span>
+            <p>当前题目：${escapeHtml(activeItemText)}。先听标准发音，再录音练习；系统会在本页生成反馈和视觉化提示。</p>
+            <button class="teacher-secondary-button" type="button" data-action="play">播放标准发音</button>
+            <div class="record-row task-record-row" aria-label="训练包录音操作">
+              <button class="record-button" type="button" data-action="task-record" data-task-practice="${escapeHtml(task.id)}" data-task-exercise="${escapeHtml(activeExercise?.id || "")}" data-task-item-index="${activeItemIndex}" ${state.modelStatus === "analyzing" ? "disabled" : ""}>
+                <span class="record-state-dot"></span>${itemRecordCopy}
+              </button>
+              <button class="square-button" type="button" data-action="play-self" ${completedItem?.recordingUrl || state.lastRecordingUrl ? "" : "disabled"}>回听</button>
+            </div>
+          </div>
+          ${renderTaskStepVisualFeedback(activeItemText, completedItem)}
+          ${
+            allItemsDone
+              ? `<div class="task-next-step">
+                  <span>已完成</span>
+                  <p>这一小步里的 ${activePracticeItems.length || 1} 个题目都已保存，可以返回任务步骤继续完成下一项。</p>
+                </div>`
+              : ""
+          }
+        </section>
+    `;
+  }
+  if (isCompletedPackage) {
+    return `
+        <section class="panel task-simple-card">
+          <span class="model-kicker">已完成训练包</span>
+          <div class="today-task-heading">
+            <div>
+              <h2>${escapeHtml(task.title)}</h2>
+              ${taskGoalMarkup(task.goal)}
+            </div>
+            <span class="status-pill">已完成</span>
+          </div>
+          <div class="teacher-task-meta">
+            <span>${escapeHtml(task.suggestedDue)}</span>
+            <span>完成 ${packageState.totalCount}/${packageState.totalCount} 步</span>
+            <span>${submissions.length} 次提交</span>
+          </div>
+        </section>
+
+        <section class="panel task-feedback-card">
+          <span class="model-kicker">本任务反馈</span>
+          <strong>${escapeHtml(teacherFeedbackTitle)}</strong>
+          <p>${escapeHtml(teacherFeedbackBody)}</p>
+        </section>
+
+        <button class="teacher-secondary-button" type="button" data-view="tasks">返回任务列表</button>
+    `;
+  }
   return `
         <section class="panel task-simple-card">
           <span class="model-kicker">训练包</span>
           <div class="today-task-heading">
             <div>
               <h2>${escapeHtml(task.title)}</h2>
-              <p>${escapeHtml(task.goal)}</p>
+              ${taskGoalMarkup(task.goal)}
             </div>
             <span class="status-pill">${escapeHtml(task.status)}</span>
           </div>
           <div class="teacher-task-meta">
             <span>${escapeHtml(task.suggestedDue)}</span>
-            <span>练习 ${task.repeatCount} 次</span>
+            <span>已完成 ${completedCount}/${exerciseSet.length} 步</span>
             <span>需提交 ${task.requiredSubmissions} 次录音</span>
           </div>
-          <div class="task-primary-target">
-            <span>${escapeHtml(taskStatus)}</span>
-            <strong>${escapeHtml(activeExercise?.targetText || task.practiceText || "我要吃饭")}</strong>
-            <p>${isActiveTask ? escapeHtml(state.recordingError || state.modelSummary) : "点击开始后朗读这句话。系统会先生成 AI 初评，再把录音提交到教师端批改中心。"}</p>
+          <div class="task-step-list">
+            ${exerciseSet.map((exercise, index) => `
+              <button class="task-step-card ${taskProgress[exercise.id]?.completed ? "is-complete" : ""}" type="button" data-task-practice="${escapeHtml(task.id)}" data-task-exercise="${escapeHtml(exercise.id)}">
+                <span class="task-exercise-index">${index + 1}</span>
+                <span>
+                  <strong>${escapeHtml(exercise.title)}</strong>
+                  <small>${escapeHtml(exercise.instruction)}</small>
+                  <em>${escapeHtml(exercise.targetText || task.practiceText || "")} · ${exercise.requiredCount || 1} 次${exercise.requiresSubmission ? " · 录音提交" : ""}</em>
+                  ${renderPracticeItemChips(practiceItemsForExercise(exercise), "practice-item-list is-compact")}
+                </span>
+                <b>${taskProgress[exercise.id]?.completed ? "已完成" : "去完成"}</b>
+              </button>
+            `).join("")}
           </div>
-          <div class="record-row task-record-row" aria-label="训练包录音操作">
-            <button class="record-button" type="button" data-action="task-record" data-task-practice="${escapeHtml(task.id)}" data-task-exercise="${escapeHtml(activeExercise?.id || "")}" ${state.modelStatus === "analyzing" ? "disabled" : ""}>
-              <span class="record-state-dot"></span>${taskRecordCopy}
-            </button>
-            <button class="square-button" type="button" data-action="play-self" ${state.lastRecordingUrl ? "" : "disabled"}>回听</button>
-          </div>
+          <button class="teacher-primary-button" type="button" data-action="submit-task-to-teacher" data-task-practice="${escapeHtml(task.id)}" ${allStepsCompleted && !latestSubmission ? "" : "disabled"}>
+            ${latestSubmission ? "已提交给老师" : allStepsCompleted ? "提交给老师" : "完成所有步骤后提交"}
+          </button>
         </section>
 
         <section class="panel task-feedback-card">
-          <span class="model-kicker">老师反馈</span>
-          <strong>${latestSubmission?.teacherFeedback ? `${latestSubmission.teacherScore ?? latestSubmission.aiScores?.overall ?? "--"} 分 · 老师已反馈` : pendingCount ? "等待老师批改" : "还没有提交"}</strong>
-          <p>${escapeHtml(feedbackCopy)}</p>
+          <span class="model-kicker">本任务反馈</span>
+          <strong>${escapeHtml(teacherFeedbackTitle)}</strong>
+          <p>${escapeHtml(teacherFeedbackBody)}</p>
+          ${latestSubmission?.recordingUrl ? `<button class="teacher-secondary-button" type="button" data-action="play-submission" data-submission-id="${escapeHtml(latestSubmission.id)}">回听提交录音</button>` : ""}
         </section>
 
-        <section class="panel student-submission-card task-recent-card">
-          <div class="task-section-heading">
-            <span class="model-kicker">最近提交</span>
-            <span>${submissions.length} 条</span>
-          </div>
-          ${
-            recentSubmissions.length
-              ? recentSubmissions.map((submission) => `
-                  <article class="student-submission-row">
-                    <strong>${escapeHtml(submission.status)}</strong>
-                    <span>${escapeHtml(submission.exerciseTitle || "短句录音提交")} · AI ${submission.aiScores?.overall ?? "--"} 分 · ${escapeHtml(submission.submittedAt)}</span>
-                    <p>${escapeHtml(submission.teacherFeedback || submission.aiSummary || "已提交，等待老师复评。")}</p>
-                    <button class="teacher-secondary-button" type="button" data-action="play-submission" data-submission-id="${escapeHtml(submission.id)}" ${submission.recordingUrl ? "" : "disabled"}>回听这次录音</button>
-                  </article>
-                `).join("")
-              : `<p class="today-task-note">还没有提交录音。</p>`
-          }
-        </section>
-
-        <details class="panel task-steps-details">
-          <summary>查看练习步骤</summary>
-          <div class="task-exercise-list">
-            ${exerciseSet.map((exercise, index) => `
-              <article class="task-exercise-item ${exercise.id === activeExercise?.id ? "is-active" : ""}">
-                <span class="task-exercise-index">${index + 1}</span>
-                <div>
-                  <strong>${escapeHtml(exercise.title)}</strong>
-                  <p>${escapeHtml(exercise.instruction)}</p>
-                  <small>${escapeHtml(exercise.type)} · ${exercise.requiredCount} 次${exercise.requiresSubmission ? " · 需提交" : ""}</small>
-                </div>
-              </article>
-            `).join("")}
-          </div>
-          <div class="task-focus-box">
-            <span class="model-kicker">本次重点</span>
-            <strong>${escapeHtml(task.focusTag || "清晰稳定地完成短句")}</strong>
-            <p>教师端会收到录音、AI 初评、识别文本和评分维度，老师听音后再给你反馈。</p>
-          </div>
-        </details>
-
-        <button class="teacher-secondary-button" type="button" data-view="practice">返回今日练习</button>
-        ${
-          embedded
-            ? ""
-            : `<button class="teacher-secondary-button" type="button" data-view="tasks">返回任务</button>`
-        }
+        <button class="teacher-secondary-button" type="button" data-view="tasks">返回任务列表</button>
   `;
 }
 
 function renderStudentTasks() {
+  const tasks = (state.publishedTasks || []).filter((task) => task.status === "已发布");
   return `
     <section class="screen" data-screen="tasks">
       ${brandHeader()}
       <div class="content task-page-content">
-        ${renderStudentTaskContent({ embedded: true })}
+        ${
+          tasks.length
+            ? `<div class="task-package-list" aria-label="训练包列表">
+                ${tasks.map((task) => {
+                  const packageState = taskPackageUiState(task);
+                  return `
+                    <button class="panel task-package-card is-${packageState.level}" type="button" data-student-task="${escapeHtml(task.id)}">
+                      <div class="task-package-topline">
+                        <span class="model-kicker">训练包</span>
+                        <span class="status-pill">${escapeHtml(packageState.label)}</span>
+                      </div>
+                      <h2>${escapeHtml(task.title)}</h2>
+                      ${taskGoalMarkup(task.goal)}
+                      <div class="teacher-task-meta">
+                        <span>${escapeHtml(task.suggestedDue)}</span>
+                        <span>${packageState.completedCount}/${packageState.totalCount} 步</span>
+                        <span>提交 ${task.requiredSubmissions} 次录音</span>
+                      </div>
+                    </button>
+                  `;
+                }).join("")}
+              </div>`
+            : `<section class="panel today-task-card task-empty-card">
+                <span class="model-kicker">任务</span>
+                <h2>暂无训练包</h2>
+                <p class="today-task-note">老师发布训练包后，会在这里显示。你可以先去练习页做自定义练习。</p>
+                <button class="teacher-secondary-button" type="button" data-view="practice">去自定义练习</button>
+              </section>`
+        }
       </div>
     </section>
   `;
@@ -1266,25 +1542,37 @@ function renderChatPage({ teacher = false } = {}) {
   const shellOpen = teacher ? "" : `<section class="screen chat-screen" data-screen="chat">${brandHeader()}`;
   const shellClose = teacher ? "" : `</section>`;
   const chatHeader = teacher ? "" : "";
-  const unreadTotal = getTotalUnreadChatCount(state, role);
   const directThreads = threads.filter((thread) => thread.type !== "class");
   const classThreads = threads.filter((thread) => thread.type === "class");
-  const primaryThread = directThreads[0] || classThreads[0] || null;
-  const primaryLast = threadLastMessage(primaryThread);
+  const students = getTeacherStudents(state);
+  const quickReplies = teacher
+    ? ["有进步，继续保持", "这次比上次更稳定", "先慢一点读", "我会再听一次", "别着急，按步骤来"]
+    : ["收到", "我已完成录音", "请老师再看一下", "今天会继续练"];
+  const studentOptions = students
+    .map((student) => `<option value="${escapeHtml(student.id)}" ${student.id === state.selectedTeacherStudentId ? "selected" : ""}>${escapeHtml(student.name)}</option>`)
+    .join("");
+  const studentCheckboxes = students
+    .map((student) => `
+      <label class="chat-student-option">
+        <input type="checkbox" data-field="class-chat-student" value="${escapeHtml(student.id)}" checked>
+        <span>${escapeHtml(student.name)}</span>
+      </label>
+    `)
+    .join("");
   const renderThreadButton = (thread) => {
     const unread = getUnreadChatCount(state, thread, role);
     const last = threadLastMessage(thread);
     const typeLabel = threadTypeLabel(thread);
+    const displayTitle = chatThreadDisplayTitle(thread, role);
     return `
       <div class="wechat-thread-row">
-        <div class="wechat-thread-actions" aria-label="${escapeHtml(thread.title)}会话操作">
-          <button class="wechat-thread-hide" type="button" data-action="hide-chat-thread" data-chat-thread-action="${escapeHtml(thread.id)}">不显示</button>
+        <div class="wechat-thread-actions" aria-label="${escapeHtml(displayTitle)}会话操作">
           <button class="wechat-thread-delete" type="button" data-action="delete-chat-thread" data-chat-thread-action="${escapeHtml(thread.id)}">删除</button>
         </div>
-        <button class="wechat-thread" type="button" data-chat-thread="${escapeHtml(thread.id)}" aria-label="${escapeHtml(thread.title)}，左滑可管理">
-          ${avatarMarkup(thread.title, "", "chat-avatar")}
+        <button class="wechat-thread" type="button" data-chat-thread="${escapeHtml(thread.id)}" aria-label="${escapeHtml(displayTitle)}，左滑可管理，学生端也可以右键删除">
+          ${avatarMarkup(displayTitle, "", "chat-avatar")}
           <span>
-            <strong>${escapeHtml(thread.title)}</strong>
+            <strong>${escapeHtml(displayTitle)}</strong>
             <small>${escapeHtml(last?.body || typeLabel)}</small>
           </span>
           <span class="thread-meta">
@@ -1298,14 +1586,6 @@ function renderChatPage({ teacher = false } = {}) {
   };
   const threadList = `
     <section class="wechat-list-panel coach-chat-list">
-      <div class="coach-chat-hero">
-        <div>
-          <span class="model-kicker">学习沟通</span>
-          <strong>${unreadTotal ? `${unreadTotal} 条未读反馈` : "今天没有未读消息"}</strong>
-          <p>${primaryLast ? escapeHtml(primaryLast.body) : "老师消息、班级提醒和任务沟通都会在这里集中显示。"}</p>
-        </div>
-        <span class="status-pill">${threads.length} 个会话</span>
-      </div>
       ${
         directThreads.length
           ? `<div class="wechat-thread-group">
@@ -1324,11 +1604,30 @@ function renderChatPage({ teacher = false } = {}) {
       }
       ${
         teacher
-          ? `<div class="chat-create-actions">
-              <button class="teacher-primary-button" type="button" data-action="create-class-chat">创建班级群聊</button>
-              <button class="teacher-secondary-button" type="button" data-action="create-direct-chat">创建学生私聊</button>
-            </div>`
-          : ""
+          ? `<section class="chat-create-card" aria-label="创建聊天">
+              <div class="chat-create-block">
+                <span class="model-kicker">创建班级群聊</span>
+                <label>
+                  <span>群聊名字</span>
+                  <input data-field="class-chat-title" value="${escapeHtml(state.teacherDashboard?.className || "启音一班")}群聊" placeholder="例如：周三声调练习群">
+                </label>
+                <div class="chat-student-options" aria-label="选择加入群聊的学生">
+                  ${studentCheckboxes}
+                </div>
+                <button class="teacher-primary-button" type="button" data-action="create-class-chat">创建群聊</button>
+              </div>
+              <div class="chat-create-block">
+                <span class="model-kicker">创建学生私聊</span>
+                <label>
+                  <span>选择学生</span>
+                  <select data-field="direct-chat-student">${studentOptions}</select>
+                </label>
+                <button class="teacher-secondary-button" type="button" data-action="create-direct-chat">开始私聊</button>
+              </div>
+            </section>`
+          : `<section class="student-chat-tools" aria-label="联系老师">
+              <button class="teacher-secondary-button" type="button" data-action="create-student-direct-chat">和老师私聊</button>
+            </section>`
       }
     </section>
   `;
@@ -1337,7 +1636,7 @@ function renderChatPage({ teacher = false } = {}) {
       <header class="wechat-chat-header">
         <button class="wechat-back-button" type="button" data-action="chat-back">‹</button>
         <div>
-          <strong>${escapeHtml(selectedThread.title)}</strong>
+          <strong>${escapeHtml(chatThreadDisplayTitle(selectedThread, role))}</strong>
           <span>${threadTypeLabel(selectedThread)} · ${getUnreadChatCount(state, selectedThread, role)} 未读</span>
         </div>
         <span class="status-pill">${selectedThread.type === "class" ? "班级" : "私聊"}</span>
@@ -1373,10 +1672,10 @@ function renderChatPage({ teacher = false } = {}) {
         }
       </div>
       <div class="wechat-emoji-row" aria-label="快捷回复">
-        ${["收到", "我已完成录音", "请老师再看一下", "今天会继续练"].map((reply) => `<button type="button" data-chat-emoji="${escapeHtml(reply)}">${escapeHtml(reply)}</button>`).join("")}
+        ${quickReplies.map((reply) => `<button type="button" data-chat-emoji="${escapeHtml(reply)}">${escapeHtml(reply)}</button>`).join("")}
       </div>
       <div class="wechat-compose">
-        <input data-field="chat-message" placeholder="输入练习情况或问题">
+        <input data-field="chat-message" placeholder="${teacher ? "输入鼓励、提醒或训练建议" : "输入练习情况或问题"}">
         <button type="button" data-action="send-chat-message">发送</button>
       </div>
     </section>
@@ -1395,7 +1694,7 @@ function renderChatPage({ teacher = false } = {}) {
   `;
 }
 
-function detailHeader(syllable) {
+function detailHeader(syllable, { fromTask = false } = {}) {
   return `
     <header class="app-header detail-header">
       <div class="status-row">
@@ -1404,7 +1703,7 @@ function detailHeader(syllable) {
       </div>
       <div class="detail-title-row">
         <div>
-          <button class="back-button" type="button" data-view="practice">返回练习</button>
+          <button class="back-button" type="button" ${fromTask ? 'data-action="return-task-detail"' : 'data-view="practice"'}>${fromTask ? "返回任务" : "返回练习"}</button>
           <h1 class="detail-heading">详细练习</h1>
           <p class="detail-subtitle">${syllable.pinyinDisplay || syllable.pinyin} · ${syllable.tone} · 当前 ${syllable.score} 分</p>
         </div>
@@ -1415,8 +1714,9 @@ function detailHeader(syllable) {
 }
 
 function renderDetail() {
-  const activeSyllables = getSyllables(state);
-  const activeTeachingSegment = state.teachingPlan?.segments?.[state.selectedClipSegmentIndex];
+  const taskSubmission = state.taskDetailMode ? getLatestTaskSubmission(state) : null;
+  const activeSyllables = taskSubmission?.syllables || getSyllables(state);
+  const activeTeachingSegment = !taskSubmission ? state.teachingPlan?.segments?.[state.selectedClipSegmentIndex] : null;
   const segmentSyllable = activeTeachingSegment?.syllableId
     ? activeSyllables[activeTeachingSegment.syllableId]
     : activeTeachingSegment?.syllable;
@@ -1425,9 +1725,9 @@ function renderDetail() {
   const missingImageUnits = missingArticulationImageUnits(syllable);
   return `
     <section class="screen" data-screen="detail">
-      ${detailHeader(syllable)}
+      ${detailHeader(syllable, { fromTask: Boolean(taskSubmission) })}
       <div class="content">
-        ${renderTeachingVideoPanel()}
+        ${taskSubmission ? "" : renderTeachingVideoPanel()}
         <section aria-labelledby="mouth-title">
           <p class="section-label" id="mouth-title">嘴型与舌位对照</p>
           <div class="panel mouth-grid">
@@ -1452,7 +1752,6 @@ function renderDetail() {
             </div>
             ${renderGeneratedTongue(syllable)}
           </div>
-          <p class="model-summary">系统会把一个拼音拆成声母和韵母分别展示。请先看声母的嘴形和舌位，再看韵母的嘴形和舌位；摄像头适合观察嘴唇和下巴，舌头位置以参考图和文字提示为主。</p>
           ${
             missingImageUnits.length
               ? `<p class="model-summary">当前 ${missingImageUnits.map((item) => `${item.kind} ${item.unit}`).join("、")} 暂无精确嘴型/舌位图，已避免显示不匹配图片；请以上方教学视频和文字提示为准。</p>`
@@ -1469,7 +1768,6 @@ function renderDetail() {
             </div>
           </div>
           <canvas id="tone-chart" width="640" height="248" aria-label="目标声调与当前声调趋势对比图"></canvas>
-          <p class="plot-note">${escapeHtml(syllable.toneCue)}</p>
         </section>
 
         <section class="panel analysis-card" aria-label="本音节分析结论">
@@ -1480,25 +1778,6 @@ function renderDetail() {
               ? `<span class="analysis-extra">${escapeHtml(syllable.issue.detail)}</span>`
               : ""
           }
-        </section>
-
-        <section aria-labelledby="tips-title">
-          <p class="section-label" id="tips-title">发音建议</p>
-          <div class="tip-list">
-            ${tips
-              .map(
-                (tip, index) => `
-                  <button class="tip-card ${state.selectedTip === tip.id ? "is-selected" : ""}" type="button" data-tip="${tip.id}">
-                    <span class="tip-number">${index + 1}</span>
-                    <span>
-                      <strong class="tip-title">${tip.title}</strong>
-                      <span class="tip-copy">${syllable[tip.descriptionKey]}</span>
-                    </span>
-                  </button>
-                `,
-              )
-              .join("")}
-          </div>
         </section>
 
         <button class="replay-button ${state.playing ? "is-active" : ""}" type="button" data-action="play-detail">
@@ -1512,21 +1791,10 @@ function renderDetail() {
 function renderProgress() {
   const progress = getProgressData(state);
   const calendarDays = getCalendarDays(state);
-  const latestFeedback = getLatestStudentFeedback(state);
-  const pendingSubmissions = (state.taskSubmissions || []).filter((submission) => submission.status === "待教师复评").length;
   return `
     <section class="screen" data-screen="progress">
       ${brandHeader({ progress: true })}
       <div class="content">
-        <section class="panel progress-task-summary" aria-labelledby="progress-task-title">
-          <div>
-            <span class="model-kicker">任务反馈</span>
-            <strong id="progress-task-title">${latestFeedback ? `${latestFeedback.teacherScore} 分 · 老师已反馈` : pendingSubmissions ? `${pendingSubmissions} 条待老师批改` : "暂无新的任务反馈"}</strong>
-            <p>${latestFeedback ? escapeHtml(latestFeedback.teacherFeedback) : "作业录音、老师评价和历史提交都放在任务页；这里保留长期趋势。 "}</p>
-          </div>
-          <button class="teacher-secondary-button" type="button" data-view="tasks">查看任务</button>
-        </section>
-
         <section aria-labelledby="trend-title">
           <p class="section-label" id="trend-title">综合评分趋势</p>
           <div class="panel chart-card trend-wrap">
@@ -1540,10 +1808,10 @@ function renderProgress() {
             ${calendarDays
               .map(
                 (day) => `
-                  <span class="calendar-day ${day.practiced ? "is-done" : ""} ${day.today ? "is-today" : ""}">
+                  <button class="calendar-day ${day.practiced ? "is-done" : ""} ${day.today ? "is-today" : ""} ${day.selected ? "is-selected" : ""}" type="button" data-progress-date="${escapeHtml(day.date)}">
                     <strong>${day.label}</strong>
                     <span>${day.practiced ? "已练" : "未练"}</span>
-                  </span>
+                  </button>
                 `,
               )
               .join("")}
@@ -1551,9 +1819,10 @@ function renderProgress() {
         </section>
 
         <section aria-labelledby="words-title">
-          <p class="section-label" id="words-title">${progress.label}练习词汇</p>
+          <p class="section-label" id="words-title">当日练习词汇</p>
           <div class="word-list">
-            ${progress.words
+            ${progress.words.length
+              ? progress.words
               .map(
                 (item) => `
                   <button class="word-row level-${item.level}" type="button" data-word="${item.word}" data-score="${item.score}" data-status="${item.status}">
@@ -1567,7 +1836,8 @@ function renderProgress() {
                   </button>
                 `,
               )
-              .join("")}
+              .join("")
+              : `<p class="panel today-task-note">这一天还没有自定义练习记录。</p>`}
           </div>
         </section>
 
@@ -1624,17 +1894,13 @@ function renderTeacherHomePage(summary, classProgress) {
           <strong>${summary.pendingSubmissions}</strong>
           <span>未批改录音</span>
         </button>
-        <button class="teacher-metric-card ${summary.overdueTasks ? "is-alert" : ""}" type="button" data-teacher-view="students">
-          <strong>${summary.overdueTasks}</strong>
-          <span>未完成任务</span>
-        </button>
-        <button class="teacher-metric-card ${summary.needsAttention ? "is-alert" : ""}" type="button" data-teacher-view="students">
+        <button class="teacher-metric-card ${summary.needsAttention ? "is-alert" : ""}" type="button" data-teacher-view="students" data-teacher-filter="attention">
           <strong>${summary.needsAttention}</strong>
           <span>需要关注</span>
         </button>
         <button class="teacher-metric-card" type="button" data-teacher-view="tasks">
-          <strong>${summary.studentCount}</strong>
-          <span>学生档案</span>
+          <strong>${summary.totalPublishedTasks || 0}</strong>
+          <span>发布练习任务</span>
         </button>
       </div>
     </section>
@@ -1666,65 +1932,47 @@ function renderTeacherHomePage(summary, classProgress) {
             }
           </div>
         </div>
-        <div>
-          <span class="teacher-report-label">快捷处理</span>
-          <div class="teacher-action-list">
-            <button type="button" data-teacher-view="reviews">去批改录音</button>
-            <button type="button" data-teacher-view="tasks">发布练习任务</button>
-          </div>
-        </div>
       </div>
     </section>
   `;
 }
 
 function renderTeacherStudentsPage(students, selectedStudent, assessmentReport) {
+  const activeFilter = state.teacherStudentFilter === "attention" ? "attention" : "all";
+  const visibleStudents = activeFilter === "attention" ? getFilteredTeacherStudents(state) : students;
+  const isEditingSummary = Boolean(selectedStudent && state.editingTeacherStudentSummaryId === selectedStudent.id);
   return `
     <section aria-labelledby="teacher-students-title">
       <p class="section-label" id="teacher-students-title">学生管理</p>
+      <div class="teacher-action-list teacher-filter-list" aria-label="学生筛选">
+        <button type="button" data-teacher-view="students" data-teacher-filter="all" ${activeFilter === "all" ? "aria-current=\"page\"" : ""}>全部学生</button>
+        <button type="button" data-teacher-view="students" data-teacher-filter="attention" ${activeFilter === "attention" ? "aria-current=\"page\"" : ""}>需要关注</button>
+      </div>
       <div class="teacher-student-list">
-        ${students
-          .map(
-            (student) => `
+        ${
+          visibleStudents.length
+            ? visibleStudents
+              .map((student) => {
+                const attentionCopy = getTeacherStudentAttentionReasons(student).join(" / ");
+                return `
               <button class="teacher-student-card ${student.id === selectedStudent?.id ? "is-selected" : ""}" type="button" data-teacher-student="${escapeHtml(student.id)}">
                 <span>
                   <strong>${escapeHtml(student.name)}</strong>
-                  <span>${escapeHtml(student.stage)} · 本周 ${student.weeklyPracticeCount} 次</span>
+                  <span>${escapeHtml(student.stage)} · 本周 ${student.weeklyPracticeCount} 次${attentionCopy ? ` · ${escapeHtml(attentionCopy)}` : ""}</span>
                 </span>
                 <span class="status-pill">${student.latestScore} 分</span>
               </button>
-            `,
-          )
-          .join("")}
+                `;
+              })
+              .join("")
+            : `<p class="teacher-empty-copy">目前没有需要关注的学生。</p>`
+        }
       </div>
     </section>
 
     ${
-      selectedStudent
+      selectedStudent && assessmentReport
         ? `
-          <section class="panel teacher-profile-card" aria-labelledby="teacher-profile-title">
-            <span class="model-kicker">学生发音档案</span>
-            <h2 id="teacher-profile-title">${escapeHtml(selectedStudent.name)} · ${selectedStudent.age} 岁</h2>
-            <p>${escapeHtml(selectedStudent.hearingProfile)}</p>
-            <dl class="teacher-profile-list">
-              <div>
-                <dt>康复目标</dt>
-                <dd>${escapeHtml(selectedStudent.rehabGoal)}</dd>
-              </div>
-              <div>
-                <dt>最近练习</dt>
-                <dd>${escapeHtml(selectedStudent.lastPracticeAt)} · 本周 ${selectedStudent.weeklyPracticeCount} 次</dd>
-              </div>
-              <div>
-                <dt>测评结论</dt>
-                <dd>${escapeHtml(selectedStudent.assessmentSummary)}</dd>
-              </div>
-            </dl>
-            <div class="teacher-tag-list">
-              ${(selectedStudent.focusTags || []).map((tag) => `<span>${escapeHtml(tag)}</span>`).join("")}
-            </div>
-          </section>
-
           <section class="panel teacher-report-card" aria-labelledby="teacher-report-title">
             <span class="model-kicker">阶段画像</span>
             <h2 id="teacher-report-title">${escapeHtml(assessmentReport.studentName)}</h2>
@@ -1733,7 +1981,24 @@ function renderTeacherStudentsPage(students, selectedStudent, assessmentReport) 
               <span><strong>${assessmentReport.averageAiScore}</strong>AI 均分</span>
               <span><strong>${assessmentReport.teacherAverage || "--"}</strong>教师均分</span>
             </div>
-            <p>${escapeHtml(assessmentReport.conclusion)}</p>
+            ${
+              isEditingSummary
+                ? `<form class="teacher-summary-form" data-student-summary-form="${escapeHtml(selectedStudent.id)}">
+                    <label class="template-field">
+                      <span>老师阶段备注</span>
+                      <textarea data-field="teacher-student-summary" rows="3">${escapeHtml(assessmentReport.conclusion)}</textarea>
+                    </label>
+                    <button class="teacher-secondary-button" type="button" data-action="save-teacher-student-summary" data-student-id="${escapeHtml(selectedStudent.id)}">保存阶段备注</button>
+                  </form>`
+                : `<div class="teacher-summary-display">
+                    <span>老师阶段备注</span>
+                    <p>${escapeHtml(assessmentReport.conclusion)}</p>
+                    <button class="teacher-secondary-button" type="button" data-action="edit-teacher-student-summary" data-student-id="${escapeHtml(selectedStudent.id)}">修改备注</button>
+                  </div>`
+            }
+            <div class="teacher-tag-list">
+              ${(selectedStudent.focusTags || []).map((tag) => `<span>${escapeHtml(tag)}</span>`).join("")}
+            </div>
           </section>
         `
         : ""
@@ -1745,25 +2010,31 @@ function renderTeacherTasksPage(selectedStudent, recommendedTask, publishedTask,
   if (!selectedStudent || !recommendedTask) {
     return `<p class="teacher-empty-copy">请先在学生管理中选择学生，再生成练习任务。</p>`;
   }
+  const taskDraft = publishedTask || recommendedTask;
+  const students = getTeacherStudents(state);
   return `
+    <section class="panel teacher-next-card" aria-label="新建训练任务">
+      <span class="model-kicker">新建任务</span>
+      <strong>给学生单独布置训练包</strong>
+      <p>老师可以选择学生，再进入可编辑模板，使用题库或自定义步骤布置任务。</p>
+      <label class="template-field">
+        <span>选择学生</span>
+        <select data-field="new-task-student">
+          ${students.map((student) => `<option value="${escapeHtml(student.id)}" ${student.id === selectedStudent.id ? "selected" : ""}>${escapeHtml(student.name)}</option>`).join("")}
+        </select>
+      </label>
+      <button class="teacher-primary-button" type="button" data-action="start-new-teacher-task">新建训练任务</button>
+    </section>
+
     <section class="panel teacher-next-card" aria-label="AI 辅助任务">
       <span class="model-kicker">任务中心</span>
-      <strong>${escapeHtml(recommendedTask.title)}</strong>
-      <p>${escapeHtml(recommendedTask.goal)}</p>
+      <strong>${escapeHtml(taskDraft.title)}</strong>
       <div class="teacher-task-meta">
         <span>${escapeHtml(publishedTask?.status || recommendedTask.status)}</span>
-        <span>${escapeHtml(recommendedTask.suggestedDue)}</span>
-        <span>提交 ${recommendedTask.requiredSubmissions} 次录音</span>
+        <span>${taskDraft.exerciseSet?.length || taskDraft.items?.length || 0} 个任务步骤</span>
       </div>
-      <ol class="teacher-task-preview">
-        ${recommendedTask.items.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
-      </ol>
-      <div class="teacher-tag-list">
-        ${recommendedTask.reviewTags.map((tag) => `<span>${escapeHtml(tag)}</span>`).join("")}
-      </div>
-      <p>${escapeHtml(recommendedTask.teacherNote)}</p>
-      <button class="teacher-primary-button" type="button" data-action="publish-recommended-task">
-        ${publishedTask ? "已发布到学生端" : "审核并发布"}
+      <button class="teacher-primary-button" type="button" data-teacher-view="taskPackageEditor">
+        ${publishedTask ? "重新审核并修改" : "审核并修改训练包"}
       </button>
     </section>
 
@@ -1777,17 +2048,359 @@ function renderTeacherTasksPage(selectedStudent, recommendedTask, publishedTask,
               </div>
               <span class="teacher-review-score">${assessmentProfile.overallScore} 分</span>
             </div>
-            <p>${escapeHtml(assessmentProfile.profileSummary)}</p>
-            <div class="teacher-tag-list">
-              ${assessmentProfile.issueTags.map((tag) => `<span>${escapeHtml(tag)}</span>`).join("")}
+            <div class="teacher-task-meta">
+              <span>${escapeHtml(assessmentProfile.status)}</span>
+              <span>${assessmentProfile.issueTags.length} 个关注点</span>
             </div>
-            <p>${escapeHtml(assessmentProfile.recommendation)}</p>
-            <button class="teacher-primary-button" type="button" data-action="publish-assessment-task" ${assessmentProfile.status === "教师已确认" ? "disabled" : ""}>
-              ${assessmentProfile.status === "教师已确认" ? "已发布初始任务" : "确认并发布初始任务"}
+            <button class="teacher-primary-button" type="button" data-teacher-view="assessmentEditor" ${assessmentProfile.status === "教师已确认" ? "disabled" : ""}>
+              ${assessmentProfile.status === "教师已确认" ? "已发布初始任务" : "编辑训练包模板"}
             </button>
           </section>`
         : ""
     }
+  `;
+}
+
+
+function renderTaskPackageEditor(selectedStudent, recommendedTask, publishedTask) {
+  const isNewTask = state.teacherTaskMode === "new";
+  const taskDraft = isNewTask ? recommendedTask : (publishedTask || recommendedTask);
+  if (!selectedStudent || !taskDraft) {
+    return `
+      <section class="panel teacher-assessment-card">
+        <span class="model-kicker">训练包审核</span>
+        <strong>还没有可编辑的训练包</strong>
+        <p>请先选择学生，系统会根据学生画像生成训练包初稿。</p>
+        <button class="teacher-secondary-button" type="button" data-teacher-view="tasks">返回任务中心</button>
+      </section>
+    `;
+  }
+  const exerciseSet = taskDraft.exerciseSet?.length ? taskDraft.exerciseSet : (taskDraft.items || []).map((item, index) => ({
+    id: `editor-${index}`,
+    type: index === 0 ? "听辨" : index === 1 ? "跟读" : "录音",
+    title: item,
+    instruction: index === 0 ? "听标准发音，观察嘴型和节奏。" : index === 1 ? "把重点音放慢跟读。" : "读完整句并录音提交。",
+    targetText: taskDraft.practiceText,
+    requiredCount: index === 1 ? taskDraft.repeatCount : 1,
+    requiresSubmission: index === (taskDraft.items || []).length - 1,
+  }));
+  return `
+    <section class="assessment-editor-page" aria-labelledby="task-package-editor-title">
+      <button class="teacher-secondary-button assessment-editor-back" type="button" data-teacher-view="tasks">返回任务中心</button>
+
+      <section class="panel assessment-editor-hero">
+        <div>
+          <span class="model-kicker">训练包审核模板</span>
+          <h2 id="task-package-editor-title">${isNewTask ? "新建训练任务" : `${escapeHtml(selectedStudent.name)} 的训练任务`}</h2>
+          <p>${isNewTask ? `正在给 ${escapeHtml(selectedStudent.name)} 新建训练包。可以使用题库，也可以完全自定义。` : "系统只生成初稿。请老师确认目标、练习量和给学生看的说明，再发布到学生端。"}</p>
+        </div>
+        <span class="teacher-review-score">${escapeHtml(String(selectedStudent.latestScore || "--"))} 分</span>
+      </section>
+
+      <section class="panel assessment-template-section">
+        <div class="assessment-template-step">
+          <span>1</span>
+          <div>
+            <strong>确认训练目标</strong>
+            <p>把训练方向改成老师真正想让学生这一轮重点练习的内容。</p>
+          </div>
+        </div>
+        <div class="teacher-tag-list">
+          ${(recommendedTask.reviewTags || []).map((tag) => `<span>${escapeHtml(tag)}</span>`).join("")}
+        </div>
+        <label class="template-field">
+          <span>任务标题</span>
+          <input data-field="recommended-task-title" value="${escapeHtml(taskDraft.title)}">
+        </label>
+        <label class="template-field">
+          <span>训练目标，学生任务页会看到</span>
+          <textarea data-field="recommended-task-goal" rows="3">${escapeHtml(taskDraft.goal)}</textarea>
+        </label>
+      </section>
+
+      <section class="panel assessment-template-section">
+        <div class="assessment-template-step">
+          <span>2</span>
+          <div>
+            <strong>修改练习内容</strong>
+            <p>老师可以换练习句子、调整次数，也可以把步骤写得更具体。</p>
+          </div>
+        </div>
+        <label class="template-field">
+          <span>本次练习句子</span>
+          <input data-field="recommended-practice-text" value="${escapeHtml(taskDraft.practiceText)}">
+        </label>
+        <div class="assessment-edit-grid">
+          <label class="template-field">
+            <span>完成期限</span>
+            <input data-field="recommended-suggested-due" value="${escapeHtml(taskDraft.suggestedDue)}">
+          </label>
+          <label class="template-field">
+            <span>跟读次数</span>
+            <input data-field="recommended-repeat-count" type="number" min="1" value="${escapeHtml(taskDraft.repeatCount)}">
+          </label>
+          <label class="template-field">
+            <span>提交录音次数</span>
+            <input data-field="recommended-required-submissions" type="number" min="1" value="${escapeHtml(taskDraft.requiredSubmissions)}">
+          </label>
+        </div>
+        <div class="teacher-step-editor-list" data-step-editor-list>
+          ${exerciseSet.map((exercise, index) => renderTeacherStepEditor(exercise, index)).join("")}
+        </div>
+        <button class="teacher-add-step-button" type="button" data-action="add-task-step">＋</button>
+      </section>
+
+      <section class="panel assessment-template-section">
+        <div class="assessment-template-step">
+          <span>3</span>
+          <div>
+            <strong>写给学生的说明</strong>
+            <p>用学生能理解的话告诉他为什么练、怎么练、先注意哪里。</p>
+          </div>
+        </div>
+        <label class="template-field">
+          <span>学生端说明</span>
+          <textarea data-field="recommended-teacher-note" rows="4">${escapeHtml(taskDraft.teacherNote)}</textarea>
+        </label>
+        <button class="teacher-primary-button" type="button" data-action="publish-recommended-task">
+          ${publishedTask && !isNewTask ? "保存修改并重新发布" : "提交给学生"}
+        </button>
+      </section>
+    </section>
+  `;
+}
+
+
+function renderTeacherStepEditor(exercise, index) {
+  const mode = exercise.sourceMode === "bank" ? "bank" : "custom";
+  const selectedBank = questionBankById(exercise.bankPackageId);
+  return `
+    <article class="teacher-step-editor-card" data-step-editor-card data-step-mode="${escapeHtml(mode)}">
+      <div class="teacher-step-editor-head">
+        <div>
+          <span class="teacher-step-number">${index + 1}</span>
+          <strong class="teacher-step-title">任务步骤 ${index + 1}</strong>
+        </div>
+        <div class="step-source-toggle" role="group" aria-label="任务内容来源">
+          <button class="${mode === "bank" ? "is-selected" : ""}" type="button" data-action="set-step-source" data-source-mode="bank">使用题库</button>
+          <button class="${mode === "custom" ? "is-selected" : ""}" type="button" data-action="set-step-source" data-source-mode="custom">自定义</button>
+        </div>
+        <button class="step-delete-button" type="button" data-action="delete-task-step" aria-label="删除任务步骤 ${index + 1}">删除</button>
+      </div>
+      <section class="step-bank-panel" data-bank-panel ${mode === "bank" ? "" : "hidden"}>
+        <label class="template-field">
+          <span>选择题目包</span>
+          <select data-step-field="bankPackageId">
+            ${questionBankPackages.map((pack) => `<option value="${escapeHtml(pack.id)}" ${pack.id === selectedBank.id ? "selected" : ""}>${escapeHtml(pack.title)}</option>`).join("")}
+          </select>
+        </label>
+        <div class="question-bank-preview" data-bank-preview>
+          <strong>${escapeHtml(selectedBank.title)}</strong>
+          <p>${escapeHtml(selectedBank.description)}</p>
+          ${renderPracticeItemChips(selectedBank.items)}
+        </div>
+      </section>
+      <div class="assessment-edit-grid">
+        <label class="template-field">
+          <span>步骤类型</span>
+          <input data-step-field="type" value="${escapeHtml(exercise.type || "练习")}">
+        </label>
+        <label class="template-field">
+          <span>练习次数</span>
+          <input data-step-field="requiredCount" type="number" min="1" value="${escapeHtml(exercise.requiredCount || 1)}">
+        </label>
+      </div>
+      <label class="template-field">
+        <span>学生看到的步骤名称</span>
+        <input data-step-field="title" value="${escapeHtml(exercise.title || "")}">
+      </label>
+      <label class="template-field">
+        <span>具体练习题/句子</span>
+        <input data-step-field="targetText" value="${escapeHtml(exercise.targetText || "")}">
+      </label>
+      <label class="template-field">
+        <span>学生端显示的具体题目，每行一个</span>
+        <textarea data-step-field="practiceItems" rows="3">${escapeHtml((practiceItemsForExercise(exercise).length ? practiceItemsForExercise(exercise) : selectedBank.items).join("\n"))}</textarea>
+      </label>
+      <label class="template-field">
+        <span>步骤说明</span>
+        <textarea data-step-field="instruction" rows="2">${escapeHtml(exercise.instruction || "")}</textarea>
+      </label>
+      <label class="template-check-field">
+        <input data-step-field="requiresSubmission" type="checkbox" ${exercise.requiresSubmission ? "checked" : ""}>
+        <span>这一步需要录音，作为提交给老师的作业</span>
+      </label>
+    </article>
+  `;
+}
+
+
+function applyQuestionBankToStepCard(card, packageId) {
+  const bank = questionBankById(packageId);
+  const setValue = (field, value) => {
+    const input = card.querySelector(`[data-step-field="${field}"]`);
+    if (input) input.value = value;
+  };
+  setValue("bankPackageId", bank.id);
+  setValue("title", bank.title);
+  setValue("targetText", bank.targetText);
+  setValue("instruction", bank.description);
+  setValue("practiceItems", bank.items.join("\n"));
+  const preview = card.querySelector("[data-bank-preview]");
+  if (preview) {
+    preview.innerHTML = `
+      <strong>${escapeHtml(bank.title)}</strong>
+      <p>${escapeHtml(bank.description)}</p>
+      ${renderPracticeItemChips(bank.items)}
+    `;
+  }
+}
+
+
+function renumberTeacherStepCards(list) {
+  list.querySelectorAll("[data-step-editor-card]").forEach((card, index) => {
+    const number = card.querySelector(".teacher-step-number");
+    const title = card.querySelector(".teacher-step-title");
+    const deleteButton = card.querySelector('[data-action="delete-task-step"]');
+    if (number) number.textContent = String(index + 1);
+    if (title) title.textContent = `任务步骤 ${index + 1}`;
+    if (deleteButton) deleteButton.setAttribute("aria-label", `删除任务步骤 ${index + 1}`);
+  });
+}
+
+
+function renderAssessmentTemplateEditor(assessmentProfile) {
+  if (!assessmentProfile) {
+    return `
+      <section class="panel teacher-assessment-card">
+        <span class="model-kicker">训练包模板</span>
+        <strong>还没有可编辑的入门测评画像</strong>
+        <p>学生完成入门测评后，系统会先生成画像，再由老师编辑训练包。</p>
+        <button class="teacher-secondary-button" type="button" data-teacher-view="tasks">返回任务中心</button>
+      </section>
+    `;
+  }
+  const repeatCount = assessmentProfile.overallScore < 70 ? 5 : 3;
+  const bankPackage = questionBankById(
+    questionBankPackages.find((pack) => pack.focusTags.some((tag) => (assessmentProfile.issueTags || []).join(" ").includes(tag)))?.id,
+  );
+  const assessmentExerciseSet = [
+    {
+      id: "assessment-listen",
+      type: "示范",
+      title: "听标准发音并观察动作",
+      instruction: "先听标准发音，观察口型、舌位和节奏。",
+      targetText: bankPackage.targetText || "我要喝水",
+      requiredCount: 2,
+      sourceMode: "bank",
+      bankPackageId: bankPackage.id,
+      practiceItems: bankPackage.items,
+    },
+    {
+      id: "assessment-focus",
+      type: "跟读",
+      title: "重点音放慢跟读",
+      instruction: "把测评中不稳定的重点音放慢练，先保证动作完整。",
+      targetText: bankPackage.targetText || "我要喝水",
+      requiredCount: repeatCount,
+      sourceMode: "bank",
+      bankPackageId: bankPackage.id,
+      practiceItems: bankPackage.items,
+    },
+    {
+      id: "assessment-submit",
+      type: "提交",
+      title: "完整短句录音提交",
+      instruction: "读完整句并录音提交，老师会在批改中心复听。",
+      targetText: bankPackage.targetText || "我要喝水",
+      requiredCount: 1,
+      requiresSubmission: true,
+      sourceMode: "bank",
+      bankPackageId: bankPackage.id,
+      practiceItems: bankPackage.items,
+    },
+  ];
+  return `
+    <section class="assessment-editor-page" aria-labelledby="assessment-editor-title">
+      <button class="teacher-secondary-button assessment-editor-back" type="button" data-teacher-view="tasks">返回任务中心</button>
+
+      <section class="panel assessment-editor-hero">
+        <div>
+          <span class="model-kicker">入门测评训练包模板</span>
+          <h2 id="assessment-editor-title">${escapeHtml(assessmentProfile.studentName)} 的初始训练包</h2>
+          <p>AI 已经生成初稿。请老师根据学生情况修改后，再提交给学生端。</p>
+        </div>
+        <span class="teacher-review-score">${assessmentProfile.overallScore} 分</span>
+      </section>
+
+      <section class="panel assessment-template-section">
+        <div class="assessment-template-step">
+          <span>1</span>
+          <div>
+            <strong>确认训练目标</strong>
+            <p>先把 AI 建议改成老师真正想让学生练习的方向。</p>
+          </div>
+        </div>
+        <div class="teacher-tag-list">
+          ${assessmentProfile.issueTags.map((tag) => `<span>${escapeHtml(tag)}</span>`).join("")}
+        </div>
+        <label class="template-field">
+          <span>给老师看的测评摘要</span>
+          <textarea data-field="assessment-profile-summary" rows="3">${escapeHtml(assessmentProfile.profileSummary)}</textarea>
+        </label>
+        <label class="template-field">
+          <span>训练目标，学生任务页会看到</span>
+          <textarea data-field="assessment-recommendation" rows="4">${escapeHtml(assessmentProfile.recommendation)}</textarea>
+        </label>
+      </section>
+
+      <section class="panel assessment-template-section">
+        <div class="assessment-template-step">
+          <span>2</span>
+          <div>
+            <strong>编辑发布给学生的任务</strong>
+            <p>让任务像康复老师布置作业一样清楚：练什么、练几次、提交几次。</p>
+          </div>
+        </div>
+        <label class="template-field">
+          <span>任务标题</span>
+          <input data-field="assessment-task-title" value="${escapeHtml(`${assessmentProfile.studentName} · 入门测评训练包`)}">
+        </label>
+        <label class="template-field">
+          <span>本次练习句子</span>
+          <input data-field="assessment-practice-text" value="${escapeHtml(bankPackage.targetText || "我要喝水")}">
+        </label>
+        <div class="assessment-edit-grid">
+          <label class="template-field">
+            <span>跟读次数</span>
+            <input data-field="assessment-repeat-count" type="number" min="1" max="20" value="${repeatCount}">
+          </label>
+          <label class="template-field">
+            <span>提交录音次数</span>
+            <input data-field="assessment-required-submissions" type="number" min="1" max="10" value="1">
+          </label>
+        </div>
+        <div class="teacher-step-editor-list" data-step-editor-list>
+          ${assessmentExerciseSet.map((exercise, index) => renderTeacherStepEditor(exercise, index)).join("")}
+        </div>
+        <button class="teacher-add-step-button" type="button" data-action="add-task-step">＋</button>
+      </section>
+
+      <section class="panel assessment-template-section">
+        <div class="assessment-template-step">
+          <span>3</span>
+          <div>
+            <strong>写给学生的说明</strong>
+            <p>这段话会出现在学生任务页，建议写得短、具体、鼓励。</p>
+          </div>
+        </div>
+        <label class="template-field">
+          <span>学生可见说明</span>
+          <textarea data-field="assessment-teacher-note" rows="4">老师已经根据你的入门测评调整了训练包。今天先不用追求很快，重点把目标音放慢、说完整，录完后老师会再听一遍。</textarea>
+        </label>
+        <button class="teacher-primary-button" type="button" data-action="publish-assessment-task">提交给学生</button>
+      </section>
+    </section>
   `;
 }
 
@@ -1815,38 +2428,9 @@ function renderTeacherReviewsPage(pendingSubmissions) {
                         </span>
                         <span class="teacher-review-score">${submission.aiScores.overall} 分</span>
                       </div>
-                      <div class="teacher-submission-audio">
-                        ${
-                          submission.recordingUrl
-                            ? `<audio controls src="${escapeHtml(submission.recordingUrl)}"></audio>`
-                            : `<p>暂无可播放录音，请让学生重新提交。</p>`
-                        }
-                      </div>
-                      <p>${escapeHtml(submission.aiSummary || submission.diagnosisSummary || "AI 初评已完成，等待老师复评。")}</p>
-                      <div class="teacher-task-meta">
-                        <span>题目：${escapeHtml(submission.exerciseTitle || "短句录音提交")}</span>
-                        <span>目标：${escapeHtml(submission.targetText)}</span>
-                        <span>听到：${escapeHtml(submission.heardText || "待确认")}</span>
-                        <span>${escapeHtml(submission.status)}</span>
-                      </div>
-                      <div class="teacher-score-strip" aria-label="AI 初评分">
-                        <span>声调 ${submission.aiScores.tone}</span>
-                        <span>清晰度 ${submission.aiScores.clarity}</span>
-                        <span>节奏 ${submission.aiScores.rhythm}</span>
-                      </div>
-                      <div class="teacher-review-form">
-                        <label>
-                          <span>教师评分</span>
-                          <input data-review-score="${escapeHtml(submission.id)}" type="number" min="0" max="100" value="${submission.aiScores.overall}">
-                        </label>
-                        <label>
-                          <span>反馈给学生</span>
-                          <textarea data-review-feedback="${escapeHtml(submission.id)}" rows="3">这次比上次更接近目标，继续把重点音放慢一点练，老师已经看到你的进步。</textarea>
-                        </label>
-                        <button class="teacher-primary-button" type="button" data-review-submission="${escapeHtml(submission.id)}">
-                          保存批改并反馈
-                        </button>
-                      </div>
+                      <button class="teacher-primary-button" type="button" data-action="open-review-editor" data-review-editor="${escapeHtml(submission.id)}">
+                        修改反馈
+                      </button>
                     </article>
                   `,
                 )
@@ -1854,6 +2438,64 @@ function renderTeacherReviewsPage(pendingSubmissions) {
             </div>`
           : `<p class="teacher-empty-copy">学生完成老师布置的录音任务后，会出现在这里，老师再结合 AI 初评补充反馈。</p>`
       }
+    </section>
+  `;
+}
+
+function renderTeacherReviewEditorPage(submission) {
+  if (!submission) {
+    return `
+      <section class="panel teacher-review-card">
+        <span class="model-kicker">批改中心</span>
+        <strong>没有找到这条录音</strong>
+        <p>这条录音可能已经批改完成，或已不在待复评列表中。</p>
+        <button class="teacher-secondary-button" type="button" data-teacher-view="reviews">返回批改中心</button>
+      </section>
+    `;
+  }
+  return `
+    <section class="panel teacher-review-card teacher-review-editor" aria-labelledby="teacher-review-editor-title">
+      <button class="teacher-secondary-button assessment-editor-back" type="button" data-teacher-view="reviews">返回批改中心</button>
+      <div class="teacher-review-heading">
+        <div>
+          <span class="model-kicker">修改反馈</span>
+          <strong id="teacher-review-editor-title">${escapeHtml(submission.studentName)}</strong>
+          <p>${escapeHtml(submission.taskTitle)}</p>
+        </div>
+        <span class="teacher-review-score">${submission.aiScores.overall} 分</span>
+      </div>
+      <div class="teacher-submission-audio">
+        ${
+          submission.recordingUrl
+            ? `<audio controls src="${escapeHtml(submission.recordingUrl)}"></audio>`
+            : `<p>暂无可播放录音，请让学生重新提交。</p>`
+        }
+      </div>
+      <p>${escapeHtml(submission.aiSummary || submission.diagnosisSummary || "AI 初评已完成，等待老师复评。")}</p>
+      <div class="teacher-task-meta">
+        <span>题目：${escapeHtml(submission.exerciseTitle || "短句录音提交")}</span>
+        <span>目标：${escapeHtml(submission.targetText)}</span>
+        <span>听到：${escapeHtml(submission.heardText || "待确认")}</span>
+        <span>${escapeHtml(submission.status)}</span>
+      </div>
+      <div class="teacher-score-strip" aria-label="AI 初评分">
+        <span>声调 ${submission.aiScores.tone}</span>
+        <span>清晰度 ${submission.aiScores.clarity}</span>
+        <span>节奏 ${submission.aiScores.rhythm}</span>
+      </div>
+      <div class="teacher-review-form">
+        <label>
+          <span>教师评分</span>
+          <input data-review-score="${escapeHtml(submission.id)}" type="number" min="0" max="100" value="${submission.aiScores.overall}">
+        </label>
+        <label>
+          <span>反馈给学生</span>
+          <textarea data-review-feedback="${escapeHtml(submission.id)}" rows="4">这次比上次更接近目标，继续把重点音放慢一点练，老师已经看到你的进步。</textarea>
+        </label>
+        <button class="teacher-primary-button" type="button" data-review-submission="${escapeHtml(submission.id)}">
+          保存批改并反馈
+        </button>
+      </div>
     </section>
   `;
 }
@@ -1906,18 +2548,27 @@ function renderTeacherDashboard() {
   const recommendedTask = buildRecommendedTaskPackage(selectedStudent);
   const assessmentReport = buildStudentAssessmentReport(state, selectedStudent);
   const publishedTask = (state.publishedTasks || []).find((task) => task.targetStudentId === selectedStudent?.id);
+  const selectedReviewSubmission = pendingSubmissions.find((submission) => submission.id === state.selectedReviewSubmissionId)
+    || pendingSubmissions[0]
+    || null;
   const teacherPages = {
     home: () => renderTeacherHomePage(summary, classProgress),
     students: () => renderTeacherStudentsPage(students, selectedStudent, assessmentReport),
     tasks: () => renderTeacherTasksPage(selectedStudent, recommendedTask, publishedTask, assessmentProfile),
+    assessmentEditor: () => renderAssessmentTemplateEditor(assessmentProfile),
+    taskPackageEditor: () => renderTaskPackageEditor(selectedStudent, recommendedTask, publishedTask),
     reviews: () => renderTeacherReviewsPage(pendingSubmissions),
+    reviewEditor: () => renderTeacherReviewEditorPage(selectedReviewSubmission),
     chat: () => renderChatPage({ teacher: true }),
   };
   const teacherTitles = {
     home: "\u9996\u9875",
     students: "\u5b66\u751f\u7ba1\u7406",
     tasks: "\u4efb\u52a1\u4e2d\u5fc3",
+    assessmentEditor: "\u5ba1\u6838\u8bad\u7ec3\u5305",
+    taskPackageEditor: "\u5ba1\u6838\u8bad\u7ec3\u5305",
     reviews: "\u6279\u6539\u4e2d\u5fc3",
+    reviewEditor: "\u4fee\u6539\u53cd\u9988",
     chat: "\u804a\u5929\u6c9f\u901a",
   };
   const activeTeacherView = teacherPages[state.teacherView] ? state.teacherView : "home";
@@ -2021,17 +2672,7 @@ function renderClipSegmentContent(segment, plan) {
   }
   if (segment.type === "articulation") {
     return `
-      <div class="clip-articulation-grid">
-        <div class="clip-articulation-panel">
-          <p class="panel-title">口型参考</p>
-          ${renderGeneratedMouth(syllable)}
-        </div>
-        <div class="clip-articulation-panel">
-          <p class="panel-title">舌位参考</p>
-          ${renderGeneratedTongue(syllable)}
-        </div>
-      </div>
-      <p class="clip-asset-note">这个音暂时没有切好的视频片段，先使用口型和舌位参考图练习。</p>
+      <p class="clip-asset-note">这个音暂时没有匹配到可播放的视频片段。请先听标准发音，后续补充视频素材后会直接显示视频。</p>
     `;
   }
   if (segment.type === "tone") {
@@ -2082,6 +2723,22 @@ function renderTeachingVideoPanel() {
   const segment = segments[index] || segments[0];
   const progress = segments.length ? `${index + 1} / ${segments.length}` : "0 / 0";
   const showSegmentNavigation = segments.length > 1;
+  const segmentTabs = segments.map((item, itemIndex) => {
+    const label = item.character || item.title || `第 ${itemIndex + 1} 段`;
+    const pinyin = item.pinyin || "";
+    return `
+      <button
+        type="button"
+        class="clip-character-tab ${itemIndex === index ? "is-active" : ""}"
+        data-action="clip-segment"
+        data-clip-segment="${itemIndex}"
+        aria-pressed="${itemIndex === index ? "true" : "false"}"
+      >
+        <strong>${escapeHtml(label)}</strong>
+        ${pinyin ? `<span>${escapeHtml(pinyin)}</span>` : ""}
+      </button>
+    `;
+  }).join("");
   return `
     <section class="panel clip-player detail-teaching-video" aria-labelledby="detail-teaching-video-title">
       <span class="model-kicker">教学视频</span>
@@ -2090,6 +2747,9 @@ function renderTeachingVideoPanel() {
       ${
         showSegmentNavigation
           ? `
+            <div class="clip-character-tabs" aria-label="选择句子里的字">
+              ${segmentTabs}
+            </div>
             <div class="clip-progress-row">
               <span>${progress}</span>
             </div>
@@ -2208,7 +2868,13 @@ function renderNav() {
       <button type="button" data-teacher-view="${item.view}" aria-current="${
         state.currentView === "account"
           ? item.view === "account" ? "page" : "false"
-          : item.view === state.teacherView ? "page" : "false"
+          : item.view === (
+            state.teacherView === "assessmentEditor" || state.teacherView === "taskPackageEditor"
+              ? "tasks"
+              : state.teacherView === "reviewEditor"
+                ? "reviews"
+                : state.teacherView
+          ) ? "page" : "false"
       }">
         <span class="nav-index">${item.index}</span>
         <span>${item.label}${item.view === "chat" && getTotalUnreadChatCount(state, "teacher") ? ` · ${getTotalUnreadChatCount(state, "teacher")}` : ""}</span>
@@ -2507,7 +3173,7 @@ async function stopRecordingAndAnalyze() {
 
 async function analyzeRecording(blob) {
   const form = new FormData();
-  form.append("text", state.targetText.trim());
+  form.append("text", standardPronunciationText() || state.targetText.trim());
   form.append("audio", blob, "practice.webm");
   state = reduceState(state, { type: "ANALYZE_START" });
   render();
@@ -2750,7 +3416,8 @@ function playSubmissionRecording(submissionId) {
 }
 
 function handleAction(target) {
-  const action = target.closest("[data-action]")?.dataset.action;
+  const actionTarget = target.closest("[data-action]");
+  const action = actionTarget?.dataset.action;
   if (!action) return false;
 
   if (action === "record") {
@@ -2826,6 +3493,17 @@ function handleAction(target) {
     return true;
   }
 
+  if (action === "clip-segment") {
+    pauseAllClipVideos();
+    clearTimers();
+    state = reduceState(state, {
+      type: "SET_CLIP_SEGMENT",
+      index: Number(actionTarget.dataset.clipSegment || 0),
+    });
+    render();
+    return true;
+  }
+
   if (action === "clip-next") {
     pauseAllClipVideos();
     clearTimers();
@@ -2846,7 +3524,19 @@ function handleAction(target) {
   }
 
   if (action === "play-submission") {
-    playSubmissionRecording(target.dataset.submissionId);
+    playSubmissionRecording(actionTarget.dataset.submissionId);
+    return true;
+  }
+
+  if (action === "open-review-editor") {
+    state = reduceState(state, {
+      type: "NAVIGATE_TEACHER",
+      view: "reviewEditor",
+      submissionId: actionTarget.dataset.reviewEditor,
+    });
+    render();
+    app.scrollTop = 0;
+    showToast("进入这条录音的反馈编辑页。");
     return true;
   }
 
@@ -2905,11 +3595,12 @@ function handleAction(target) {
   }
 
   if (action === "task-record") {
-    const taskId = target.dataset.taskPractice || state.selectedTaskId;
-    const exerciseId = target.dataset.taskExercise || state.activeTaskExerciseId || "";
+    const taskId = actionTarget.dataset.taskPractice || state.selectedTaskId;
+    const exerciseId = actionTarget.dataset.taskExercise || state.activeTaskExerciseId || "";
+    const itemIndex = Number(actionTarget.dataset.taskItemIndex || state.activeTaskItemIndex || 0);
     if (state.modelStatus === "analyzing") return true;
-    if (state.activeTaskPracticeId !== taskId || state.recordingState === "complete") {
-      state = reduceState(state, { type: "START_TASK_PRACTICE", taskId, exerciseId });
+    if (state.activeTaskPracticeId !== taskId || state.activeTaskExerciseId !== exerciseId || state.activeTaskItemIndex !== itemIndex || state.recordingState === "complete") {
+      state = reduceState(state, { type: "START_TASK_PRACTICE", taskId, exerciseId, itemIndex });
       render();
       scheduleTextInfo(state.targetText);
     }
@@ -2940,6 +3631,134 @@ function handleAction(target) {
     return true;
   }
 
+  if (action === "save-task-step") {
+    const taskId = actionTarget.dataset.taskPractice || state.selectedTaskId;
+    const exerciseId = actionTarget.dataset.taskExercise || state.activeTaskExerciseId || "";
+    const itemIndex = Number(actionTarget.dataset.taskItemIndex || state.activeTaskItemIndex || 0);
+    state = reduceState(state, {
+      type: "SAVE_TASK_STEP",
+      taskId,
+      exerciseId,
+      itemIndex,
+      keepExerciseActive: true,
+      nextItemIndex: itemIndex + 1,
+      recordingUrl: state.lastRecordingUrl,
+      result: state.analysisResult,
+    });
+    render();
+    showToast("这一小步已保存，可以继续完成下一步。");
+    return true;
+  }
+
+  if (action === "submit-task-to-teacher") {
+    const taskId = actionTarget.dataset.taskPractice || state.selectedTaskId;
+    const beforeCount = state.taskSubmissions.length;
+    state = reduceState(state, { type: "SUBMIT_TASK_TO_TEACHER", taskId });
+    render();
+    showToast(state.taskSubmissions.length > beforeCount ? "任务已提交给老师。" : "请先完成所有任务步骤。");
+    return true;
+  }
+
+  if (action === "return-task-steps") {
+    state = {
+      ...state,
+      activeTaskPracticeId: "",
+      activeTaskExerciseId: "",
+      recordingState: "idle",
+      modelStatus: "idle",
+      recordingError: "",
+    };
+    render();
+    app.scrollTop = 0;
+    return true;
+  }
+
+  if (action === "save-teacher-student-summary") {
+    const studentId = actionTarget.dataset.studentId || state.selectedTeacherStudentId;
+    const summary = app.querySelector("[data-field=\"teacher-student-summary\"]")?.value || "";
+    state = reduceState(state, {
+      type: "UPDATE_TEACHER_STUDENT_SUMMARY",
+      studentId,
+      summary,
+    });
+    render();
+    showToast("阶段画像备注已保存。");
+    return true;
+  }
+
+  if (action === "edit-teacher-student-summary") {
+    state = reduceState(state, {
+      type: "EDIT_TEACHER_STUDENT_SUMMARY",
+      studentId: target.dataset.studentId || state.selectedTeacherStudentId,
+    });
+    render();
+    showToast("可以修改阶段备注了。");
+    return true;
+  }
+
+  if (action === "add-task-step") {
+    const list = app.querySelector("[data-step-editor-list]");
+    if (!list) return true;
+    const index = list.querySelectorAll("[data-step-editor-card]").length;
+    const wrapper = document.createElement("div");
+    wrapper.innerHTML = renderTeacherStepEditor({
+      id: `custom-${index + 1}`,
+      type: "练习",
+      title: "新的练习步骤",
+      instruction: "按老师要求完成这一小步。",
+      targetText: "",
+      requiredCount: 1,
+      sourceMode: "custom",
+      practiceItems: [],
+    }, index);
+    const article = wrapper.firstElementChild;
+    list.append(article);
+    renumberTeacherStepCards(list);
+    article.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    return true;
+  }
+
+  if (action === "start-new-teacher-task") {
+    const studentId = app.querySelector('[data-field="new-task-student"]')?.value || state.selectedTeacherStudentId;
+    state = reduceState(state, { type: "SELECT_TEACHER_STUDENT", studentId });
+    state = reduceState(state, { type: "START_NEW_TEACHER_TASK" });
+    render();
+    app.scrollTop = 0;
+    showToast("已打开新建任务模板。");
+    return true;
+  }
+
+  if (action === "delete-task-step") {
+    const card = target.closest("[data-step-editor-card]");
+    const list = target.closest("[data-step-editor-list]");
+    if (!card || !list) return true;
+    const cards = list.querySelectorAll("[data-step-editor-card]");
+    if (cards.length <= 1) {
+      showToast("至少保留一个任务步骤。");
+      return true;
+    }
+    card.remove();
+    renumberTeacherStepCards(list);
+    showToast("已删除这个任务步骤。");
+    return true;
+  }
+
+  if (action === "set-step-source") {
+    const card = target.closest("[data-step-editor-card]");
+    if (!card) return true;
+    const mode = target.dataset.sourceMode === "bank" ? "bank" : "custom";
+    card.dataset.stepMode = mode;
+    card.querySelectorAll("[data-source-mode]").forEach((button) => {
+      button.classList.toggle("is-selected", button.dataset.sourceMode === mode);
+    });
+    const panel = card.querySelector("[data-bank-panel]");
+    if (panel) panel.hidden = mode !== "bank";
+    if (mode === "bank") {
+      applyQuestionBankToStepCard(card, card.querySelector('[data-step-field="bankPackageId"]')?.value);
+    }
+    return true;
+  }
+
   if (action === "complete-entry-assessment") {
     state = reduceState(state, { type: "COMPLETE_ENTRY_ASSESSMENT" });
     render();
@@ -2948,23 +3767,79 @@ function handleAction(target) {
   }
 
   if (action === "publish-assessment-task") {
-    state = reduceState(state, { type: "PUBLISH_ASSESSMENT_TASK" });
+    const exerciseSet = Array.from(app.querySelectorAll("[data-step-editor-card]")).map((card, index) => ({
+      id: `assessment-step-${index + 1}`,
+      type: card.querySelector('[data-step-field="type"]')?.value || "练习",
+      title: card.querySelector('[data-step-field="title"]')?.value || `任务步骤 ${index + 1}`,
+      instruction: card.querySelector('[data-step-field="instruction"]')?.value || "按老师要求完成这一小步。",
+      targetText: card.querySelector('[data-step-field="targetText"]')?.value || app.querySelector('[data-field="assessment-practice-text"]')?.value || "",
+      requiredCount: card.querySelector('[data-step-field="requiredCount"]')?.value || "1",
+      requiresSubmission: Boolean(card.querySelector('[data-step-field="requiresSubmission"]')?.checked),
+      sourceMode: card.dataset.stepMode === "bank" ? "bank" : "custom",
+      bankPackageId: card.querySelector('[data-step-field="bankPackageId"]')?.value || "",
+      practiceItems: (card.querySelector('[data-step-field="practiceItems"]')?.value || "")
+        .split(/\n+/)
+        .map((item) => item.trim())
+        .filter(Boolean),
+    }));
+    const edits = {
+      recommendation: app.querySelector('[data-field="assessment-recommendation"]')?.value || "",
+      title: app.querySelector('[data-field="assessment-task-title"]')?.value || "",
+      practiceText: app.querySelector('[data-field="assessment-practice-text"]')?.value || "",
+      repeatCount: app.querySelector('[data-field="assessment-repeat-count"]')?.value || "",
+      requiredSubmissions: app.querySelector('[data-field="assessment-required-submissions"]')?.value || "",
+      items: exerciseSet.map((exercise, index) => `${index + 1}. ${exercise.title}`),
+      exerciseSet,
+      teacherNote: app.querySelector('[data-field="assessment-teacher-note"]')?.value || "",
+    };
+    state = reduceState(state, { type: "PUBLISH_ASSESSMENT_TASK", edits });
     render();
-    showToast("初始训练任务已发布到学生端。");
+    showToast("老师修改后的初始训练任务已发布到学生端。");
     return true;
   }
 
   if (action === "publish-recommended-task") {
-    state = reduceState(state, { type: "PUBLISH_RECOMMENDED_TASK" });
+    const exerciseSet = Array.from(app.querySelectorAll("[data-step-editor-card]")).map((card, index) => ({
+      id: `step-${index + 1}`,
+      type: card.querySelector('[data-step-field="type"]')?.value || "练习",
+      title: card.querySelector('[data-step-field="title"]')?.value || `任务步骤 ${index + 1}`,
+      instruction: card.querySelector('[data-step-field="instruction"]')?.value || "按老师要求完成这一小步。",
+      targetText: card.querySelector('[data-step-field="targetText"]')?.value || app.querySelector('[data-field="recommended-practice-text"]')?.value || "",
+      requiredCount: card.querySelector('[data-step-field="requiredCount"]')?.value || "1",
+      requiresSubmission: Boolean(card.querySelector('[data-step-field="requiresSubmission"]')?.checked),
+      sourceMode: card.dataset.stepMode === "bank" ? "bank" : "custom",
+      bankPackageId: card.querySelector('[data-step-field="bankPackageId"]')?.value || "",
+      practiceItems: (card.querySelector('[data-step-field="practiceItems"]')?.value || "")
+        .split(/\n+/)
+        .map((item) => item.trim())
+        .filter(Boolean),
+    }));
+    const edits = {
+      title: app.querySelector('[data-field="recommended-task-title"]')?.value || "",
+      goal: app.querySelector('[data-field="recommended-task-goal"]')?.value || "",
+      practiceText: app.querySelector('[data-field="recommended-practice-text"]')?.value || "",
+      suggestedDue: app.querySelector('[data-field="recommended-suggested-due"]')?.value || "",
+      repeatCount: app.querySelector('[data-field="recommended-repeat-count"]')?.value || "",
+      requiredSubmissions: app.querySelector('[data-field="recommended-required-submissions"]')?.value || "",
+      items: exerciseSet.map((exercise, index) => `${index + 1}. ${exercise.title}`),
+      exerciseSet,
+      teacherNote: app.querySelector('[data-field="recommended-teacher-note"]')?.value || "",
+    };
+    state = reduceState(state, { type: "PUBLISH_RECOMMENDED_TASK", edits });
+    state = reduceState(state, { type: "NAVIGATE_TEACHER", view: "tasks" });
     render();
-    showToast("任务已发布到学生端今日任务。");
+    showToast("老师审核后的训练任务已发布到学生端。");
     return true;
   }
 
   if (action === "login-account") {
     const username = app.querySelector('[data-field="login-username"]')?.value || "";
     const password = app.querySelector('[data-field="login-password"]')?.value || "";
-    const role = app.querySelector('input[name="login-role"]:checked')?.value || state.currentRole || "student";
+    const role = app.querySelector('input[name="login-role"]:checked')?.value || "";
+    if (!["student", "teacher"].includes(role)) {
+      showToast("请先选择学生或教师身份。");
+      return true;
+    }
     state = reduceState(state, {
       type: "LOGIN_ACCOUNT",
       username,
@@ -2997,16 +3872,32 @@ function handleAction(target) {
   }
 
   if (action === "create-class-chat") {
-    state = reduceState(state, { type: "CREATE_CLASS_CHAT", title: "启音一班群聊" });
+    const title = app.querySelector('[data-field="class-chat-title"]')?.value?.trim() || "新的班级群聊";
+    const memberIds = Array.from(app.querySelectorAll('[data-field="class-chat-student"]:checked'))
+      .map((input) => input.value)
+      .filter(Boolean);
+    if (!memberIds.length) {
+      showToast("请至少选择一位学生加入群聊。");
+      return true;
+    }
+    state = reduceState(state, { type: "CREATE_CLASS_CHAT", title, memberIds });
     render();
     showToast("班级群聊已创建。");
     return true;
   }
 
   if (action === "create-direct-chat") {
-    state = reduceState(state, { type: "CREATE_DIRECT_CHAT", studentId: state.selectedTeacherStudentId });
+    const studentId = app.querySelector('[data-field="direct-chat-student"]')?.value || state.selectedTeacherStudentId;
+    state = reduceState(state, { type: "CREATE_DIRECT_CHAT", studentId });
     render();
     showToast("学生私聊已创建。");
+    return true;
+  }
+
+  if (action === "create-student-direct-chat") {
+    state = reduceState(state, { type: "CREATE_STUDENT_DIRECT_CHAT" });
+    render();
+    showToast("已打开老师私聊。");
     return true;
   }
 
@@ -3024,19 +3915,20 @@ function handleAction(target) {
     return true;
   }
 
-  if (action === "hide-chat-thread") {
-    const threadId = target.dataset.chatThreadAction;
-    const thread = (state.chatThreads || []).find((item) => item.id === threadId);
-    if (!threadId || !thread) return true;
-    state = reduceState(state, { type: "HIDE_CHAT_THREAD", threadId });
+  if (action === "chat-back") {
+    state = { ...state, chatMode: "list" };
     render();
     app.scrollTop = 0;
-    showToast("已从当前列表隐藏。");
     return true;
   }
 
-  if (action === "chat-back") {
-    state = { ...state, chatMode: "list" };
+  if (action === "return-task-detail") {
+    state = {
+      ...state,
+      currentRole: "student",
+      currentView: "taskDetail",
+      taskDetailMode: false,
+    };
     render();
     app.scrollTop = 0;
     return true;
@@ -3070,6 +3962,7 @@ function handleClick(event) {
     state = reduceState(state, {
       type: "NAVIGATE_TEACHER",
       view: teacherViewButton.dataset.teacherView,
+      studentFilter: teacherViewButton.dataset.teacherFilter,
     });
     render();
     app.scrollTop = 0;
@@ -3080,6 +3973,25 @@ function handleClick(event) {
   if (viewButton) {
     clearTimers();
     if (viewButton.dataset.view !== "detail") stopCameraPreview();
+    if (viewButton.dataset.view === "tasks") {
+      state = {
+        ...state,
+        taskDetailMode: false,
+        activeTaskPracticeId: "",
+        activeTaskExerciseId: "",
+        activeTaskItemIndex: 0,
+        recordingState: "idle",
+        modelStatus: "idle",
+      };
+    }
+    if (viewButton.dataset.view === "practice" && state.activeTaskPracticeId) {
+      state = reduceState(state, { type: "RESTORE_CUSTOM_PRACTICE" });
+      render();
+      scheduleTextInfo(state.targetText);
+      app.scrollTop = 0;
+      return;
+    }
+    state = { ...state, taskDetailMode: false };
     state = reduceState(state, {
       type: "NAVIGATE",
       view: viewButton.dataset.view,
@@ -3092,6 +4004,7 @@ function handleClick(event) {
   const studentTaskButton = target.closest("[data-student-task]");
   if (studentTaskButton) {
     clearTimers();
+    state = { ...state, taskDetailMode: false };
     state = reduceState(state, {
       type: "SELECT_STUDENT_TASK",
       taskId: studentTaskButton.dataset.studentTask,
@@ -3102,12 +4015,25 @@ function handleClick(event) {
     return;
   }
 
+  const progressDateButton = target.closest("[data-progress-date]");
+  if (progressDateButton) {
+    state = reduceState(state, {
+      type: "SELECT_PROGRESS_DATE",
+      date: progressDateButton.dataset.progressDate,
+    });
+    render();
+    requestAnimationFrame(drawProgressChart);
+    return;
+  }
+
   const taskPracticeButton = target.closest("[data-task-practice]");
   if (taskPracticeButton && !target.closest('[data-action="task-record"]')) {
     clearTimers();
     state = reduceState(state, {
       type: "START_TASK_PRACTICE",
       taskId: taskPracticeButton.dataset.taskPractice,
+      exerciseId: taskPracticeButton.dataset.taskExercise || "",
+      itemIndex: Number(taskPracticeButton.dataset.taskItemIndex || 0),
     });
     render();
     scheduleTextInfo(state.targetText);
@@ -3139,6 +4065,7 @@ function handleClick(event) {
   const syllableButton = target.closest("[data-syllable]");
   if (syllableButton) {
     clearTimers();
+    state = { ...state, taskDetailMode: false };
     state = reduceState(state, {
       type: "SELECT_SYLLABLE",
       syllableId: syllableButton.dataset.syllable,
@@ -3148,6 +4075,22 @@ function handleClick(event) {
     render();
     app.scrollTop = 0;
     showToast(`正在查看“${activeSyllables[state.selectedSyllable].character}”的发音详情。`);
+    return;
+  }
+
+  const taskSyllableButton = target.closest("[data-task-syllable]");
+  if (taskSyllableButton) {
+    const latestSubmission = getLatestTaskSubmission(state);
+    const syllables = latestSubmission?.syllables || {};
+    if (!syllables[taskSyllableButton.dataset.taskSyllable]) return;
+    state = {
+      ...state,
+      currentView: "detail",
+      selectedSyllable: taskSyllableButton.dataset.taskSyllable,
+      taskDetailMode: true,
+    };
+    render();
+    app.scrollTop = 0;
     return;
   }
 
@@ -3246,7 +4189,27 @@ function handleInput(event) {
 
 function handleChange(event) {
   const target = event.target;
+  if (!(target instanceof HTMLInputElement) && !(target instanceof HTMLSelectElement)) return;
+  if (target.dataset.stepField === "bankPackageId") {
+    const card = target.closest("[data-step-editor-card]");
+    if (card) {
+      card.dataset.stepMode = "bank";
+      card.querySelectorAll("[data-source-mode]").forEach((button) => {
+        button.classList.toggle("is-selected", button.dataset.sourceMode === "bank");
+      });
+      const panel = card.querySelector("[data-bank-panel]");
+      if (panel) panel.hidden = false;
+      applyQuestionBankToStepCard(card, target.value);
+    }
+    return;
+  }
   if (!(target instanceof HTMLInputElement)) return;
+  if (target.name === "login-role") {
+    state = reduceState(state, { type: "SELECT_ROLE", role: target.value });
+    state = { ...state, currentView: "account" };
+    render();
+    return;
+  }
   if (target.dataset.field !== "avatar-file") return;
   const file = target.files?.[0];
   if (!file) return;
@@ -3266,6 +4229,24 @@ function handleKeydown(event) {
   event.preventDefault();
   state = reduceState(state, { type: "SEND_CHAT_MESSAGE", body: target.value || "" });
   render();
+}
+
+function handleChatContextMenu(event) {
+  const target = event.target;
+  if (!(target instanceof Element)) return;
+  const threadButton = target.closest("[data-chat-thread]");
+  if (!threadButton || state.currentRole !== "student" || state.currentView !== "chat") return;
+  event.preventDefault();
+  const threadId = threadButton.dataset.chatThread;
+  const thread = (state.chatThreads || []).find((item) => item.id === threadId);
+  if (!threadId || !thread) return;
+  const label = thread.type === "class" ? "群聊" : "私聊";
+  const confirmed = window.confirm(`删除“${thread.title}”${label}吗？删除后这个聊天会从学生端列表中移除。`);
+  if (!confirmed) return;
+  state = reduceState(state, { type: "DELETE_CHAT_THREAD", threadId });
+  render();
+  app.scrollTop = 0;
+  showToast(`${label}已删除。`);
 }
 
 function handleTouchStart(event) {
@@ -3313,6 +4294,7 @@ document.addEventListener("click", handleClick);
 document.addEventListener("input", handleInput);
 document.addEventListener("change", handleChange);
 document.addEventListener("keydown", handleKeydown);
+document.addEventListener("contextmenu", handleChatContextMenu);
 document.addEventListener("touchstart", handleTouchStart, { passive: true });
 document.addEventListener("touchend", handleTouchEnd, { passive: true });
 document.addEventListener("compositionstart", handleCompositionStart);
