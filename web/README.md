@@ -14,7 +14,7 @@
 ## 运行
 
 ```bash
-cd /Users/chloe/Downloads/my-voice
+cd /home/SturkaCircutz/see-my-voice/web
 ./start.sh
 ```
 
@@ -22,6 +22,12 @@ cd /Users/chloe/Downloads/my-voice
 
 ```text
 http://127.0.0.1:4173
+```
+
+外部访问：
+
+```text
+http://seemyvoice.ddns.net:4173
 ```
 
 第一次分析时 FunASR 可能需要加载模型，会比较慢。后续录音会快一些。

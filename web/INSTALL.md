@@ -21,7 +21,7 @@ export SEE_MY_VOICE_DIR=/path/to/see-my-voice
 ## 启动
 
 ```bash
-cd /Users/chloe/Downloads/my-voice
+cd /home/SturkaCircutz/see-my-voice/web
 ./start.sh
 ```
 
@@ -29,6 +29,12 @@ cd /Users/chloe/Downloads/my-voice
 
 ```text
 http://127.0.0.1:4173
+```
+
+外部访问：
+
+```text
+http://seemyvoice.ddns.net:4173
 ```
 
 ## 使用
