@@ -305,6 +305,58 @@ Initialize Pages in the GitHub web UI:
 
 GitHub Pages will host only the static frontend. Speech analysis still requires a running Python backend. For the hosted Pages app, set `web/config.js` to a reachable backend origin before deploying, or the API calls will fail from the browser.
 
+## Connect GitHub Pages Frontend to Backend
+
+GitHub Pages cannot run `web/server.py`; it only serves the static files. To make recording analysis work from the Pages frontend, run the Python backend somewhere public over HTTPS and point `web/config.js` at that backend origin.
+
+The frontend uses this value for every API request:
+
+```js
+window.SEE_MY_VOICE_API_BASE = "https://your-backend-url";
+```
+
+For same-machine local development, use an empty string:
+
+```js
+window.SEE_MY_VOICE_API_BASE = "";
+```
+
+For a quick public development setup, run the backend locally:
+
+```bash
+SEE_MY_VOICE_DIR="$PWD" PORT=4173 python web/server.py
+```
+
+Then expose `http://127.0.0.1:4173` with a tunnel such as LocalTunnel, ngrok, or Cloudflare Tunnel. If the tunnel gives you:
+
+```text
+https://abc123.ngrok-free.app
+```
+
+set `web/config.js` to:
+
+```js
+window.SEE_MY_VOICE_API_BASE = "https://abc123.ngrok-free.app";
+```
+
+Commit and push the change so GitHub Pages redeploys:
+
+```bash
+git add web/config.js
+git commit -m "Configure hosted backend URL"
+git push origin seemyvoice-4.0
+```
+
+For a stable setup, deploy this repository to a VPS or cloud host, install `requirements.txt`, and run:
+
+```bash
+SEE_MY_VOICE_DIR=/path/to/see-my-voice HOST=0.0.0.0 PORT=4173 python web/server.py
+```
+
+Put HTTPS in front of it with a reverse proxy such as Caddy, Nginx, a cloud load balancer, or a managed tunnel, then set `web/config.js` to that HTTPS origin.
+
+Because GitHub Pages is served over HTTPS, browsers may block calls to a plain `http://` backend as mixed content. Use an `https://` backend URL for the hosted Pages site.
+
 Official GitHub references:
 
 - Creating a repository: https://docs.github.com/en/repositories/creating-and-managing-repositories/quickstart-for-repositories
