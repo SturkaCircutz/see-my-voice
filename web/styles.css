@@ -2831,6 +2831,44 @@ canvas {
   min-height: 38px;
 }
 
+.teacher-audio-label {
+  color: var(--navy);
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.teacher-recording-list {
+  display: grid;
+  gap: 10px;
+}
+
+.teacher-recording-item {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid rgba(53, 84, 110, 0.12);
+  border-radius: 12px;
+  background: rgba(250, 247, 241, 0.75);
+}
+
+.teacher-recording-item div {
+  display: grid;
+  gap: 3px;
+}
+
+.teacher-recording-item strong {
+  color: var(--navy);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.teacher-recording-item span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
 .teacher-submission-audio p {
   margin: 0;
   color: var(--muted);

@@ -67,6 +67,15 @@ let pronunciationClipManifest = { clips: { initial: {}, final: {} } };
 let clockTimer = null;
 let chatSwipeState = null;
 
+function blobToDataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.addEventListener("load", () => resolve(String(reader.result || "")), { once: true });
+    reader.addEventListener("error", () => reject(reader.error || new Error("录音读取失败。")), { once: true });
+    reader.readAsDataURL(blob);
+  });
+}
+
 const ARTICULATION_UNITS = new Set([
   "a",
   "ai",
@@ -922,6 +931,33 @@ function practiceItemsForExercise(exercise) {
   if (Array.isArray(exercise?.practiceItems) && exercise.practiceItems.length) return exercise.practiceItems;
   if (exercise?.bankPackageId) return questionBankById(exercise.bankPackageId)?.items || [];
   return exercise?.targetText ? [exercise.targetText] : [];
+}
+
+function practiceItemsFromStepCard(card) {
+  return (card.querySelector('[data-step-field="practiceItems"]')?.value || "")
+    .split(/\n+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function submissionRecordings(submission) {
+  const recordings = (submission?.completedSteps || [])
+    .flatMap((step) => (step.items || []).map((item, index) => ({
+      id: `${step.id || "step"}-${index}`,
+      stepTitle: step.title || submission.exerciseTitle || "任务录音",
+      targetText: item.targetText || step.targetText || submission.targetText || "",
+      recordingUrl: item.recordingUrl || "",
+    })))
+    .filter((item) => item.recordingUrl);
+  if (recordings.length) return recordings;
+  return submission?.recordingUrl
+    ? [{
+      id: submission.id,
+      stepTitle: submission.exerciseTitle || "任务录音",
+      targetText: submission.targetText || "",
+      recordingUrl: submission.recordingUrl,
+    }]
+    : [];
 }
 
 function taskPackageUiState(task) {
@@ -2122,27 +2158,9 @@ function renderTaskPackageEditor(selectedStudent, recommendedTask, publishedTask
         <div class="assessment-template-step">
           <span>2</span>
           <div>
-            <strong>修改练习内容</strong>
-            <p>老师可以换练习句子、调整次数，也可以把步骤写得更具体。</p>
+            <strong>任务步骤</strong>
+            <p>每一步都可以选择题库或自定义题目，学生会按步骤逐项完成。</p>
           </div>
-        </div>
-        <label class="template-field">
-          <span>本次练习句子</span>
-          <input data-field="recommended-practice-text" value="${escapeHtml(taskDraft.practiceText)}">
-        </label>
-        <div class="assessment-edit-grid">
-          <label class="template-field">
-            <span>完成期限</span>
-            <input data-field="recommended-suggested-due" value="${escapeHtml(taskDraft.suggestedDue)}">
-          </label>
-          <label class="template-field">
-            <span>跟读次数</span>
-            <input data-field="recommended-repeat-count" type="number" min="1" value="${escapeHtml(taskDraft.repeatCount)}">
-          </label>
-          <label class="template-field">
-            <span>提交录音次数</span>
-            <input data-field="recommended-required-submissions" type="number" min="1" value="${escapeHtml(taskDraft.requiredSubmissions)}">
-          </label>
         </div>
         <div class="teacher-step-editor-list" data-step-editor-list>
           ${exerciseSet.map((exercise, index) => renderTeacherStepEditor(exercise, index)).join("")}
@@ -2215,11 +2233,7 @@ function renderTeacherStepEditor(exercise, index) {
         <input data-step-field="title" value="${escapeHtml(exercise.title || "")}">
       </label>
       <label class="template-field">
-        <span>具体练习题/句子</span>
-        <input data-step-field="targetText" value="${escapeHtml(exercise.targetText || "")}">
-      </label>
-      <label class="template-field">
-        <span>学生端显示的具体题目，每行一个</span>
+        <span>学生端显示的具体题目</span>
         <textarea data-step-field="practiceItems" rows="3">${escapeHtml((practiceItemsForExercise(exercise).length ? practiceItemsForExercise(exercise) : selectedBank.items).join("\n"))}</textarea>
       </label>
       <label class="template-field">
@@ -2359,27 +2373,13 @@ function renderAssessmentTemplateEditor(assessmentProfile) {
           <span>2</span>
           <div>
             <strong>编辑发布给学生的任务</strong>
-            <p>让任务像康复老师布置作业一样清楚：练什么、练几次、提交几次。</p>
+            <p>直接调整学生需要完成的任务步骤。</p>
           </div>
         </div>
         <label class="template-field">
           <span>任务标题</span>
           <input data-field="assessment-task-title" value="${escapeHtml(`${assessmentProfile.studentName} · 入门测评训练包`)}">
         </label>
-        <label class="template-field">
-          <span>本次练习句子</span>
-          <input data-field="assessment-practice-text" value="${escapeHtml(bankPackage.targetText || "我要喝水")}">
-        </label>
-        <div class="assessment-edit-grid">
-          <label class="template-field">
-            <span>跟读次数</span>
-            <input data-field="assessment-repeat-count" type="number" min="1" max="20" value="${repeatCount}">
-          </label>
-          <label class="template-field">
-            <span>提交录音次数</span>
-            <input data-field="assessment-required-submissions" type="number" min="1" max="10" value="1">
-          </label>
-        </div>
         <div class="teacher-step-editor-list" data-step-editor-list>
           ${assessmentExerciseSet.map((exercise, index) => renderTeacherStepEditor(exercise, index)).join("")}
         </div>
@@ -2453,6 +2453,7 @@ function renderTeacherReviewEditorPage(submission) {
       </section>
     `;
   }
+  const recordings = submissionRecordings(submission);
   return `
     <section class="panel teacher-review-card teacher-review-editor" aria-labelledby="teacher-review-editor-title">
       <button class="teacher-secondary-button assessment-editor-back" type="button" data-teacher-view="reviews">返回批改中心</button>
@@ -2466,9 +2467,22 @@ function renderTeacherReviewEditorPage(submission) {
       </div>
       <div class="teacher-submission-audio">
         ${
-          submission.recordingUrl
-            ? `<audio controls src="${escapeHtml(submission.recordingUrl)}"></audio>`
-            : `<p>暂无可播放录音，请让学生重新提交。</p>`
+          recordings.length
+            ? `
+              <span class="teacher-audio-label">学生提交录音 · ${recordings.length} 条</span>
+              <div class="teacher-recording-list">
+                ${recordings.map((recording, index) => `
+                  <article class="teacher-recording-item">
+                    <div>
+                      <strong>录音 ${index + 1}</strong>
+                      <span>${escapeHtml(recording.stepTitle)} · ${escapeHtml(recording.targetText || "未标注题目")}</span>
+                    </div>
+                    <audio controls src="${escapeHtml(recording.recordingUrl)}"></audio>
+                  </article>
+                `).join("")}
+              </div>
+            `
+            : `<p>这条提交还没有同步到录音，请让学生重新录音提交。</p>`
         }
       </div>
       <p>${escapeHtml(submission.aiSummary || submission.diagnosisSummary || "AI 初评已完成，等待老师复评。")}</p>
@@ -3168,10 +3182,11 @@ async function stopRecordingAndAnalyze() {
   stopTracks();
   if (lastRecordingObjectUrl) URL.revokeObjectURL(lastRecordingObjectUrl);
   lastRecordingObjectUrl = URL.createObjectURL(blob);
-  await analyzeRecording(blob);
+  const persistentRecordingUrl = await blobToDataUrl(blob);
+  await analyzeRecording(blob, persistentRecordingUrl);
 }
 
-async function analyzeRecording(blob) {
+async function analyzeRecording(blob, persistentRecordingUrl = "") {
   const form = new FormData();
   form.append("text", standardPronunciationText() || state.targetText.trim());
   form.append("audio", blob, "practice.webm");
@@ -3186,7 +3201,7 @@ async function analyzeRecording(blob) {
   state = reduceState(state, {
     type: "APPLY_ANALYSIS",
     result: payload,
-    recordingUrl: lastRecordingObjectUrl,
+    recordingUrl: persistentRecordingUrl || lastRecordingObjectUrl,
     clipManifest: pronunciationClipManifest,
   });
   render();
@@ -3767,27 +3782,27 @@ function handleAction(target) {
   }
 
   if (action === "publish-assessment-task") {
-    const exerciseSet = Array.from(app.querySelectorAll("[data-step-editor-card]")).map((card, index) => ({
-      id: `assessment-step-${index + 1}`,
-      type: card.querySelector('[data-step-field="type"]')?.value || "练习",
-      title: card.querySelector('[data-step-field="title"]')?.value || `任务步骤 ${index + 1}`,
-      instruction: card.querySelector('[data-step-field="instruction"]')?.value || "按老师要求完成这一小步。",
-      targetText: card.querySelector('[data-step-field="targetText"]')?.value || app.querySelector('[data-field="assessment-practice-text"]')?.value || "",
-      requiredCount: card.querySelector('[data-step-field="requiredCount"]')?.value || "1",
-      requiresSubmission: Boolean(card.querySelector('[data-step-field="requiresSubmission"]')?.checked),
-      sourceMode: card.dataset.stepMode === "bank" ? "bank" : "custom",
-      bankPackageId: card.querySelector('[data-step-field="bankPackageId"]')?.value || "",
-      practiceItems: (card.querySelector('[data-step-field="practiceItems"]')?.value || "")
-        .split(/\n+/)
-        .map((item) => item.trim())
-        .filter(Boolean),
-    }));
+    const exerciseSet = Array.from(app.querySelectorAll("[data-step-editor-card]")).map((card, index) => {
+      const practiceItems = practiceItemsFromStepCard(card);
+      return {
+        id: `assessment-step-${index + 1}`,
+        type: card.querySelector('[data-step-field="type"]')?.value || "练习",
+        title: card.querySelector('[data-step-field="title"]')?.value || `任务步骤 ${index + 1}`,
+        instruction: card.querySelector('[data-step-field="instruction"]')?.value || "按老师要求完成这一小步。",
+        targetText: practiceItems[0] || "",
+        requiredCount: card.querySelector('[data-step-field="requiredCount"]')?.value || "1",
+        requiresSubmission: Boolean(card.querySelector('[data-step-field="requiresSubmission"]')?.checked),
+        sourceMode: card.dataset.stepMode === "bank" ? "bank" : "custom",
+        bankPackageId: card.querySelector('[data-step-field="bankPackageId"]')?.value || "",
+        practiceItems,
+      };
+    });
     const edits = {
       recommendation: app.querySelector('[data-field="assessment-recommendation"]')?.value || "",
       title: app.querySelector('[data-field="assessment-task-title"]')?.value || "",
-      practiceText: app.querySelector('[data-field="assessment-practice-text"]')?.value || "",
-      repeatCount: app.querySelector('[data-field="assessment-repeat-count"]')?.value || "",
-      requiredSubmissions: app.querySelector('[data-field="assessment-required-submissions"]')?.value || "",
+      practiceText: exerciseSet.flatMap((exercise) => exercise.practiceItems).filter(Boolean)[0] || "",
+      repeatCount: exerciseSet[0]?.requiredCount || "1",
+      requiredSubmissions: exerciseSet.filter((exercise) => exercise.requiresSubmission).length || 1,
       items: exerciseSet.map((exercise, index) => `${index + 1}. ${exercise.title}`),
       exerciseSet,
       teacherNote: app.querySelector('[data-field="assessment-teacher-note"]')?.value || "",
@@ -3799,28 +3814,28 @@ function handleAction(target) {
   }
 
   if (action === "publish-recommended-task") {
-    const exerciseSet = Array.from(app.querySelectorAll("[data-step-editor-card]")).map((card, index) => ({
-      id: `step-${index + 1}`,
-      type: card.querySelector('[data-step-field="type"]')?.value || "练习",
-      title: card.querySelector('[data-step-field="title"]')?.value || `任务步骤 ${index + 1}`,
-      instruction: card.querySelector('[data-step-field="instruction"]')?.value || "按老师要求完成这一小步。",
-      targetText: card.querySelector('[data-step-field="targetText"]')?.value || app.querySelector('[data-field="recommended-practice-text"]')?.value || "",
-      requiredCount: card.querySelector('[data-step-field="requiredCount"]')?.value || "1",
-      requiresSubmission: Boolean(card.querySelector('[data-step-field="requiresSubmission"]')?.checked),
-      sourceMode: card.dataset.stepMode === "bank" ? "bank" : "custom",
-      bankPackageId: card.querySelector('[data-step-field="bankPackageId"]')?.value || "",
-      practiceItems: (card.querySelector('[data-step-field="practiceItems"]')?.value || "")
-        .split(/\n+/)
-        .map((item) => item.trim())
-        .filter(Boolean),
-    }));
+    const exerciseSet = Array.from(app.querySelectorAll("[data-step-editor-card]")).map((card, index) => {
+      const practiceItems = practiceItemsFromStepCard(card);
+      return {
+        id: `step-${index + 1}`,
+        type: card.querySelector('[data-step-field="type"]')?.value || "练习",
+        title: card.querySelector('[data-step-field="title"]')?.value || `任务步骤 ${index + 1}`,
+        instruction: card.querySelector('[data-step-field="instruction"]')?.value || "按老师要求完成这一小步。",
+        targetText: practiceItems[0] || "",
+        requiredCount: card.querySelector('[data-step-field="requiredCount"]')?.value || "1",
+        requiresSubmission: Boolean(card.querySelector('[data-step-field="requiresSubmission"]')?.checked),
+        sourceMode: card.dataset.stepMode === "bank" ? "bank" : "custom",
+        bankPackageId: card.querySelector('[data-step-field="bankPackageId"]')?.value || "",
+        practiceItems,
+      };
+    });
     const edits = {
       title: app.querySelector('[data-field="recommended-task-title"]')?.value || "",
       goal: app.querySelector('[data-field="recommended-task-goal"]')?.value || "",
-      practiceText: app.querySelector('[data-field="recommended-practice-text"]')?.value || "",
-      suggestedDue: app.querySelector('[data-field="recommended-suggested-due"]')?.value || "",
-      repeatCount: app.querySelector('[data-field="recommended-repeat-count"]')?.value || "",
-      requiredSubmissions: app.querySelector('[data-field="recommended-required-submissions"]')?.value || "",
+      practiceText: exerciseSet.flatMap((exercise) => exercise.practiceItems).filter(Boolean)[0] || "",
+      suggestedDue: "",
+      repeatCount: exerciseSet[0]?.requiredCount || "1",
+      requiredSubmissions: exerciseSet.filter((exercise) => exercise.requiresSubmission).length || 1,
       items: exerciseSet.map((exercise, index) => `${index + 1}. ${exercise.title}`),
       exerciseSet,
       teacherNote: app.querySelector('[data-field="recommended-teacher-note"]')?.value || "",

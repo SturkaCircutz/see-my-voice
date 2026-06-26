@@ -421,6 +421,9 @@ test("published task analysis creates a teacher review submission", () => {
   assert.equal(submissions[0].studentId, "student-lin");
   assert.equal(submissions[0].exerciseTitle, "短句录音提交");
   assert.equal(submissions[0].recordingUrl, "blob:student-recording");
+  assert.ok(
+    submissions[0].completedSteps.flatMap((step) => step.items).filter((item) => item.recordingUrl).length > 1,
+  );
   assert.equal(submissions[0].targetText, "风很大。");
   assert.equal(submissions[0].aiScores.overall, 67);
   assert.equal(submissions[0].aiScores.rhythm, 62);
