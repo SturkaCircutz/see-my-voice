@@ -11,7 +11,18 @@ const app = express();
 
 app.use(
   cors({
-    origin: config.frontendOrigin,
+    origin(origin, callback) {
+      if (
+        !origin ||
+        config.frontendOrigins.includes(origin) ||
+        /^https:\/\/[a-z0-9-]+\.vercel\.app$/i.test(origin)
+      ) {
+        callback(null, true);
+        return;
+      }
+
+      callback(new Error("Origin is not allowed by CORS."));
+    },
     credentials: true,
   }),
 );
