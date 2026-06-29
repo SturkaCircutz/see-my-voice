@@ -24,21 +24,32 @@ export interface LoginEventDocument {
 
 let client: MongoClient | null = null;
 let database: Db | null = null;
+let connectionPromise: Promise<Db> | null = null;
 
 export async function connectToMongo(): Promise<Db> {
   if (database) return database;
+  if (connectionPromise) return connectionPromise;
 
-  client = new MongoClient(config.mongoUri);
-  await client.connect();
-  database = client.db(config.mongoDbName);
+  connectionPromise = (async () => {
+    client = new MongoClient(config.mongoUri);
+    await client.connect();
+    database = client.db(config.mongoDbName);
 
-  await Promise.all([
-    usersCollection().createIndex({ username: 1 }, { unique: true }),
-    loginEventsCollection().createIndex({ userId: 1, createdAt: -1 }),
-    loginEventsCollection().createIndex({ username: 1, createdAt: -1 }),
-  ]);
+    await Promise.all([
+      usersCollection().createIndex({ username: 1 }, { unique: true }),
+      loginEventsCollection().createIndex({ userId: 1, createdAt: -1 }),
+      loginEventsCollection().createIndex({ username: 1, createdAt: -1 }),
+    ]);
 
-  return database;
+    return database;
+  })().catch((error) => {
+    connectionPromise = null;
+    client = null;
+    database = null;
+    throw error;
+  });
+
+  return connectionPromise;
 }
 
 export function usersCollection(): Collection<UserDocument> {
