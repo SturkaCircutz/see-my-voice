@@ -7,13 +7,12 @@ This branch keeps two runnable app paths:
 - `frontend/` and `backend/`: the TypeScript account-based app path with Next.js, Express, MongoDB, JWT auth, and a pronunciation proxy.
 - `web/`, `src/`, `tests/`, and `tools/`: the original local Python analysis prototype and its static browser UI.
 
-The Python prototype is still used for the current FunASR pronunciation workflow and for GitHub Pages static deployment. Do not remove it unless the branch is intentionally moving fully to the TypeScript app.
+The Python prototype is still used for the current FunASR pronunciation workflow. Do not remove it unless the branch is intentionally moving fully to the TypeScript app.
 
 ## Repository Layout
 
 ```text
 .
-├── .github/workflows/pages.yml        # Deploys the static web app from web/
 ├── backend/                           # Express API, MongoDB, JWT auth
 ├── frontend/                          # Next.js + React app
 ├── samples/                           # Sample/evaluation manifests
@@ -31,7 +30,6 @@ The Python prototype is still used for the current FunASR pronunciation workflow
 
 - Current branch: `seemyvoice-4.0`
 - Upstream: `origin/seemyvoice-4.0`
-- Static deployment: `.github/workflows/pages.yml` copies `web/` into the GitHub Pages artifact.
 - TypeScript app: run locally from the root workspace scripts.
 
 ## TypeScript App
@@ -171,18 +169,6 @@ The browser reads `window.SEE_MY_VOICE_API_BASE` from `web/config.js`.
 
 - Local same-origin server: `window.SEE_MY_VOICE_API_BASE = "";`
 - Hosted static frontend with separate backend: set it to the public HTTPS backend origin.
-
-## GitHub Pages
-
-The Pages workflow deploys only static files from `web/`. It cannot run `web/server.py`.
-
-For a hosted Pages deployment with live speech analysis:
-
-1. Run the Python backend on a public HTTPS origin.
-2. Set `web/config.js` to that origin.
-3. Push to `seemyvoice-4.0`.
-
-If `web/config.js` is empty, the Pages UI loads but API calls expect same-origin endpoints and speech analysis will fail on GitHub Pages.
 
 ## Analysis Scripts
 
