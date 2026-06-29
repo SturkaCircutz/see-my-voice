@@ -28,9 +28,18 @@ The Python prototype is still used for the current FunASR pronunciation workflow
 
 ## Branch State
 
-- Current branch: `seemyvoice-4.0`
-- Upstream: `origin/seemyvoice-4.0`
+- Primary development branch: `main`
+- Current stable version tag: `v4.0`
+- Compatibility branch: `seemyvoice-4.0`
 - TypeScript app: run locally from the root workspace scripts.
+
+Use short-lived branches for new work:
+
+```text
+feature/<short-name>
+fix/<short-name>
+chore/<short-name>
+```
 
 ## TypeScript App
 
