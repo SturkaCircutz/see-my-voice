@@ -202,7 +202,7 @@ def decode_with_pyav(input_path: Path, output_path: Path) -> Path:
     container = av.open(str(input_path))
     stream = next((item for item in container.streams if item.type == "audio"), None)
     if stream is None:
-        raise RuntimeError("录音文件里没有可读取的音频流。")
+        raise RuntimeError("The recording does not contain a readable audio stream.")
 
     chunks = []
     sample_rate = int(stream.rate or 0)
@@ -215,7 +215,7 @@ def decode_with_pyav(input_path: Path, output_path: Path) -> Path:
     container.close()
 
     if not chunks or sample_rate <= 0:
-        raise RuntimeError("无法从浏览器录音中解码音频。")
+        raise RuntimeError("Could not decode audio from the browser recording.")
 
     audio = np.concatenate(chunks)
     peak = float(np.max(np.abs(audio))) if len(audio) else 0.0
@@ -297,11 +297,11 @@ def segmental_issue(target: dict, heard: dict | None) -> dict:
     if heard is None:
         return {
             "type": "missing",
-            "title": "这个音节没有被稳定听清",
-            "summary": f"目标是 {target_label}，但系统没有在对应位置听到清楚的音节。",
-            "focus": "整音节",
+            "title": "This syllable was not heard clearly",
+            "summary": f"The target is {target_label}, but the system did not hear a clear syllable in that position.",
+            "focus": "Whole syllable",
             "practice": [target.get("char", "")],
-            "detail": "建议先慢速读这个字，再和前后字连起来。注意起音、韵母和声调都要完整，不要太轻或太快。",
+            "detail": "Read this character slowly first, then connect it with the surrounding characters. Keep the onset, final, and tone complete instead of reading too lightly or too fast.",
         }
 
     heard_label = pinyin_unit_label(heard)
@@ -310,43 +310,43 @@ def segmental_issue(target: dict, heard: dict | None) -> dict:
     tone_changed = target.get("tone") != heard.get("tone")
 
     if initial_changed and not final_changed:
-        value = target.get("initial") or "零声母"
+        value = target.get("initial") or "zero initial"
         return {
             "type": "initial",
-            "title": f"声母 {value} 可能不够清楚",
-            "summary": f"目标是 {target_label}，系统听成了 {heard_label}。主要差异在声母开头。",
-            "focus": f"声母 {value}",
+            "title": f"Initial {value} may not be clear enough",
+            "summary": f"The target is {target_label}, but the system heard {heard_label}. The main difference is at the initial onset.",
+            "focus": f"Initial {value}",
             "practice": drill_words("initial", value, target.get("char", "")),
-            "detail": "先单独练起音，再接上韵母。录音时可以稍微放慢，让开头的气流、舌尖或唇齿动作更清楚。",
+            "detail": "Practice the onset by itself, then attach the final. Slow down slightly while recording so the airflow, tongue tip, or lip-to-teeth movement at the start is clearer.",
         }
     if final_changed and not initial_changed:
-        value = target.get("final") or "韵母"
+        value = target.get("final") or "final"
         return {
             "type": "final",
-            "title": f"韵母 {value} 可能不够完整",
-            "summary": f"目标是 {target_label}，系统听成了 {heard_label}。声母接近，但后面的韵母不同。",
-            "focus": f"韵母 {value}",
+            "title": f"Final {value} may not be complete enough",
+            "summary": f"The target is {target_label}, but the system heard {heard_label}. The initial is close, but the following final is different.",
+            "focus": f"Final {value}",
             "practice": drill_words("final", value, target.get("char", "")),
-            "detail": "重点把口型变化和结尾收音做完整。可以先拖长韵母，再逐渐恢复正常语速。",
+            "detail": "Focus on completing the mouth-shape transition and the ending. Stretch the final first, then gradually return to a natural speed.",
         }
     if tone_changed and not initial_changed and not final_changed:
         tone = target.get("tone") or ""
         return {
             "type": "tone",
-            "title": f"声调 T{tone} 可能影响识别",
-            "summary": f"目标是 {target_label}，系统听成了 {heard_label}。声母和韵母接近，主要差异在声调。",
-            "focus": f"声调 T{tone}",
+            "title": f"Tone T{tone} may affect recognition",
+            "summary": f"The target is {target_label}, but the system heard {heard_label}. The initial and final are close; the main difference is the tone.",
+            "focus": f"Tone T{tone}",
             "practice": [target.get("char", "")],
-            "detail": "对照声调趋势线练习高低变化。先夸张一点读准方向，再回到自然语速。",
+            "detail": "Use the tone contour to practice the pitch movement. Exaggerate the direction first, then return to a natural speed.",
         }
 
     return {
         "type": "syllable",
-        "title": "整个音节可能需要重练",
-        "summary": f"目标是 {target_label}，系统听成了 {heard_label}。声母、韵母或声调可能同时有差异。",
-        "focus": "整音节",
+        "title": "The whole syllable may need more practice",
+        "summary": f"The target is {target_label}, but the system heard {heard_label}. The initial, final, or tone may all be different.",
+        "focus": "Whole syllable",
         "practice": [target.get("char", "")],
-        "detail": "建议把这个音节拆成“声母 + 韵母 + 声调”三步练：先练起音，再练韵母口型，最后加上声调。",
+        "detail": "Break this syllable into three steps: initial, final, and tone. Practice the onset first, then the final mouth shape, and add the tone last.",
     }
 
 
@@ -384,21 +384,21 @@ def add_pinyin_diagnosis(result: dict, target_text: str) -> dict:
                 {
                     "index": extra.get("index"),
                     "type": "extra",
-                    "title": "系统听到了额外音节",
-                    "summary": f"系统额外听到了 {pinyin_unit_label(extra)}，可能是拖音、杂音或多读了一个音。",
-                    "focus": "节奏",
+                    "title": "The system heard an extra syllable",
+                    "summary": f"The system additionally heard {pinyin_unit_label(extra)}, possibly because of a held sound, noise, or one extra syllable.",
+                    "focus": "Rhythm",
                     "practice": [],
-                    "detail": "建议录音时减少停顿和杂音，读完目标句子后尽快停止录音。",
+                    "detail": "Reduce pauses and background noise while recording, and stop the recording soon after reading the target sentence.",
                 }
             )
 
     if issues:
-        summary = f"系统发现 {len(issues)} 个可能影响听懂的拼音差异。"
+        summary = f"The system found {len(issues)} pinyin difference(s) that may affect intelligibility."
     else:
-        summary = "系统听到的拼音和目标拼音一致，当前更适合重点看声调和节奏。"
+        summary = "The heard pinyin matches the target pinyin. Focus next on tone and rhythm."
 
     result["pinyin_diagnosis"] = {
-        "method": "ASR 听辨结果与目标拼音对比",
+        "method": "Compare ASR pinyin with the target pinyin",
         "limitation": "",
         "target_text": target_clean,
         "heard_text": heard_clean,
@@ -436,35 +436,35 @@ def rescale_curve(values, points: int = 6) -> list[int]:
 
 
 def chinese_tone_feedback(tone: str, score: int | None) -> str:
-    """Return product-facing Chinese feedback only."""
+    """Return product-facing tone feedback."""
     if score is None:
-        return "录音后会根据你的声调走向给出建议。"
+        return "After recording, the app will give advice based on your tone contour."
     if score >= 82:
-        return "声调走向比较接近目标，可以继续保持。"
+        return "Your tone contour is close to the target. Keep it consistent."
     if score >= 68:
-        prefix = "声调大方向接近，但还不够稳定。"
+        prefix = "The overall tone direction is close, but it is not stable enough yet. "
     else:
-        prefix = "这个音节需要重点练习。"
+        prefix = "This syllable needs focused practice. "
 
     if tone == "1":
-        return f"{prefix}第一声要保持高而平，避免中途下滑或抖动。"
+        return f"{prefix}Tone 1 should stay high and level; avoid sliding down or wobbling."
     if tone == "2":
-        return f"{prefix}第二声要从较低处自然上扬，结尾需要更明显地升起来。"
+        return f"{prefix}Tone 2 should rise naturally from a lower point, with a clearer lift at the end."
     if tone == "3":
-        return f"{prefix}第三声中间要先降到低点，再轻轻回升，不要一直平着读。"
+        return f"{prefix}Tone 3 should dip to a low point and then rise lightly; do not keep it flat."
     if tone == "4":
-        return f"{prefix}第四声要从高处快速下降，结尾要收得干净。"
-    return f"{prefix}轻声要短而轻，不要拖得太长。"
+        return f"{prefix}Tone 4 should fall quickly from a high point and end cleanly."
+    return f"{prefix}The neutral tone should be short and light, not dragged out."
 
 
 def tone_name(tone: str) -> str:
     return {
-        "1": "第一声",
-        "2": "第二声",
-        "3": "第三声",
-        "4": "第四声",
-        "5": "轻声",
-    }.get(str(tone), "目标声调")
+        "1": "Tone 1",
+        "2": "Tone 2",
+        "3": "Tone 3",
+        "4": "Tone 4",
+        "5": "neutral tone",
+    }.get(str(tone), "the target tone")
 
 
 def add_user_facing_tone_curves(result: dict, audio_path: Path) -> dict:
@@ -496,9 +496,9 @@ def add_user_facing_tone_curves(result: dict, audio_path: Path) -> dict:
             "has_user_pitch": user_contour is not None,
         }
         syllable["tone_explanation"] = (
-            f"{syllable.get('char', '')} 的目标是{tone_name(tone)}。"
-            f"系统会把你的音高变化简化成一条红线，再和绿色目标线比较；"
-            f"当前分数是 {score} 分，主要看趋势是否接近，不代表声母、韵母已经完全准确。"
+            f"The target for {syllable.get('char', '')} is {tone_name(tone)}. "
+            f"The system simplifies your pitch movement into a red line and compares it with the green target line. "
+            f"The current score is {score}; this mainly checks whether the tone trend is close and does not mean the initial and final are fully accurate."
         )
     return result
 
@@ -612,8 +612,8 @@ class VoiceHandler(SimpleHTTPRequestHandler):
     def handle_analyze(self):
         if ANALYSIS_IMPORT_ERROR is not None:
             raise RuntimeError(
-                "网页已经启动，但发音分析模块暂时没有加载成功。"
-                "请确认 see-my-voice/src 文件可以被读取后再重新启动服务。"
+                "The web app started, but the pronunciation analysis module did not load. "
+                "Confirm that see-my-voice/src is readable, then restart the server."
             )
 
         content_type = self.headers.get("Content-Type", "")
@@ -636,11 +636,11 @@ class VoiceHandler(SimpleHTTPRequestHandler):
 
         target_text = (fields.get("text") or "").strip()
         if not target_text:
-            raise ValueError("请先输入想练习的中文句子。")
+            raise ValueError("Enter the Chinese sentence you want to practice first.")
 
         audio_bytes = files.get("audio")
         if not audio_bytes:
-            raise ValueError("没有收到录音文件。")
+            raise ValueError("No recording file was received.")
 
         with tempfile.TemporaryDirectory(prefix="see_my_voice_web_") as temp_dir:
             temp_path = Path(temp_dir)
@@ -654,7 +654,7 @@ class VoiceHandler(SimpleHTTPRequestHandler):
             result = combine_results(target_text, audio_for_model, model, plot_dir)
             result["communication_result"]["main_feedback"] = result["communication_result"][
                 "main_feedback"
-            ].replace("pitch 图", "声调趋势图").replace("看 声调趋势图", "看声调趋势图")
+            ].replace("pitch 图", "tone contour chart").replace("看 tone contour chart", "check the tone contour chart")
             result = add_display_fields(result, target_text)
             result = add_user_facing_tone_curves(result, audio_for_model)
             result = add_pinyin_diagnosis(result, target_text)
@@ -673,14 +673,14 @@ def main():
     port = int(os.environ.get("PORT", "4173"))
     server = ThreadingHTTPServer((host, port), VoiceHandler)
     display_host = "127.0.0.1" if host == "0.0.0.0" else host
-    print(f"绘声发音训练已启动：http://{display_host}:{port}")
+    print(f"See My Voice pronunciation training is running: http://{display_host}:{port}")
     if host == "0.0.0.0":
         lan_ip = get_lan_ip()
         if lan_ip:
-            print(f"局域网访问：http://{lan_ip}:{port}")
-        print("外部访问需要配置公网主机、端口转发或 HTTPS 隧道。")
-    print(f"项目路径：{SEE_MY_VOICE_DIR}")
-    print("按 Control + C 停止服务。")
+            print(f"LAN access: http://{lan_ip}:{port}")
+        print("External access requires a public host, port forwarding, or an HTTPS tunnel.")
+    print(f"Project path: {SEE_MY_VOICE_DIR}")
+    print("Press Control + C to stop the server.")
     server.serve_forever()
 
 

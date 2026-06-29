@@ -6,7 +6,7 @@ import {
   createInitialState,
   buildParentCompanionSummary,
   buildRecommendedTaskPackage,
-  buildRehabWeeklyReport,
+  buildMandarinWeeklyReport,
   buildStudentAssessmentReport,
   buildTeacherClassProgress,
   buildTeachingPlan,
@@ -37,7 +37,7 @@ function completeAllTaskStepsAndSubmit(state, result, recordingUrl = "blob:stude
     for (let itemIndex = 0; itemIndex < items.length; itemIndex += 1) {
       const itemResult = { ...result, target_text: items[itemIndex] };
       state = reduceState(state, { type: "START_TASK_PRACTICE", taskId: task.id, exerciseId: exercise.id, itemIndex });
-      if (exercise.requiresSubmission || !/听|示范/.test(`${exercise.type} ${exercise.title}`)) {
+      if (exercise.requiresSubmission || !/Watch|Demo/.test(`${exercise.type} ${exercise.title}`)) {
         state = reduceState(state, { type: "APPLY_ANALYSIS", result: itemResult, recordingUrl });
       } else {
         state = reduceState(state, {
@@ -98,7 +98,7 @@ test("analysis result updates scores and model text", () => {
     pinyin_display: ["nǐ", "hǎo"],
     communication_result: {
       readiness_score: 91,
-      main_feedback: "系统已经听懂这句话。",
+      main_feedback: "系统已经听懂这句话.",
     },
     asr: { heard_text: "你好", text_similarity: 100 },
     tone_timing: {
@@ -113,7 +113,7 @@ test("analysis result updates scores and model text", () => {
           final: "i",
           tone: "2",
           tone_score: 84,
-          feedback: "不错。",
+          feedback: "不错.",
         },
       ],
     },
@@ -202,16 +202,16 @@ test("teacher dashboard starts with student profiles and review workload", () =>
   assert.equal(summary.studentCount, 3);
   assert.equal(summary.pendingSubmissions, 0);
   assert.equal(summary.overdueTasks, 1);
-  assert.equal(getSelectedTeacherStudent(state).name, "林一一");
+  assert.equal(getSelectedTeacherStudent(state).name, "Lin Yiyi");
 });
 
 test("teacher class progress summarizes completion and attention", () => {
   const result = {
     target_text: "我要吃饭",
     pinyin_display: ["wo3", "yao4", "chi1", "fan4"],
-    communication_result: { readiness_score: 67, main_feedback: "继续关注 f 和 an。" },
+    communication_result: { readiness_score: 67, main_feedback: "继续关注 f 和 an." },
     asr: { heard_text: "我要吃饭", text_similarity: 82 },
-    pinyin_diagnosis: { summary: "继续关注 an 收尾。", issues: [] },
+    pinyin_diagnosis: { summary: "继续关注 an 收尾.", issues: [] },
     tone_timing: {
       overall_score: 71,
       boundary_confidence: "medium",
@@ -226,7 +226,7 @@ test("teacher class progress summarizes completion and attention", () => {
   assert.equal(progress.completionRate, 0);
   assert.equal(progress.taskCoverageRate, 0);
   assert.equal(progress.averageLatestScore, 73);
-  assert.ok(progress.commonFocusTags.some((item) => item.tag === "f 起音不稳定"));
+  assert.ok(progress.commonFocusTags.some((item) => item.tag === "Unstable f onset"));
   assert.ok(progress.attentionStudents.some((student) => student.id === "student-chen"));
 
   state = reduceState(state, { type: "PUBLISH_RECOMMENDED_TASK" });
@@ -245,7 +245,7 @@ test("teacher view navigation and student selection update teacher profile", () 
   assert.equal(state.teacherView, "students");
   state = reduceState(state, { type: "SELECT_TEACHER_STUDENT", studentId: "student-chen" });
   assert.equal(state.currentView, "teacher");
-  assert.equal(getSelectedTeacherStudent(state).name, "陈小禾");
+  assert.equal(getSelectedTeacherStudent(state).name, "Chen Xiaohe");
 });
 
 test("teacher can edit selected student stage profile comment", () => {
@@ -254,13 +254,13 @@ test("teacher can edit selected student stage profile comment", () => {
   assert.equal(state.editingTeacherStudentSummaryId, "student-chen");
   state = reduceState(state, {
     type: "UPDATE_TEACHER_STUDENT_SUMMARY",
-    summary: "第三声比上周稳定，短句停顿仍需要老师继续观察。",
+    summary: "Tone 3 is more stable than last week; short-sentence pauses still need teacher observation.",
   });
   const student = getSelectedTeacherStudent(state);
   const report = buildStudentAssessmentReport(state, student);
 
-  assert.equal(student.assessmentSummary, "第三声比上周稳定，短句停顿仍需要老师继续观察。");
-  assert.equal(report.conclusion, "第三声比上周稳定，短句停顿仍需要老师继续观察。");
+  assert.equal(student.assessmentSummary, "Tone 3 is more stable than last week; short-sentence pauses still need teacher observation.");
+  assert.equal(report.conclusion, "Tone 3 is more stable than last week; short-sentence pauses still need teacher observation.");
   assert.equal(state.editingTeacherStudentSummaryId, "");
 });
 
@@ -270,10 +270,10 @@ test("parent companion summary remains internal while parent page is not navigab
     pinyin_display: ["wo3", "yao4", "chi1", "fan4"],
     communication_result: {
       readiness_score: 67,
-      main_feedback: "f 的起音比上次清楚。",
+      main_feedback: "f 的起音比上次Clear.",
     },
     asr: { heard_text: "我要吃饭", text_similarity: 82 },
-    pinyin_diagnosis: { summary: "继续关注 an。", issues: [] },
+    pinyin_diagnosis: { summary: "继续关注 an.", issues: [] },
     tone_timing: {
       overall_score: 71,
       boundary_confidence: "medium",
@@ -290,28 +290,28 @@ test("parent companion summary remains internal while parent page is not navigab
     type: "REVIEW_TASK_SUBMISSION",
     submissionId: getPendingTeacherSubmissions(state)[0].id,
     teacherScore: 74,
-    feedback: "这次更清楚了，陪练时把 an 的收尾再放慢一点。",
+    feedback: "This is clearer. During companion practice, slow down the an ending a bit more.",
   });
   const summary = buildParentCompanionSummary(state);
-  assert.match(summary.todayTitle, /声母专项|入门测评|训练包/);
+  assert.match(summary.todayTitle, /Initial Practice|Entry Assessment|Practice Pack/);
   assert.ok(summary.practiceItems.length > 0);
-  assert.match(summary.teacherAdvice, /陪练时/);
-  assert.match(summary.weeklyPlainReport, /林一一 本周练习/);
+  assert.match(summary.teacherAdvice, /companion practice/);
+  assert.match(summary.weeklyPlainReport, /Lin Yiyi practiced 5 times this week/);
 });
 
-test("recommended task package stays teacher-reviewed before publishing", () => {
+test("recommended task package stays teacher feedback completed before publishing", () => {
   let state = createInitialState();
   let taskPackage = buildRecommendedTaskPackage(getSelectedTeacherStudent(state));
-  assert.equal(taskPackage.status, "待教师审核");
+  assert.equal(taskPackage.status, "Needs Teacher Review");
   assert.equal(taskPackage.category, undefined);
-  assert.match(taskPackage.title, /声母专项/);
-  assert.ok(taskPackage.items.some((item) => item.includes("短句录音提交")));
+  assert.match(taskPackage.title, /Initial Practice/);
+  assert.ok(taskPackage.exerciseSet.some((item) => item.title.includes("Short-Sentence Recording Submission")));
 
   state = reduceState(state, { type: "SELECT_TEACHER_STUDENT", studentId: "student-chen" });
   taskPackage = buildRecommendedTaskPackage(getSelectedTeacherStudent(state));
-  assert.match(taskPackage.title, /声调专项/);
+  assert.match(taskPackage.title, /Tone Practice/);
   assert.equal(taskPackage.repeatCount, 5);
-  assert.ok(taskPackage.reviewTags.includes("第三声常读平"));
+  assert.ok(taskPackage.reviewTags.includes("Tone 3 often sounds flat"));
 });
 
 test("teacher can publish a recommended task to the student today task", () => {
@@ -320,16 +320,16 @@ test("teacher can publish a recommended task to the student today task", () => {
 
   state = reduceState(state, { type: "PUBLISH_RECOMMENDED_TASK" });
   let todayTask = getTodayStudentTask(state);
-  assert.equal(todayTask.status, "已发布");
+  assert.equal(todayTask.status, "Published");
   assert.equal(todayTask.targetStudentId, "student-lin");
-  assert.match(todayTask.title, /声母专项/);
+  assert.match(todayTask.title, /Initial Practice/);
 
   state = reduceState(state, { type: "SELECT_TEACHER_STUDENT", studentId: "student-chen" });
   state = reduceState(state, { type: "PUBLISH_RECOMMENDED_TASK" });
   todayTask = getTodayStudentTask(state);
   assert.equal(state.publishedTasks.length, 2);
   assert.ok(state.publishedTasks.some((task) => task.targetStudentId === "student-chen"));
-  assert.equal(todayTask.status, "已发布");
+  assert.equal(todayTask.status, "Published");
 });
 
 test("student entry assessment creates a teacher-confirmed initial task", () => {
@@ -340,17 +340,17 @@ test("student entry assessment creates a teacher-confirmed initial task", () => 
   assert.equal(state.account.entryAssessmentCompleted, true);
   assert.equal(getPendingAssessmentProfiles(state).length, 1);
   assert.equal(getTeacherDashboardSummary(state).pendingAssessments, 1);
-  assert.equal(getSelectedAssessmentProfile(state).studentName, "林一一");
-  assert.match(getSelectedAssessmentProfile(state).profileSummary, /入门测评/);
+  assert.equal(getSelectedAssessmentProfile(state).studentName, "Lin Yiyi");
+  assert.match(getSelectedAssessmentProfile(state).profileSummary, /entry assessment/);
 
   state = reduceState(state, { type: "PUBLISH_ASSESSMENT_TASK" });
   const profile = getSelectedAssessmentProfile(state);
   const todayTask = getTodayStudentTask(state);
-  assert.equal(profile.status, "教师已确认");
+  assert.equal(profile.status, "Teacher Confirmed");
   assert.equal(getPendingAssessmentProfiles(state).length, 0);
   assert.equal(todayTask.sourceAssessmentId, profile.id);
-  assert.match(todayTask.title, /入门测评训练包/);
-  assert.equal(todayTask.status, "已发布");
+  assert.match(todayTask.title, /Entry Assessment Practice Pack/);
+  assert.equal(todayTask.status, "Published");
 });
 
 test("analysis without a published task does not create teacher submission", () => {
@@ -359,10 +359,10 @@ test("analysis without a published task does not create teacher submission", () 
     pinyin_display: ["ni3", "hao3"],
     communication_result: {
       readiness_score: 80,
-      main_feedback: "这次整体接近目标。",
+      main_feedback: "这次整体接近目标.",
     },
     asr: { heard_text: "你好", text_similarity: 88 },
-    pinyin_diagnosis: { summary: "拼音基本一致。", issues: [] },
+    pinyin_diagnosis: { summary: "拼音基本一致.", issues: [] },
     tone_timing: {
       overall_score: 76,
       boundary_confidence: "medium",
@@ -382,12 +382,12 @@ test("published task analysis creates a teacher review submission", () => {
     pinyin_display: ["wo3", "yao4", "chi1", "fan4"],
     communication_result: {
       readiness_score: 67,
-      main_feedback: "f 的起音比上次清楚，an 的收尾还可以再慢一点。",
+      main_feedback: "f 的起音比上次Clear，an 的收尾还可以再慢一点.",
     },
     asr: { heard_text: "我要吃饭", text_similarity: 82 },
     pinyin_diagnosis: {
-      summary: "主要关注 fan 的韵母收尾。",
-      issues: [{ index: 3, type: "final", title: "an 收尾", summary: "an 收尾还不够完整。", focus: "韵母 an" }],
+      summary: "主要关注 fan 的Final收尾.",
+      issues: [{ index: 3, type: "final", title: "an 收尾", summary: "an 收尾还不够完整.", focus: "Final an" }],
     },
     tone_timing: {
       overall_score: 71,
@@ -419,7 +419,7 @@ test("published task analysis creates a teacher review submission", () => {
   assert.equal(state.currentView, "taskDetail");
   assert.equal(getTeacherDashboardSummary(state).pendingSubmissions, 1);
   assert.equal(submissions[0].studentId, "student-lin");
-  assert.equal(submissions[0].exerciseTitle, "短句录音提交");
+  assert.equal(submissions[0].exerciseTitle, "Short-Sentence Recording Submission");
   assert.equal(submissions[0].recordingUrl, "blob:student-recording");
   assert.ok(
     submissions[0].completedSteps.flatMap((step) => step.items).filter((item) => item.recordingUrl).length > 1,
@@ -436,10 +436,10 @@ test("teacher review completes a submission and exposes student feedback", () =>
     pinyin_display: ["wo3", "yao4", "chi1", "fan4"],
     communication_result: {
       readiness_score: 67,
-      main_feedback: "f 的起音比上次清楚。",
+      main_feedback: "f 的起音比上次Clear.",
     },
     asr: { heard_text: "我要吃饭", text_similarity: 82 },
-    pinyin_diagnosis: { summary: "继续关注 an。", issues: [] },
+    pinyin_diagnosis: { summary: "继续关注 an.", issues: [] },
     tone_timing: {
       overall_score: 71,
       boundary_confidence: "medium",
@@ -455,17 +455,17 @@ test("teacher review completes a submission and exposes student feedback", () =>
     type: "REVIEW_TASK_SUBMISSION",
     submissionId,
     teacherScore: "74",
-    feedback: "这次更清楚了，下一次把 an 的收尾再放慢一点。",
+    feedback: "This is clearer. Next time, slow down the an ending a little more.",
   });
 
   assert.equal(getPendingTeacherSubmissions(state).length, 0);
   assert.equal(getTeacherDashboardSummary(state).pendingSubmissions, 0);
   assert.equal(getLatestStudentFeedback(state).teacherScore, 74);
-  assert.match(getLatestStudentFeedback(state).teacherFeedback, /下一次/);
-  assert.equal(getLatestStudentFeedback(state).status, "教师已复评");
+  assert.match(getLatestStudentFeedback(state).teacherFeedback, /Next time/);
+  assert.equal(getLatestStudentFeedback(state).status, "Teacher Reviewed");
   assert.equal(getStudentTaskMessages(state).length, 1);
   assert.equal(getStudentTaskMessages(state)[0].senderRole, "teacher");
-  assert.match(getStudentTaskMessages(state)[0].body, /下一次/);
+  assert.match(getStudentTaskMessages(state)[0].body, /Next time/);
   assert.equal(getSelectedTeacherMessages(state).length, 1);
   assert.equal(getSelectedTeacherMessages(state)[0].relatedText, "风很大。");
 });
@@ -476,10 +476,10 @@ test("teacher assessment report summarizes profile and reviewed submissions", ()
     pinyin_display: ["wo3", "yao4", "chi1", "fan4"],
     communication_result: {
       readiness_score: 67,
-      main_feedback: "f 的起音比上次清楚。",
+      main_feedback: "f 的起音比上次Clear.",
     },
     asr: { heard_text: "我要吃饭", text_similarity: 82 },
-    pinyin_diagnosis: { summary: "继续关注 an 收尾。", issues: [] },
+    pinyin_diagnosis: { summary: "继续关注 an 收尾.", issues: [] },
     tone_timing: {
       overall_score: 71,
       boundary_confidence: "medium",
@@ -490,10 +490,10 @@ test("teacher assessment report summarizes profile and reviewed submissions", ()
   };
   let state = createInitialState();
   let report = buildStudentAssessmentReport(state);
-  assert.equal(report.studentName, "林一一");
+  assert.equal(report.studentName, "Lin Yiyi");
   assert.equal(report.averageAiScore, 72);
   assert.equal(report.teacherAverage, null);
-  assert.ok(report.focusAreas.includes("f 起音不稳定"));
+  assert.ok(report.focusAreas.includes("Unstable f onset"));
 
   state = reduceState(state, { type: "PUBLISH_RECOMMENDED_TASK" });
   state = completeAllTaskStepsAndSubmit(state, result);
@@ -501,25 +501,25 @@ test("teacher assessment report summarizes profile and reviewed submissions", ()
     type: "REVIEW_TASK_SUBMISSION",
     submissionId: getPendingTeacherSubmissions(state)[0].id,
     teacherScore: 74,
-    feedback: "这次更清楚了。",
+    feedback: "This is clearer.",
   });
   report = buildStudentAssessmentReport(state);
   assert.equal(report.completedSubmissions, 1);
   assert.equal(report.reviewedSubmissions, 1);
   assert.equal(report.teacherAverage, 74);
   assert.equal(report.averageAiScore, 67);
-  assert.ok(report.nextSteps.some((item) => item.includes("f 起音不稳定")));
+  assert.ok(report.nextSteps.some((item) => item.includes("Unstable f onset")));
 
-  const weeklyReport = buildRehabWeeklyReport(state);
-  assert.match(weeklyReport, /绘声康复周报/);
-  assert.match(weeklyReport, /教师复评分均值 74 分/);
+  const weeklyReport = buildMandarinWeeklyReport(state);
+  assert.match(weeklyReport, /See My Voice Mandarin Progress Report/);
+  assert.match(weeklyReport, /Teacher feedback average 74/);
   assert.match(weeklyReport, /继续关注 an 收尾/);
 });
 
 test("teaching issue selection prefers segmental issues over tone-only issues", () => {
   const issue = selectPrimaryTeachingIssue([
-    { type: "tone", index: 0, title: "声调问题" },
-    { type: "final", index: 1, title: "韵母问题" },
+    { type: "tone", index: 0, title: "Tone问题" },
+    { type: "final", index: 1, title: "Final问题" },
   ]);
   assert.equal(issue.type, "final");
 });
@@ -535,10 +535,10 @@ test("teaching plan uses pronunciation video clips when manifest matches", () =>
         {
           index: 0,
           type: "initial",
-          title: "声母 ch 可能不够清楚",
-          summary: "目标是 chi1，系统听成 qi1。",
-          focus: "声母 ch",
-          detail: "舌尖稍向后卷。",
+          title: "Initial ch 可能不够Clear",
+          summary: "目标是 chi1，系统听成 qi1.",
+          focus: "Initial ch",
+          detail: "舌尖稍向后卷.",
           practice: ["吃", "茶"],
         },
       ],
@@ -565,8 +565,8 @@ test("teaching plan uses pronunciation video clips when manifest matches", () =>
       initial: {
         ch: {
           url: "./assets/pronunciation-clips/initial-ch.mp4",
-          title: "声母 ch 发音示范",
-          notes: "看舌尖后卷和送气。",
+          title: "Initial ch Pronunciation Demo",
+          notes: "看舌尖后卷和送气.",
         },
       },
       final: {},
@@ -591,10 +591,10 @@ test("teaching plan uses generated pronunciation clip manifest", () => {
         {
           index: 0,
           type: "initial",
-          title: "声母 m 可能不够清楚",
-          summary: "目标声母是 m。",
-          focus: "声母 m",
-          detail: "闭唇并让气流从鼻腔出来。",
+          title: "Initial m 可能不够Clear",
+          summary: "目标Initial是 m.",
+          focus: "Initial m",
+          detail: "闭唇并让气流从鼻腔出来.",
           practice: ["妈"],
         },
       ],
@@ -622,10 +622,10 @@ test("teaching plan uses generated final clips from manifest", () => {
         {
           index: 0,
           type: "final",
-          title: "韵母 a 可能不够完整",
-          summary: "目标韵母是 a。",
-          focus: "韵母 a",
-          detail: "口腔打开，声音要饱满。",
+          title: "Final a 可能不够完整",
+          summary: "目标Final是 a.",
+          focus: "Final a",
+          detail: "口腔打开，声音要饱满.",
           practice: ["啊"],
         },
       ],
@@ -653,10 +653,10 @@ test("teaching plan can use generated compound final clips", () => {
         {
           index: 0,
           type: "final",
-          title: "韵母 uang 可能不够完整",
-          summary: "目标韵母是 uang。",
-          focus: "韵母 uang",
-          detail: "圆唇后打开并收到后鼻音。",
+          title: "Final uang 可能不够完整",
+          summary: "目标Final是 uang.",
+          focus: "Final uang",
+          detail: "圆唇后打开并收到后鼻音.",
           practice: ["光"],
         },
       ],
@@ -683,10 +683,10 @@ test("teaching plan falls back to articulation segment when clip is missing", ()
         {
           index: 0,
           type: "final",
-          title: "韵母 an 可能不够完整",
-          summary: "目标韵母是 an。",
-          focus: "韵母 an",
-          detail: "结尾收住鼻音。",
+          title: "Final an 可能不够完整",
+          summary: "目标Final是 an.",
+          focus: "Final an",
+          detail: "结尾收住鼻音.",
           practice: [],
         },
       ],
@@ -711,7 +711,7 @@ test("task sentence teaching plan keeps one video segment for every character", 
     asr: { heard_text: "风很大", text_similarity: 100 },
     pinyin_diagnosis: {
       issues: [
-        { index: 1, type: "tone", title: "第三声需要观察", summary: "很的第三声需要放慢练。", focus: "很" },
+        { index: 1, type: "tone", title: "Tone 3需要观察", summary: "很的Tone 3需要放慢练.", focus: "很" },
       ],
     },
     tone_timing: {
@@ -734,7 +734,7 @@ test("analysis automatically generates teaching clip state without navigating aw
     communication_result: { readiness_score: 61 },
     asr: { heard_text: "范", text_similarity: 61 },
     pinyin_diagnosis: {
-      issues: [{ index: 0, type: "tone", title: "声调问题", summary: "声调需要练习。", focus: "声调 T4" }],
+      issues: [{ index: 0, type: "tone", title: "Tone问题", summary: "Tone需要练习.", focus: "Tone T4" }],
     },
     tone_timing: {
       syllables: [
@@ -757,7 +757,7 @@ test("analysis without diagnosis issues generates a review teaching clip", () =>
     pinyin_display: ["nǐ"],
     communication_result: { readiness_score: 95 },
     asr: { heard_text: "你", text_similarity: 100 },
-    pinyin_diagnosis: { issues: [], summary: "拼音一致。" },
+    pinyin_diagnosis: { issues: [], summary: "拼音一致." },
     tone_timing: {
       syllables: [
         { index: 0, char: "你", pinyin: "ni3", pinyin_display: "nǐ", initial: "n", final: "i", tone: "3", tone_score: 90 },
@@ -851,7 +851,7 @@ test("selecting a detail syllable rebuilds teaching clip for that syllable", () 
     communication_result: { readiness_score: 75 },
     asr: { heard_text: "光明", text_similarity: 75 },
     pinyin_diagnosis: {
-      issues: [{ index: 0, type: "final", title: "韵母 uang 需要巩固", summary: "练习 uang", focus: "韵母 uang" }],
+      issues: [{ index: 0, type: "final", title: "Final uang 需要巩固", summary: "练习 uang", focus: "Final uang" }],
     },
     tone_timing: {
       syllables: [
@@ -876,7 +876,7 @@ test("clip segment navigation clamps to valid segment range", () => {
     communication_result: { readiness_score: 61 },
     asr: { heard_text: "范", text_similarity: 61 },
     pinyin_diagnosis: {
-      issues: [{ index: 0, type: "final", title: "韵母问题", summary: "韵母需要练习。", focus: "韵母 an" }],
+      issues: [{ index: 0, type: "final", title: "Final问题", summary: "Final需要练习.", focus: "Final an" }],
     },
     tone_timing: {
       syllables: [

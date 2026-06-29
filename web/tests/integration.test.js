@@ -16,17 +16,17 @@ function analysisWithIssue({ issueType, unit, initial = "", final = "", text = "
   return {
     target_text: text,
     pinyin_display: [pinyin],
-    communication_result: { readiness_score: 66, main_feedback: "需要重点练习。" },
+    communication_result: { readiness_score: 66, main_feedback: "Needs focused practice." },
     asr: { heard_text: text, text_similarity: 60 },
     pinyin_diagnosis: {
       issues: [
         {
           index: 0,
           type: issueType,
-          title: `${issueType === "initial" ? "声母" : "韵母"} ${unit} 需要练习`,
-          summary: `目标 ${unit} 需要更清楚。`,
-          focus: `${issueType === "initial" ? "声母" : "韵母"} ${unit}`,
-          detail: "对照视频片段练习。",
+          title: `${issueType === "initial" ? "Initial" : "Final"} ${unit} needs practice`,
+          summary: `Target ${unit} needs to be clearer.`,
+          focus: `${issueType === "initial" ? "Initial" : "Final"} ${unit}`,
+          detail: "Practice with the video clip.",
           practice: [text],
         },
       ],
@@ -118,7 +118,7 @@ test("web app contains teaching video detail renderer and demo entry", () => {
   assert.match(appJs, /ARTICULATION_IMAGE_UNITS/);
   assert.match(appJs, /missingArticulationImageUnits/);
   assert.match(appJs, /activeTeachingSegment/);
-  assert.match(appJs, /教学视频/);
+  assert.match(appJs, /Teaching Video/);
   assert.match(appJs, /showSegmentNavigation\s*=\s*segments\.length\s*>\s*1/);
   assert.match(appJs, /clip-video/);
   assert.match(appJs, /pronunciation-clips\/manifest\.json/);

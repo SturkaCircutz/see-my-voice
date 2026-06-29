@@ -44,7 +44,7 @@ def load_segments(path: Path) -> list[dict[str, str]]:
                 "type": clip_type,
                 "start": start,
                 "end": end,
-                "title": (row.get("title") or f"{unit} 发音示范").strip(),
+                "title": (row.get("title") or f"{clip_type.title()} {unit} Pronunciation Demo").strip(),
                 "notes": (row.get("notes") or "").strip(),
             })
     return rows

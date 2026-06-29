@@ -68,14 +68,14 @@ def main_feedback(stage2a_result: dict[str, Any], asr_result: dict[str, Any]) ->
     tone_score = stage2a_result["overall_score"] or 0
 
     if label == "understood" and tone_score >= 75 and boundary_confidence != "low":
-        return "系统已经听懂这句话，声调和节奏也比较稳定。下一步可以练更长的句子。"
+        return "The system understood this sentence, and the tone and rhythm are fairly stable. Next, try practicing a longer sentence."
     if label == "understood":
-        return "系统能听懂这句话，但声调或音节时间还不够稳定。建议先看 pitch 图，重点练低分音节。"
+        return "The system understood this sentence, but the tone or syllable timing is not stable enough yet. Check the pitch chart first and focus on the lowest-scored syllables."
     if label == "mostly_understood":
-        return "系统大致听懂了，但有少数字可能不清楚。建议放慢速度，把每个音节说完整。"
+        return "The system mostly understood you, but a few characters may not be clear. Slow down and complete every syllable."
     if label == "partly_understood":
-        return "系统只能听懂一部分。建议先练单个词，再回到整句话。"
-    return "系统没有稳定听懂这句话。建议先确认录音环境，再从单个音节或词开始练。"
+        return "The system only understood part of the sentence. Practice single words first, then return to the full sentence."
+    return "The system could not reliably understand this sentence. Check the recording environment first, then start with one syllable or word."
 
 
 def compact_syllable_feedback(stage2a_result: dict[str, Any]) -> list[dict[str, Any]]:

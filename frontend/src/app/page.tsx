@@ -36,7 +36,7 @@ const defaultSyllables: SyllableFeedback[] = [
     pinyin: "wǒ",
     score: 0,
     focus: "T3",
-    feedback: "录音后会显示这个音节的声调和清晰度反馈。",
+    feedback: "After recording, tone and clarity feedback for this syllable will appear here.",
   },
   {
     id: "yao",
@@ -44,7 +44,7 @@ const defaultSyllables: SyllableFeedback[] = [
     pinyin: "yào",
     score: 0,
     focus: "T4",
-    feedback: "点击录音后系统会判断是否听懂。",
+    feedback: "After you record, the system will estimate whether the phrase was understood.",
   },
   {
     id: "chi",
@@ -52,7 +52,7 @@ const defaultSyllables: SyllableFeedback[] = [
     pinyin: "chī",
     score: 0,
     focus: "T1",
-    feedback: "声母、韵母和声调会在这里拆开显示。",
+    feedback: "Initial, final, and tone feedback will be shown separately here.",
   },
   {
     id: "fan",
@@ -60,14 +60,14 @@ const defaultSyllables: SyllableFeedback[] = [
     pinyin: "fàn",
     score: 0,
     focus: "T4",
-    feedback: "API 接入后会给出更具体的练习建议。",
+    feedback: "Once the analysis API is connected, this will show more specific practice advice.",
   },
 ];
 
 const fallbackAnalysis: PronunciationAnalysis = {
-  heardText: "等待 API",
+  heardText: "Waiting for API",
   summary:
-    "登录和 MongoDB 记录已连接。发音分析 API 还没有配置，所以这里先保留原型反馈。",
+    "Login and MongoDB logging are connected. The pronunciation analysis API is not configured yet, so prototype feedback is shown for now.",
   scores: defaultScores,
   syllables: defaultSyllables,
 };
@@ -184,11 +184,11 @@ function AuthScreen({ error, onLogin, onRegister }: AuthScreenProps) {
           <header className="app-header">
             <div className="status-row">
               <span>9:41</span>
-              <span>账户</span>
+              <span>Account</span>
             </div>
             <div className="brand-row">
               <h1 className="brand">
-                <span className="brand-accent">声见</span> · See My Voice
+                <span className="brand-accent">VoiceSight</span> · See My Voice
               </h1>
             </div>
           </header>
@@ -196,33 +196,33 @@ function AuthScreen({ error, onLogin, onRegister }: AuthScreenProps) {
           <div className="content auth-content">
             <section className="sentence-card auth-hero" aria-labelledby="auth-title">
               <label className="eyebrow" htmlFor="username">
-                {mode === "login" ? "欢迎回来" : "创建账户"}
+                {mode === "login" ? "Welcome back" : "Create account"}
               </label>
-              <h2 id="auth-title">中文发音练习</h2>
-              <p>账号和登录记录会写入 MongoDB。</p>
+              <h2 id="auth-title">Mandarin pronunciation practice</h2>
+              <p>Accounts and login events are saved to MongoDB.</p>
             </section>
 
-            <div className="auth-tabs" role="tablist" aria-label="账户模式">
+            <div className="auth-tabs" role="tablist" aria-label="Account mode">
               <button
                 type="button"
                 className={mode === "login" ? "is-active" : ""}
                 onClick={() => setMode("login")}
               >
-                登录
+                Log in
               </button>
               <button
                 type="button"
                 className={mode === "register" ? "is-active" : ""}
                 onClick={() => setMode("register")}
               >
-                注册
+                Register
               </button>
             </div>
 
             <form className="panel auth-form" onSubmit={submit}>
               {mode === "register" && (
                 <label>
-                  昵称
+                  Display name
                   <input
                     value={name}
                     onChange={(event) => setName(event.target.value)}
@@ -233,7 +233,7 @@ function AuthScreen({ error, onLogin, onRegister }: AuthScreenProps) {
                 </label>
               )}
               <label>
-                用户名
+                Username
                 <input
                   id="username"
                   value={username}
@@ -243,7 +243,7 @@ function AuthScreen({ error, onLogin, onRegister }: AuthScreenProps) {
                 />
               </label>
               <label>
-                密码
+                Password
                 <input
                   type="password"
                   value={password}
@@ -256,7 +256,7 @@ function AuthScreen({ error, onLogin, onRegister }: AuthScreenProps) {
               {error && <p className="model-summary is-error">{error}</p>}
               <button className="record-button auth-submit" type="submit" disabled={busy}>
                 <span className="record-state-dot"></span>
-                {busy ? "正在连接…" : mode === "register" ? "创建账户" : "进入练习"}
+                {busy ? "Connecting..." : mode === "register" ? "Create account" : "Start practicing"}
               </button>
             </form>
           </div>
@@ -289,12 +289,12 @@ function PracticeApp({ user, users, onLogout }: PracticeAppProps) {
   const syllables = activeAnalysis.syllables.length ? activeAnalysis.syllables : defaultSyllables;
   const selectedSyllable =
     syllables.find((item) => item.id === selectedSyllableId) || syllables[0] || defaultSyllables[0];
-  const pinyin = pinyinByText[targetText] || (analysis ? activeAnalysis.heardText : "等待录音分析");
+  const pinyin = pinyinByText[targetText] || (analysis ? activeAnalysis.heardText : "Waiting for recording analysis");
 
   async function startRecording() {
     setMessage("");
     if (!navigator.mediaDevices?.getUserMedia) {
-      setMessage("当前浏览器不支持麦克风录音。");
+      setMessage("This browser does not support microphone recording.");
       return;
     }
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -336,7 +336,7 @@ function PracticeApp({ user, users, onLogout }: PracticeAppProps) {
       setMessage("");
     } catch (error) {
       setAnalysis(fallbackAnalysis);
-      setMessage(error instanceof Error ? error.message : "分析失败，请确认 API 是否配置。");
+      setMessage(error instanceof Error ? error.message : "Analysis failed. Check whether the API is configured.");
     } finally {
       setBusy(false);
     }
@@ -344,7 +344,7 @@ function PracticeApp({ user, users, onLogout }: PracticeAppProps) {
 
   function playReference() {
     if (!("speechSynthesis" in window)) {
-      setMessage("当前浏览器无法播放标准音。");
+      setMessage("This browser cannot play the reference pronunciation.");
       return;
     }
     const utterance = new SpeechSynthesisUtterance(targetText);
@@ -396,7 +396,7 @@ function PracticeApp({ user, users, onLogout }: PracticeAppProps) {
         {view === "progress" && <ProgressScreen attempts={attempts} />}
       </main>
 
-      <nav className="app-nav" aria-label="主要页面">
+      <nav className="app-nav" aria-label="Main pages">
         <button
           type="button"
           data-view="practice"
@@ -404,7 +404,7 @@ function PracticeApp({ user, users, onLogout }: PracticeAppProps) {
           onClick={() => setView("practice")}
         >
           <span className="nav-index">01</span>
-          <span>练习</span>
+          <span>Practice</span>
         </button>
         <button
           type="button"
@@ -413,7 +413,7 @@ function PracticeApp({ user, users, onLogout }: PracticeAppProps) {
           onClick={() => setView("detail")}
         >
           <span className="nav-index">02</span>
-          <span>详情</span>
+          <span>Details</span>
         </button>
         <button
           type="button"
@@ -422,7 +422,7 @@ function PracticeApp({ user, users, onLogout }: PracticeAppProps) {
           onClick={() => setView("progress")}
         >
           <span className="nav-index">03</span>
-          <span>进度</span>
+          <span>Progress</span>
         </button>
       </nav>
     </PhoneShell>
@@ -466,18 +466,18 @@ function PracticeScreen({
   onLogout,
   onSelectSyllable,
 }: PracticeScreenProps) {
-  const recordCopy = busy ? "正在分析…" : recording ? "正在录音… 点击完成" : "开始录音";
+  const recordCopy = busy ? "Analyzing..." : recording ? "Recording... tap to finish" : "Start recording";
 
   return (
     <section className="screen" data-screen="practice">
       <header className="app-header">
         <div className="status-row">
           <span>9:41</span>
-          <span>中文发音训练</span>
+          <span>Mandarin pronunciation training</span>
         </div>
         <div className="brand-row">
           <h1 className="brand">
-            <span className="brand-accent">声见</span> · See My Voice
+            <span className="brand-accent">VoiceSight</span> · See My Voice
           </h1>
           <button className="header-link" type="button" onClick={onLogout}>
             <LogOut size={13} aria-hidden="true" />
@@ -489,7 +489,7 @@ function PracticeScreen({
       <div className="content">
         <section className="sentence-card" aria-labelledby="sentence-title">
           <label className="eyebrow" htmlFor="target-text">
-            自定义练习
+            Custom practice
           </label>
           <input
             className="sentence-input"
@@ -503,20 +503,20 @@ function PracticeScreen({
           <p className="pinyin">{pinyin}</p>
         </section>
 
-        <section className="model-card level-good" aria-label="模型状态">
+        <section className="model-card level-good" aria-label="Model status">
           <div>
             <span className="model-kicker">MongoDB + API</span>
-            <strong>{busy ? "分析中" : "等待录音"}</strong>
-            <span>系统听到：{analysis.heardText}</span>
+            <strong>{busy ? "Analyzing" : "Waiting for recording"}</strong>
+            <span>System heard: {analysis.heardText}</span>
           </div>
-          <span className="status-pill">{users.length} 用户</span>
+          <span className="status-pill">{users.length} users</span>
         </section>
 
         <p className={`model-summary ${message ? "is-error" : ""}`}>
           {message || analysis.summary}
         </p>
 
-        <div className="record-row" aria-label="练习操作">
+        <div className="record-row" aria-label="Practice actions">
           <button
             className="record-button"
             type="button"
@@ -528,34 +528,34 @@ function PracticeScreen({
             {recordCopy}
           </button>
           <button className="square-button" type="button" onClick={onPlay}>
-            播放
+            Play
           </button>
           <button className="square-button" type="button" disabled>
-            回听
+            Replay
           </button>
           <button className="square-button" type="button" onClick={onReset}>
-            重来
+            Reset
           </button>
         </div>
 
-        <section aria-label="发音评分">
+        <section aria-label="Pronunciation scores">
           <div className="score-grid">
-            <Score label="综合" value={scores.overall} />
-            <Score label="声调" value={scores.tone} />
-            <Score label="清晰度" value={scores.clarity} />
-            <Score label="节奏" value={scores.rhythm} />
+            <Score label="Overall" value={scores.overall} />
+            <Score label="Tone" value={scores.tone} />
+            <Score label="Clarity" value={scores.clarity} />
+            <Score label="Rhythm" value={scores.rhythm} />
           </div>
         </section>
 
-        <section className="panel diagnosis-card" aria-label="拼音诊断">
-          <span className="model-kicker">拼音诊断</span>
-          <strong>{analysis.heardText === "等待 API" ? "录音后显示可能不准的音" : "分析结果"}</strong>
+        <section className="panel diagnosis-card" aria-label="Pinyin diagnosis">
+          <span className="model-kicker">Pinyin diagnosis</span>
+          <strong>{analysis.heardText === "Waiting for API" ? "Likely unclear sounds will appear after recording" : "Analysis result"}</strong>
           <p>{analysis.summary}</p>
         </section>
 
         <section aria-labelledby="feedback-title">
           <p className="section-label" id="feedback-title">
-            音节反馈
+            Syllable feedback
           </p>
           <div className="syllable-list">
             {syllables.map((item) => (
@@ -568,7 +568,7 @@ function PracticeScreen({
                 <span>
                   <strong className="syllable-character">{item.character}</strong>
                   <span className="syllable-meta">
-                    {item.pinyin} · {item.focus} · {Math.round(item.score)}分
+                    {item.pinyin} · {item.focus} · {Math.round(item.score)} pts
                   </span>
                   <span className="syllable-feedback">{item.feedback}</span>
                 </span>
@@ -579,7 +579,7 @@ function PracticeScreen({
         </section>
 
         <button className="hint-card" type="button">
-          点击音节卡片查看嘴型示范、舌位提示、声调曲线和详细练习建议。
+          Tap a syllable card to view mouth-shape guidance, tongue-position cues, tone curves, and detailed practice advice.
         </button>
       </div>
     </section>
@@ -600,16 +600,16 @@ function DetailScreen({
       <header className="app-header detail-header">
         <div className="status-row">
           <span>9:41</span>
-          <span>音节详情</span>
+          <span>Syllable details</span>
         </div>
         <div className="detail-title-row">
           <div>
             <button className="back-button" type="button" onClick={onBack}>
-              返回练习
+              Back to practice
             </button>
-            <h1 className="detail-heading">详细练习</h1>
+            <h1 className="detail-heading">Detailed practice</h1>
             <p className="detail-subtitle">
-              {syllable.pinyin} · {syllable.focus} · 当前 {Math.round(syllable.score)} 分
+              {syllable.pinyin} · {syllable.focus} · current {Math.round(syllable.score)} pts
             </p>
           </div>
           <div className="detail-character" aria-hidden="true">
@@ -621,11 +621,11 @@ function DetailScreen({
       <div className="content">
         <section aria-labelledby="mouth-title">
           <p className="section-label" id="mouth-title">
-            嘴型与舌位对照
+            Mouth shape and tongue position
           </p>
           <div className="panel mouth-grid">
             <div className="mouth-panel">
-              <p className="panel-title">自动嘴型示意</p>
+              <p className="panel-title">Automatic mouth-shape guide</p>
               <div className="mouth-reference">
                 <div className="mouth-animation shape-open">
                   <div className="face-outline">
@@ -642,13 +642,13 @@ function DetailScreen({
                   </span>
                 </div>
               </div>
-              <p className="mouth-cue-line">先慢速读这个字，再和前后字连起来。</p>
+              <p className="mouth-cue-line">Say this character slowly first, then connect it with the surrounding words.</p>
             </div>
             <div className="mouth-panel">
-              <p className="panel-title">我的镜像</p>
+              <p className="panel-title">My mirror</p>
               <div className="mirror-area">
                 <span>
-                  <strong>摄像头预览</strong>保留原型位置，后续接入摄像头。
+                  <strong>Camera preview</strong> placeholder for future camera support.
                 </span>
               </div>
             </div>
@@ -657,26 +657,26 @@ function DetailScreen({
 
         <section className="panel chart-card" aria-labelledby="tone-title">
           <div className="chart-title">
-            <h2 id="tone-title">声调对比 · {syllable.focus}</h2>
+            <h2 id="tone-title">Tone comparison · {syllable.focus}</h2>
             <div className="chart-legend" aria-hidden="true">
-              <span className="legend-key">目标</span>
-              <span className="legend-key current">你的</span>
+              <span className="legend-key">Target</span>
+              <span className="legend-key current">Yours</span>
             </div>
           </div>
-          <div className="tone-placeholder" aria-label="目标声调与当前声调趋势对比图">
+          <div className="tone-placeholder" aria-label="Target and current tone contour comparison">
             <span></span>
             <span></span>
           </div>
           <p className="plot-note">{syllable.feedback}</p>
         </section>
 
-        <section className="panel analysis-card" aria-label="本音节分析结论">
-          <strong>本音节结论</strong>
+        <section className="panel analysis-card" aria-label="Syllable analysis conclusion">
+          <strong>Syllable conclusion</strong>
           <span>{syllable.feedback}</span>
         </section>
 
         <button className="replay-button" type="button" onClick={onPlay}>
-          重听标准发音
+          Replay reference pronunciation
         </button>
       </div>
     </section>
@@ -695,14 +695,14 @@ function ProgressScreen({ attempts }: { attempts: PracticeAttempt[] }) {
       <header className="app-header progress-header">
         <div className="status-row">
           <span>9:41</span>
-          <span>我的进步</span>
+          <span>My progress</span>
         </div>
         <div className="brand-row">
           <h1 className="brand">
-            <span className="brand-accent">声见</span> · 我的进步
+            <span className="brand-accent">VoiceSight</span> · My progress
           </h1>
           <button className="period-button" type="button">
-            最近练习
+            Recent practice
           </button>
         </div>
       </header>
@@ -710,25 +710,25 @@ function ProgressScreen({ attempts }: { attempts: PracticeAttempt[] }) {
       <div className="content">
         <section aria-labelledby="trend-title">
           <p className="section-label" id="trend-title">
-            综合评分趋势
+            Overall score trend
           </p>
           <div className="panel chart-card trend-wrap">
             <div className="progress-placeholder">
               <strong>{latest ? latest.scores.overall : 0}</strong>
-              <span>{latest ? "最近一次成绩" : "还没有练习记录"}</span>
+              <span>{latest ? "Latest score" : "No practice records yet"}</span>
             </div>
           </div>
         </section>
 
         <section aria-labelledby="calendar-title">
           <p className="section-label" id="calendar-title">
-            打卡日历
+            Practice calendar
           </p>
           <div className="panel calendar-grid">
             {days.map((day) => (
               <span className={`calendar-day ${day.practiced ? "is-done" : ""}`} key={day.label}>
                 <strong>{day.label}</strong>
-                <span>{day.practiced ? "已练" : "未练"}</span>
+                <span>{day.practiced ? "Done" : "Open"}</span>
               </span>
             ))}
           </div>
@@ -736,7 +736,7 @@ function ProgressScreen({ attempts }: { attempts: PracticeAttempt[] }) {
 
         <section aria-labelledby="words-title">
           <p className="section-label" id="words-title">
-            最近练习词汇
+            Recent practice words
           </p>
           <div className="word-list">
             {attempts.length ? (
@@ -749,7 +749,7 @@ function ProgressScreen({ attempts }: { attempts: PracticeAttempt[] }) {
                   <span className="word-top">
                     <strong className="word-name">{attempt.text}</strong>
                     <span className="word-status">
-                      {Math.round(attempt.scores.overall)}分 ·{" "}
+                      {Math.round(attempt.scores.overall)} pts ·{" "}
                       {statusFromScore(attempt.scores.overall)}
                     </span>
                   </span>
@@ -760,8 +760,8 @@ function ProgressScreen({ attempts }: { attempts: PracticeAttempt[] }) {
               ))
             ) : (
               <section className="panel diagnosis-card">
-                <strong>还没有练习记录</strong>
-                <p>完成一次录音分析后，这里会显示最近练过的词句。</p>
+                <strong>No practice records yet</strong>
+                <p>After one recording analysis, recently practiced words and phrases will appear here.</p>
               </section>
             )}
           </div>
@@ -787,9 +787,9 @@ function levelFromScore(score: number) {
 }
 
 function statusFromScore(score: number) {
-  if (score >= 82) return "清楚";
-  if (score >= 68) return "继续练习";
-  return "重点练习";
+  if (score >= 82) return "Clear";
+  if (score >= 68) return "Keep practicing";
+  return "Focus practice";
 }
 
 export default App;

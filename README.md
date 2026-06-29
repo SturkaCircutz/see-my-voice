@@ -1,6 +1,6 @@
 # See My Voice
 
-See My Voice is a Mandarin pronunciation practice prototype. The current branch is `seemyvoice-4.0`.
+See My Voice is a Mandarin pronunciation practice prototype for foreign learners. This `english-version` branch keeps the interface, teacher workflow, and documentation in English while preserving Mandarin characters, pinyin, and sample sentences as practice content.
 
 This branch keeps two runnable app paths:
 
