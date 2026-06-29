@@ -24,7 +24,7 @@ APP_DIR = Path(__file__).resolve().parent
 SEE_MY_VOICE_DIR = Path(
     os.environ.get(
         "SEE_MY_VOICE_DIR",
-        "/Users/chloe/Library/CloudStorage/OneDrive-BowdoinCollege/Desktop/see-my-voice",
+        str(APP_DIR.parent),
     )
 )
 SEE_MY_VOICE_SRC = SEE_MY_VOICE_DIR / "src"
@@ -678,7 +678,7 @@ def main():
         lan_ip = get_lan_ip()
         if lan_ip:
             print(f"局域网访问：http://{lan_ip}:{port}")
-        print(f"外部访问：http://seemyvoice.ddns.net:{port}")
+        print("外部访问需要配置公网主机、端口转发或 HTTPS 隧道。")
     print(f"项目路径：{SEE_MY_VOICE_DIR}")
     print("按 Control + C 停止服务。")
     server.serve_forever()

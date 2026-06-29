@@ -11,7 +11,7 @@ export const config = {
   mongoUri: required("MONGODB_URI", "mongodb://127.0.0.1:27017"),
   mongoDbName: required("MONGODB_DB", "see_my_voice"),
   jwtSecret: required("JWT_SECRET", "dev-only-change-me"),
-  frontendOrigin: process.env.FRONTEND_ORIGIN || "http://127.0.0.1:5173",
+  frontendOrigin: process.env.FRONTEND_ORIGIN || "http://127.0.0.1:3000",
   pronunciationApiUrl: process.env.PRONUNCIATION_API_URL || "",
   seedUsername: process.env.SEED_USERNAME || "",
   seedPassword: process.env.SEED_PASSWORD || "",
