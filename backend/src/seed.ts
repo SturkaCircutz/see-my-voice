@@ -8,6 +8,7 @@ export async function seedConfiguredUser(): Promise<void> {
   const password = config.seedPassword;
   if (!username || !password) return;
 
+  // The configured seed account is idempotent so deploys can refresh credentials without duplicating users.
   const now = new Date();
   const passwordHash = await bcrypt.hash(password, 12);
   const existing = await usersCollection().findOne({ username });

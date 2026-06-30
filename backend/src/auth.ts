@@ -22,6 +22,7 @@ interface TokenPayload {
 }
 
 export function toPublicUser(user: UserDocument): PublicUser {
+  // Keep password hashes and Mongo internals out of every auth-facing API response.
   return {
     id: user._id.toHexString(),
     username: user.username,
@@ -44,6 +45,7 @@ export async function requireAuth(
   next: NextFunction,
 ): Promise<void> {
   try {
+    // Downstream routes use request.user, so each token is resolved against MongoDB.
     const header = request.header("Authorization") || "";
     const token = header.startsWith("Bearer ") ? header.slice("Bearer ".length) : "";
     if (!token) {

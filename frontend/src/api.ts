@@ -1,4 +1,4 @@
-import type { AuthResponse, AuthUser, PronunciationAnalysis } from "./types";
+import type { AuthResponse, AuthUser, PracticeAttempt, PronunciationAnalysis } from "./types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "";
 const TOKEN_KEY = "see-my-voice-token";
@@ -19,6 +19,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getToken();
   const headers = new Headers(options.headers);
 
+  // Centralize browser-to-Express auth and JSON handling so page components stay transport-agnostic.
   if (!(options.body instanceof FormData) && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }
@@ -64,6 +65,33 @@ export function fetchCurrentUser(): Promise<{ user: AuthUser }> {
 
 export function fetchUsers(): Promise<{ users: AuthUser[] }> {
   return request<{ users: AuthUser[] }>("/api/users");
+}
+
+export function fetchPracticeAttempts(): Promise<{ attempts: PracticeAttempt[] }> {
+  return request<{ attempts: PracticeAttempt[] }>("/api/attempts");
+}
+
+export function createPracticeAttempt(targetText: string): Promise<{ attempt: PracticeAttempt }> {
+  return request<{ attempt: PracticeAttempt }>("/api/attempts", {
+    method: "POST",
+    body: JSON.stringify({ targetText }),
+  });
+}
+
+export function analyzePracticeAttempt(
+  attemptId: string,
+  audio: Blob,
+): Promise<{ attempt: PracticeAttempt; analysis: PronunciationAnalysis }> {
+  const form = new FormData();
+  form.append("audio", audio, "practice.webm");
+
+  return request<{ attempt: PracticeAttempt; analysis: PronunciationAnalysis }>(
+    `/api/attempts/${attemptId}/analyze`,
+    {
+      method: "POST",
+      body: form,
+    },
+  );
 }
 
 export function analyzePronunciation(

@@ -2,8 +2,13 @@ import cors from "cors";
 import express, { type ErrorRequestHandler } from "express";
 import { config } from "./config.js";
 import { connectToMongo } from "./db.js";
+import { attemptRoutes } from "./routes/attemptRoutes.js";
 import { authRoutes } from "./routes/authRoutes.js";
+import { chatRoutes } from "./routes/chatRoutes.js";
 import { pronunciationRoutes } from "./routes/pronunciationRoutes.js";
+import { reviewRoutes } from "./routes/reviewRoutes.js";
+import { submissionRoutes } from "./routes/submissionRoutes.js";
+import { taskRoutes } from "./routes/taskRoutes.js";
 import { userRoutes } from "./routes/userRoutes.js";
 import { seedConfiguredUser } from "./seed.js";
 
@@ -47,7 +52,33 @@ app.use("/api/auth", async (_request, _response, next) => {
 });
 app.use("/api/auth", authRoutes);
 
-app.use("/api/users", async (_request, _response, next) => {
+// These routes all require MongoDB before their handlers touch typed collections.
+app.use(
+  [
+    "/api/users",
+    "/api/attempts",
+    "/api/tasks",
+    "/api/submissions",
+    "/api/reviews",
+    "/api/chat",
+  ],
+  async (_request, _response, next) => {
+    try {
+      await connectToMongo();
+      next();
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+app.use("/api/users", userRoutes);
+app.use("/api/attempts", attemptRoutes);
+app.use("/api/tasks", taskRoutes);
+app.use("/api/submissions", submissionRoutes);
+app.use("/api/reviews", reviewRoutes);
+app.use("/api/chat", chatRoutes);
+
+app.use("/api/pronunciation", async (_request, _response, next) => {
   try {
     await connectToMongo();
     next();
@@ -55,7 +86,6 @@ app.use("/api/users", async (_request, _response, next) => {
     next(error);
   }
 });
-app.use("/api/users", userRoutes);
 app.use("/api/pronunciation", pronunciationRoutes);
 
 const errorHandler: ErrorRequestHandler = (error, _request, response, _next) => {

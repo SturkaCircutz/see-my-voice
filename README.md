@@ -51,14 +51,41 @@ Backend capabilities:
 - Store users and login events in MongoDB.
 - Hash passwords with bcrypt.
 - Issue JWTs.
-- Proxy pronunciation analysis through `PRONUNCIATION_API_URL` when configured.
+- Store practice attempts, uploaded recording metadata, analysis results, tasks, submissions, reviews, and chat records in MongoDB.
+- Call the Python pronunciation analysis service through `PRONUNCIATION_API_URL` when configured.
 
 Frontend capabilities:
 
 - Account login/register screens.
 - Practice screen with microphone recording.
+- Practice attempts loaded from the backend after login.
 - Progress and detail screens.
 - API calls through `/api/*` routes.
+
+### Target Structure
+
+The production-shaped path is:
+
+```text
+Next.js frontend
+  -> Express API
+  -> MongoDB source of truth
+  -> Python/FunASR pronunciation service
+  -> local development audio storage now, object storage later
+```
+
+The first migrated slice is practice attempts:
+
+```text
+1. Frontend creates `/api/attempts`.
+2. Frontend uploads recording to `/api/attempts/:attemptId/analyze`.
+3. Backend stores the audio under `backend/.uploads/` for local development.
+4. Backend sends the audio and target text to `PRONUNCIATION_API_URL`.
+5. Backend stores the normalized analysis result on the attempt.
+6. Frontend displays the stored attempt in progress.
+```
+
+The `web/` prototype remains the richer local FunASR workflow while teacher/task/chat screens are migrated into backend-backed Next.js screens.
 
 ### Environment
 
@@ -89,6 +116,7 @@ PRONUNCIATION_API_URL=
 ```
 
 The seed variables are optional. If `SEED_USERNAME` and `SEED_PASSWORD` are set, the backend creates or updates that user during startup.
+For local analysis with the Python prototype, set `PRONUNCIATION_API_URL=http://127.0.0.1:4173` after starting `web/server.py`.
 
 ### Run
 
@@ -110,19 +138,13 @@ Open:
 http://127.0.0.1:3000
 ```
 
-The Next.js rewrite sends `/api/*` requests to:
+For local development, set the browser API base URL to the Express backend:
 
 ```text
-http://127.0.0.1:8080
+NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8080
 ```
 
-Override that target with:
-
-```text
-NEXT_PUBLIC_BACKEND_URL=http://127.0.0.1:8080
-```
-
-`frontend/src/api.ts` also supports `NEXT_PUBLIC_API_BASE_URL` for deployments that call an API origin directly from the browser instead of using the Next.js rewrite.
+Without `NEXT_PUBLIC_API_BASE_URL`, the frontend calls same-origin `/api/*`, which only works when a deployment layer routes those requests to the backend.
 
 ### Verify
 

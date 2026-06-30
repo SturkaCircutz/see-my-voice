@@ -35,11 +35,17 @@ export interface PronunciationAnalysis {
   summary: string;
   scores: ScoreSet;
   syllables: SyllableFeedback[];
+  raw?: unknown;
 }
 
 export interface PracticeAttempt {
   id: string;
-  text: string;
+  targetText: string;
+  text?: string;
+  status: "created" | "analyzing" | "complete" | "failed";
   createdAt: string;
-  scores: ScoreSet;
+  updatedAt?: string;
+  scores?: ScoreSet;
+  analysis?: PronunciationAnalysis;
+  error?: string;
 }

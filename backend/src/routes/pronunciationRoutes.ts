@@ -1,8 +1,32 @@
 import { Router } from "express";
-import { requireAuth } from "../auth.js";
+import { analyzeWithPronunciationService } from "../analysis.js";
+import { requireAuth, type AuthenticatedRequest } from "../auth.js";
 import { config } from "../config.js";
 
 export const pronunciationRoutes = Router();
+
+async function readAnalyzeForm(request: AuthenticatedRequest) {
+  const webRequest = new Request("http://local.invalid", {
+    method: "POST",
+    headers: {
+      "content-type": request.header("Content-Type") || "application/octet-stream",
+    },
+    body: request as unknown as BodyInit,
+    duplex: "half",
+  } as RequestInit & { duplex: "half" });
+  const form = await webRequest.formData();
+  const text = String(form.get("text") || "").trim();
+  const audio = form.get("audio");
+
+  if (!text) throw new Error("Target text is required.");
+  if (!(audio instanceof Blob)) throw new Error("No recording file was received.");
+
+  return {
+    text,
+    audio,
+    filename: "name" in audio && typeof audio.name === "string" ? audio.name : "practice.webm",
+  };
+}
 
 pronunciationRoutes.post("/analyze", requireAuth, async (request, response) => {
   if (!config.pronunciationApiUrl) {
@@ -13,18 +37,19 @@ pronunciationRoutes.post("/analyze", requireAuth, async (request, response) => {
     return;
   }
 
-  const upstream = await fetch(`${config.pronunciationApiUrl}/analyze`, {
-    method: "POST",
-    headers: {
+  try {
+    const { text, audio, filename } = await readAnalyzeForm(request);
+    const analysis = await analyzeWithPronunciationService({
+      targetText: text,
+      audio,
+      filename,
       authorization: request.header("Authorization") || "",
-      "content-type": request.header("Content-Type") || "application/octet-stream",
-    },
-    body: request as unknown as BodyInit,
-    duplex: "half",
-  } as RequestInit & { duplex: "half" });
+    });
 
-  const text = await upstream.text();
-  response.status(upstream.status);
-  response.type(upstream.headers.get("content-type") || "application/json");
-  response.send(text);
+    response.json(analysis);
+  } catch (error) {
+    response.status(502).json({
+      error: error instanceof Error ? error.message : "Pronunciation analysis failed.",
+    });
+  }
 });

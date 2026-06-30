@@ -3,9 +3,11 @@
 import React from "react";
 import { Loader2, LogOut } from "lucide-react";
 import {
-  analyzePronunciation,
+  analyzePracticeAttempt,
   clearToken,
+  createPracticeAttempt,
   fetchCurrentUser,
+  fetchPracticeAttempts,
   fetchUsers,
   loginUser,
   registerUser,
@@ -82,6 +84,7 @@ const pinyinByText: Record<string, string> = {
 function App() {
   const [user, setUser] = React.useState<AuthUser | null>(null);
   const [users, setUsers] = React.useState<AuthUser[]>([]);
+  const [attempts, setAttempts] = React.useState<PracticeAttempt[]>([]);
   const [booting, setBooting] = React.useState(true);
   const [authError, setAuthError] = React.useState("");
 
@@ -97,6 +100,9 @@ function App() {
     fetchUsers()
       .then((payload) => setUsers(payload.users))
       .catch(() => setUsers([]));
+    fetchPracticeAttempts()
+      .then((payload) => setAttempts(payload.attempts))
+      .catch(() => setAttempts([]));
   }, [user]);
 
   function handleAuthed(payload: { token: string; user: AuthUser }) {
@@ -109,6 +115,7 @@ function App() {
     clearToken();
     setUser(null);
     setUsers([]);
+    setAttempts([]);
   }
 
   if (booting) {
@@ -142,7 +149,7 @@ function App() {
     );
   }
 
-  return <PracticeApp user={user} users={users} onLogout={handleLogout} />;
+  return <PracticeApp user={user} users={users} attempts={attempts} setAttempts={setAttempts} onLogout={handleLogout} />;
 }
 
 function PhoneShell({ children }: { children: React.ReactNode }) {
@@ -269,14 +276,15 @@ function AuthScreen({ error, onLogin, onRegister }: AuthScreenProps) {
 interface PracticeAppProps {
   user: AuthUser;
   users: AuthUser[];
+  attempts: PracticeAttempt[];
+  setAttempts: React.Dispatch<React.SetStateAction<PracticeAttempt[]>>;
   onLogout: () => void;
 }
 
-function PracticeApp({ user, users, onLogout }: PracticeAppProps) {
+function PracticeApp({ user, users, attempts, setAttempts, onLogout }: PracticeAppProps) {
   const [view, setView] = React.useState<View>("practice");
   const [targetText, setTargetText] = React.useState("我要吃饭");
   const [analysis, setAnalysis] = React.useState<PronunciationAnalysis | null>(null);
-  const [attempts, setAttempts] = React.useState<PracticeAttempt[]>([]);
   const [recording, setRecording] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
   const [message, setMessage] = React.useState("");
@@ -304,6 +312,7 @@ function PracticeApp({ user, users, onLogout }: PracticeAppProps) {
       if (event.data.size > 0) chunks.current.push(event.data);
     });
     recorder.addEventListener("stop", () => {
+      // Stop microphone tracks before handing the captured blob to the Express analysis endpoint.
       stream.getTracks().forEach((track) => track.stop());
       void submitRecording(new Blob(chunks.current, { type: recorder.mimeType || "audio/webm" }));
     });
@@ -320,21 +329,26 @@ function PracticeApp({ user, users, onLogout }: PracticeAppProps) {
 
   async function submitRecording(blob: Blob) {
     setBusy(true);
+    let createdAttemptId = "";
     try {
-      const payload = await analyzePronunciation(targetText, blob);
-      setAnalysis(payload);
-      setSelectedSyllableId(payload.syllables[0]?.id || selectedSyllableId);
+      const { attempt } = await createPracticeAttempt(targetText);
+      createdAttemptId = attempt.id;
+      setAttempts((current) => [attempt, ...current]);
+
+      const payload = await analyzePracticeAttempt(attempt.id, blob);
+      setAnalysis(payload.analysis);
+      setSelectedSyllableId(payload.analysis.syllables[0]?.id || selectedSyllableId);
       setAttempts((current) => [
-        {
-          id: crypto.randomUUID(),
-          text: targetText,
-          createdAt: new Date().toISOString(),
-          scores: payload.scores,
-        },
-        ...current,
+        payload.attempt,
+        ...current.filter((item) => item.id !== payload.attempt.id),
       ]);
       setMessage("");
     } catch (error) {
+      if (createdAttemptId) {
+        fetchPracticeAttempts()
+          .then((payload) => setAttempts(payload.attempts))
+          .catch(() => undefined);
+      }
       setAnalysis(fallbackAnalysis);
       setMessage(error instanceof Error ? error.message : "Analysis failed. Check whether the API is configured.");
     } finally {
@@ -685,6 +699,7 @@ function DetailScreen({
 
 function ProgressScreen({ attempts }: { attempts: PracticeAttempt[] }) {
   const latest = attempts[0];
+  const latestScore = attemptScore(latest);
   const days = Array.from({ length: 14 }, (_, index) => ({
     label: `${index + 1}`,
     practiced: index >= 14 - Math.min(attempts.length, 14),
@@ -714,7 +729,7 @@ function ProgressScreen({ attempts }: { attempts: PracticeAttempt[] }) {
           </p>
           <div className="panel chart-card trend-wrap">
             <div className="progress-placeholder">
-              <strong>{latest ? latest.scores.overall : 0}</strong>
+              <strong>{latest ? latestScore : 0}</strong>
               <span>{latest ? "Latest score" : "No practice records yet"}</span>
             </div>
           </div>
@@ -740,24 +755,30 @@ function ProgressScreen({ attempts }: { attempts: PracticeAttempt[] }) {
           </p>
           <div className="word-list">
             {attempts.length ? (
-              attempts.slice(0, 6).map((attempt) => (
-                <button
-                  className={`word-row level-${levelFromScore(attempt.scores.overall)}`}
-                  type="button"
-                  key={attempt.id}
-                >
-                  <span className="word-top">
-                    <strong className="word-name">{attempt.text}</strong>
-                    <span className="word-status">
-                      {Math.round(attempt.scores.overall)} pts ·{" "}
-                      {statusFromScore(attempt.scores.overall)}
+              attempts.slice(0, 6).map((attempt) => {
+                const score = attemptScore(attempt);
+                return (
+                  <button
+                    className={`word-row level-${levelFromScore(score)}`}
+                    type="button"
+                    key={attempt.id}
+                  >
+                    <span className="word-top">
+                      <strong className="word-name">{attempt.targetText || attempt.text}</strong>
+                      <span className="word-status">
+                        {attempt.status === "complete"
+                          ? `${Math.round(score)} pts · ${statusFromScore(score)}`
+                          : attempt.status === "failed"
+                            ? "Analysis failed"
+                            : "Analysis pending"}
+                      </span>
                     </span>
-                  </span>
-                  <span className="progress-track" aria-hidden="true">
-                    <span className="progress-fill" style={{ width: `${attempt.scores.overall}%` }}></span>
-                  </span>
-                </button>
-              ))
+                    <span className="progress-track" aria-hidden="true">
+                      <span className="progress-fill" style={{ width: `${score}%` }}></span>
+                    </span>
+                  </button>
+                );
+              })
             ) : (
               <section className="panel diagnosis-card">
                 <strong>No practice records yet</strong>
@@ -769,6 +790,10 @@ function ProgressScreen({ attempts }: { attempts: PracticeAttempt[] }) {
       </div>
     </section>
   );
+}
+
+function attemptScore(attempt?: PracticeAttempt): number {
+  return attempt?.analysis?.scores.overall ?? attempt?.scores?.overall ?? 0;
 }
 
 function Score({ label, value }: { label: string; value: number }) {
