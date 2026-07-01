@@ -1,0 +1,720 @@
+{
+  "source": "C:\\Users\\21628\\Desktop\\6月17日 (4)(2).mp4",
+  "generatedAt": "2026-06-22T09:24:02.479471+00:00",
+  "clips": {
+    "initial": {
+      "b": {
+        "unit": "b",
+        "type": "initial",
+        "title": "Initial b Pronunciation Demo",
+        "notes": "Close both lips, then open quickly with a light unaspirated release. Do not pronounce it like p.",
+        "url": "./assets/pronunciation-clips/initial-b.mp4",
+        "start": "00:00:00.600",
+        "end": "00:00:02.200"
+      },
+      "p": {
+        "unit": "p",
+        "type": "initial",
+        "title": "Initial p Pronunciation Demo",
+        "notes": "Close both lips, then release with clear aspiration.",
+        "url": "./assets/pronunciation-clips/initial-p.mp4",
+        "start": "00:00:03.600",
+        "end": "00:00:04.700"
+      },
+      "m": {
+        "unit": "m",
+        "type": "initial",
+        "title": "Initial m Pronunciation Demo",
+        "notes": "Close both lips and let air flow through the nose. Do not turn the onset into b or p.",
+        "url": "./assets/pronunciation-clips/initial-m.mp4",
+        "start": "00:00:05.420",
+        "end": "00:00:06.200"
+      },
+      "f": {
+        "unit": "f",
+        "type": "initial",
+        "title": "Initial f Pronunciation Demo",
+        "notes": "Touch the upper teeth lightly to the lower lip and release air through the lip-teeth gap.",
+        "url": "./assets/pronunciation-clips/initial-f.mp4",
+        "start": "00:00:07.500",
+        "end": "00:00:08.600"
+      },
+      "z": {
+        "unit": "z",
+        "type": "initial",
+        "title": "Initial z Pronunciation Demo",
+        "notes": "Place the tongue tip behind the upper teeth and release lightly without strong aspiration.",
+        "url": "./assets/pronunciation-clips/initial-z.mp4",
+        "start": "00:00:10.600",
+        "end": "00:00:12.200"
+      },
+      "c": {
+        "unit": "c",
+        "type": "initial",
+        "title": "Initial c Pronunciation Demo",
+        "notes": "Place the tongue tip behind the upper teeth and release with clear aspiration.",
+        "url": "./assets/pronunciation-clips/initial-c.mp4",
+        "start": "00:00:13.500",
+        "end": "00:00:14.700"
+      },
+      "s": {
+        "unit": "s",
+        "type": "initial",
+        "title": "Initial s Pronunciation Demo",
+        "notes": "Keep a narrow gap near the upper teeth so the airflow creates friction.",
+        "url": "./assets/pronunciation-clips/initial-s.mp4",
+        "start": "00:00:15.500",
+        "end": "00:00:16.700"
+      },
+      "d": {
+        "unit": "d",
+        "type": "initial",
+        "title": "Initial d Pronunciation Demo",
+        "notes": "Touch the tongue tip to the upper gum ridge and release shortly without aspiration.",
+        "url": "./assets/pronunciation-clips/initial-d.mp4",
+        "start": "00:00:17.500",
+        "end": "00:00:18.700"
+      },
+      "t": {
+        "unit": "t",
+        "type": "initial",
+        "title": "Initial t Pronunciation Demo",
+        "notes": "Touch the tongue tip to the upper gum ridge and release with strong aspiration.",
+        "url": "./assets/pronunciation-clips/initial-t.mp4",
+        "start": "00:00:20.600",
+        "end": "00:00:22.200"
+      },
+      "n": {
+        "unit": "n",
+        "type": "initial",
+        "title": "Initial n Pronunciation Demo",
+        "notes": "Touch the tongue tip lightly to the upper gum ridge and let air flow through the nose.",
+        "url": "./assets/pronunciation-clips/initial-n.mp4",
+        "start": "00:00:22.880",
+        "end": "00:00:23.820"
+      },
+      "l": {
+        "unit": "l",
+        "type": "initial",
+        "title": "Initial l Pronunciation Demo",
+        "notes": "Touch the tongue tip to the upper gum ridge, then let air pass along the sides of the tongue.",
+        "url": "./assets/pronunciation-clips/initial-l.mp4",
+        "start": "00:00:25.400",
+        "end": "00:00:26.320"
+      },
+      "zh": {
+        "unit": "zh",
+        "type": "initial",
+        "title": "Initial zh Pronunciation Demo",
+        "notes": "Curl the tongue tip slightly back toward the front hard palate and release without too much aspiration.",
+        "url": "./assets/pronunciation-clips/initial-zh.mp4",
+        "start": "00:00:27.500",
+        "end": "00:00:28.700"
+      },
+      "ch": {
+        "unit": "ch",
+        "type": "initial",
+        "title": "Initial ch Pronunciation Demo",
+        "notes": "Keep the tongue tip curled back and release with clear aspiration.",
+        "url": "./assets/pronunciation-clips/initial-ch.mp4",
+        "start": "00:00:45.500",
+        "end": "00:00:46.700"
+      },
+      "sh": {
+        "unit": "sh",
+        "type": "initial",
+        "title": "Initial sh Pronunciation Demo",
+        "notes": "Curl the tongue tip back and form a narrow gap for friction.",
+        "url": "./assets/pronunciation-clips/initial-sh.mp4",
+        "start": "00:00:47.500",
+        "end": "00:00:48.700"
+      },
+      "r": {
+        "unit": "r",
+        "type": "initial",
+        "title": "Initial r Pronunciation Demo",
+        "notes": "Curl the tongue tip slightly back, vibrate the vocal folds, and keep the sound soft. Do not pronounce it like l.",
+        "url": "./assets/pronunciation-clips/initial-r.mp4",
+        "start": "00:00:50.300",
+        "end": "00:00:50.860"
+      },
+      "j": {
+        "unit": "j",
+        "type": "initial",
+        "title": "Initial j Pronunciation Demo",
+        "notes": "Bring the front of the tongue close to the hard palate and release without clear aspiration.",
+        "url": "./assets/pronunciation-clips/initial-j.mp4",
+        "start": "00:00:30.600",
+        "end": "00:00:32.200"
+      },
+      "q": {
+        "unit": "q",
+        "type": "initial",
+        "title": "Initial q Pronunciation Demo",
+        "notes": "Bring the front of the tongue close to the hard palate and release with clear aspiration.",
+        "url": "./assets/pronunciation-clips/initial-q.mp4",
+        "start": "00:00:33.500",
+        "end": "00:00:34.700"
+      },
+      "x": {
+        "unit": "x",
+        "type": "initial",
+        "title": "Initial x Pronunciation Demo",
+        "notes": "Bring the front of the tongue near the hard palate and let the airflow pass through a narrow gap.",
+        "url": "./assets/pronunciation-clips/initial-x.mp4",
+        "start": "00:00:35.500",
+        "end": "00:00:36.700"
+      },
+      "g": {
+        "unit": "g",
+        "type": "initial",
+        "title": "Initial g Pronunciation Demo",
+        "notes": "Raise the tongue root to the soft palate and release shortly without aspiration.",
+        "url": "./assets/pronunciation-clips/initial-g.mp4",
+        "start": "00:00:37.500",
+        "end": "00:00:38.700"
+      },
+      "k": {
+        "unit": "k",
+        "type": "initial",
+        "title": "Initial k Pronunciation Demo",
+        "notes": "Raise the tongue root to the soft palate and release with strong aspiration.",
+        "url": "./assets/pronunciation-clips/initial-k.mp4",
+        "start": "00:00:40.600",
+        "end": "00:00:42.200"
+      },
+      "h": {
+        "unit": "h",
+        "type": "initial",
+        "title": "Initial h Pronunciation Demo",
+        "notes": "Bring the tongue root near the soft palate and release a gentle friction sound from the back of the throat.",
+        "url": "./assets/pronunciation-clips/initial-h.mp4",
+        "start": "00:00:43.500",
+        "end": "00:00:44.700"
+      }
+    },
+    "final": {
+      "a": {
+        "unit": "a",
+        "type": "final",
+        "title": "Final a Pronunciation Demo",
+        "notes": "Open the mouth, keep the tongue naturally low, and make the vowel full.",
+        "url": "./assets/pronunciation-clips/final-a.mp4",
+        "start": "00:00:52.920",
+        "end": "00:00:53.740"
+      },
+      "o": {
+        "unit": "o",
+        "type": "final",
+        "title": "Final o Pronunciation Demo",
+        "notes": "Round both lips and keep a rounded mouth space.",
+        "url": "./assets/pronunciation-clips/final-o.mp4",
+        "start": "00:00:55.300",
+        "end": "00:00:56.080"
+      },
+      "e": {
+        "unit": "e",
+        "type": "final",
+        "title": "Final e Pronunciation Demo",
+        "notes": "Relax the mouth corners, keep the tongue slightly back, and hold a stable mouth space.",
+        "url": "./assets/pronunciation-clips/final-e.mp4",
+        "start": "00:00:57.640",
+        "end": "00:00:58.580"
+      },
+      "i": {
+        "unit": "i",
+        "type": "final",
+        "title": "Final i Pronunciation Demo",
+        "notes": "Spread the mouth corners, raise the tongue body, and keep the sound focused.",
+        "url": "./assets/pronunciation-clips/final-i.mp4",
+        "start": "00:01:00.360",
+        "end": "00:01:01.040"
+      },
+      "u": {
+        "unit": "u",
+        "type": "final",
+        "title": "Final u Pronunciation Demo",
+        "notes": "Round the lips forward, move the tongue back, and keep the sound compact.",
+        "url": "./assets/pronunciation-clips/final-u.mp4",
+        "start": "00:01:02.660",
+        "end": "00:01:03.360"
+      },
+      "v": {
+        "unit": "v",
+        "type": "final",
+        "title": "Final v Pronunciation Demo",
+        "notes": "Keep the tongue position of i while rounding the lips. Avoid turning it into u.",
+        "url": "./assets/pronunciation-clips/final-v.mp4",
+        "start": "00:01:05.300",
+        "end": "00:01:06.120"
+      },
+      "i_z": {
+        "unit": "i_z",
+        "type": "final",
+        "title": "Final i_z Pronunciation Demo",
+        "notes": "Used in zi, ci, and si. Keep the tongue tip near the back of the upper teeth; do not pronounce it like regular i.",
+        "url": "./assets/pronunciation-clips/final-i_z.mp4",
+        "start": "00:01:07.700",
+        "end": "00:01:08.400"
+      },
+      "i_zh": {
+        "unit": "i_zh",
+        "type": "final",
+        "title": "Final i_zh Pronunciation Demo",
+        "notes": "Used in zhi, chi, shi, and ri. Keep the retroflex position; do not pronounce it like regular i.",
+        "url": "./assets/pronunciation-clips/final-i_zh.mp4",
+        "start": "00:01:09.820",
+        "end": "00:01:10.620"
+      },
+      "er": {
+        "unit": "er",
+        "type": "final",
+        "title": "Final er Pronunciation Demo",
+        "notes": "Curl the tongue tip lightly and keep the retroflex sound natural, not forced.",
+        "url": "./assets/pronunciation-clips/final-er.mp4",
+        "start": "00:01:12.300",
+        "end": "00:01:13.160"
+      },
+      "ai": {
+        "unit": "ai",
+        "type": "final",
+        "title": "Final ai Pronunciation Demo",
+        "notes": "Glide from open a toward narrower i with a smooth mouth-shape change.",
+        "url": "./assets/pronunciation-clips/final-ai.mp4",
+        "start": "00:01:14.740",
+        "end": "00:01:15.400"
+      },
+      "ia": {
+        "unit": "ia",
+        "type": "final",
+        "title": "Final ia Pronunciation Demo",
+        "notes": "Start from the high tongue position of i, then open quickly into a.",
+        "url": "./assets/pronunciation-clips/final-ia.mp4",
+        "start": "00:01:17.160",
+        "end": "00:01:18.060"
+      },
+      "ueng": {
+        "unit": "ueng",
+        "type": "final",
+        "title": "Final ueng Pronunciation Demo",
+        "notes": "Start with rounded u, then transition into the back nasal eng.",
+        "url": "./assets/pronunciation-clips/final-ueng.mp4",
+        "start": "00:01:19.720",
+        "end": "00:01:20.640"
+      },
+      "uang": {
+        "unit": "uang",
+        "type": "final",
+        "title": "Final uang Pronunciation Demo",
+        "notes": "Start with rounded u, open into ang, and complete the back nasal ending.",
+        "url": "./assets/pronunciation-clips/final-uang.mp4",
+        "start": "00:01:22.160",
+        "end": "00:01:23.120"
+      },
+      "iong": {
+        "unit": "iong",
+        "type": "final",
+        "title": "Final iong Pronunciation Demo",
+        "notes": "Keep the tongue body high with rounded lips, then finish into the back nasal ong.",
+        "url": "./assets/pronunciation-clips/final-iong.mp4",
+        "start": "00:01:24.500",
+        "end": "00:01:25.460"
+      },
+      "ei": {
+        "unit": "ei",
+        "type": "final",
+        "title": "Final ei Pronunciation Demo",
+        "notes": "Glide from e to i, narrowing the mouth shape gradually while keeping the sound connected.",
+        "url": "./assets/pronunciation-clips/final-ei.mp4",
+        "source": {
+          "kind": "bilibili",
+          "bvid": "BV1Dt411R7iQ",
+          "page": 31,
+          "cid": 60375192,
+          "title": "31 前响复韵母 ei",
+          "localFile": "web/assets/pronunciation-clips/bilibili-source/31-ei.mp4",
+          "displayTitle": "Final ei source clip"
+        }
+      },
+      "ao": {
+        "unit": "ao",
+        "type": "final",
+        "title": "Final ao Pronunciation Demo",
+        "notes": "Glide from a to o: open first, then round naturally.",
+        "url": "./assets/pronunciation-clips/final-ao.mp4",
+        "source": {
+          "kind": "bilibili",
+          "bvid": "BV1Dt411R7iQ",
+          "page": 32,
+          "cid": 60375195,
+          "title": "32 前响复韵母 ao",
+          "localFile": "web/assets/pronunciation-clips/bilibili-source/32-普通话 汉语拼音 声韵调 动程图 p32 32 前响复韵母 ao.mp4",
+          "displayTitle": "Final ao source clip"
+        }
+      },
+      "ou": {
+        "unit": "ou",
+        "type": "final",
+        "title": "Final ou Pronunciation Demo",
+        "notes": "Glide from o to u, rounding the lips gradually and keeping the ending compact.",
+        "url": "./assets/pronunciation-clips/final-ou.mp4",
+        "source": {
+          "kind": "bilibili",
+          "bvid": "BV1Dt411R7iQ",
+          "page": 33,
+          "cid": 60375199,
+          "title": "33 前响复韵母 ou",
+          "localFile": "web/assets/pronunciation-clips/bilibili-source/33-普通话 汉语拼音 声韵调 动程图 p33 33 前响复韵母 ou.mp4",
+          "displayTitle": "Final ou source clip"
+        }
+      },
+      "iu": {
+        "unit": "iu",
+        "type": "final",
+        "title": "Final iu Pronunciation Demo",
+        "notes": "Pronounced like iou: start with i, then transition through ou with a smooth glide.",
+        "url": "./assets/pronunciation-clips/final-iu.mp4",
+        "source": {
+          "kind": "bilibili",
+          "bvid": "BV1Dt411R7iQ",
+          "page": 35,
+          "cid": 60375210,
+          "title": "35 中响复韵母 iu",
+          "localFile": "web/assets/pronunciation-clips/bilibili-source/35-普通话 汉语拼音 声韵调 动程图 p35 35 中响复韵母 iu.mp4",
+          "displayTitle": "Final iu source clip"
+        }
+      },
+      "iao": {
+        "unit": "iao",
+        "type": "final",
+        "title": "Final iao Pronunciation Demo",
+        "notes": "Start with high i, open into a, then finish toward o.",
+        "url": "./assets/pronunciation-clips/final-iao.mp4",
+        "source": {
+          "kind": "bilibili",
+          "bvid": "BV1Dt411R7iQ",
+          "page": 36,
+          "cid": 60375212,
+          "title": "36 中响复韵母 iao",
+          "localFile": "web/assets/pronunciation-clips/bilibili-source/36-普通话 汉语拼音 声韵调 动程图 p36 36 中响复韵母 iao.mp4",
+          "displayTitle": "Final iao source clip"
+        }
+      },
+      "ui": {
+        "unit": "ui",
+        "type": "final",
+        "title": "Final ui Pronunciation Demo",
+        "notes": "Pronounced like uei: start with rounded u, then glide toward ei.",
+        "url": "./assets/pronunciation-clips/final-ui.mp4",
+        "source": {
+          "kind": "bilibili",
+          "bvid": "BV1Dt411R7iQ",
+          "page": 37,
+          "cid": 60375216,
+          "title": "37 中响复韵母 ui",
+          "localFile": "web/assets/pronunciation-clips/bilibili-source/37-普通话 汉语拼音 声韵调 动程图 p37 37 中响复韵母 ui.mp4",
+          "displayTitle": "Final ui source clip"
+        }
+      },
+      "uai": {
+        "unit": "uai",
+        "type": "final",
+        "title": "Final uai Pronunciation Demo",
+        "notes": "Start with rounded u, open into a, then close toward i.",
+        "url": "./assets/pronunciation-clips/final-uai.mp4",
+        "source": {
+          "kind": "bilibili",
+          "bvid": "BV1Dt411R7iQ",
+          "page": 38,
+          "cid": 60375219,
+          "title": "38 中响复韵母 uai",
+          "localFile": "web/assets/pronunciation-clips/bilibili-source/38-普通话 汉语拼音 声韵调 动程图 p38 38 中响复韵母 uai.mp4",
+          "displayTitle": "Final uai source clip"
+        }
+      },
+      "ie": {
+        "unit": "ie",
+        "type": "final",
+        "title": "Final ie Pronunciation Demo",
+        "notes": "Glide quickly from i to e while relaxing the mouth corners.",
+        "url": "./assets/pronunciation-clips/final-ie.mp4",
+        "source": {
+          "kind": "bilibili",
+          "bvid": "BV1Dt411R7iQ",
+          "page": 40,
+          "cid": 60375224,
+          "title": "40 后响复韵母 ie",
+          "localFile": "web/assets/pronunciation-clips/bilibili-source/40-普通话 汉语拼音 声韵调 动程图 p40 40 后响复韵母 ie.mp4",
+          "displayTitle": "Final ie source clip"
+        }
+      },
+      "uo": {
+        "unit": "uo",
+        "type": "final",
+        "title": "Final uo Pronunciation Demo",
+        "notes": "Start with rounded u, then open into o. Useful for syllables such as wo, guo, and duo.",
+        "url": "./assets/pronunciation-clips/final-uo.mp4",
+        "source": {
+          "kind": "bilibili",
+          "bvid": "BV1Dt411R7iQ",
+          "page": 41,
+          "cid": 60375226,
+          "title": "41 后响复韵母 uo",
+          "localFile": "web/assets/pronunciation-clips/bilibili-source/41-普通话 汉语拼音 声韵调 动程图 p41 41 后响复韵母 uo.mp4",
+          "displayTitle": "Final uo source clip"
+        }
+      },
+      "ua": {
+        "unit": "ua",
+        "type": "final",
+        "title": "Final ua Pronunciation Demo",
+        "notes": "Start with rounded u, then open quickly into a.",
+        "url": "./assets/pronunciation-clips/final-ua.mp4",
+        "source": {
+          "kind": "bilibili",
+          "bvid": "BV1Dt411R7iQ",
+          "page": 42,
+          "cid": 60375228,
+          "title": "42 后响复韵母 ua",
+          "localFile": "web/assets/pronunciation-clips/bilibili-source/42-普通话 汉语拼音 声韵调 动程图 p42 42 后响复韵母 ua.mp4",
+          "displayTitle": "Final ua source clip"
+        }
+      },
+      "ve": {
+        "unit": "ve",
+        "type": "final",
+        "title": "Final ve Pronunciation Demo",
+        "notes": "Keep the tongue and lip shape of ü, then glide toward e. Used in yue, jue, que, and xue.",
+        "url": "./assets/pronunciation-clips/final-ve.mp4",
+        "source": {
+          "kind": "bilibili",
+          "bvid": "BV1Dt411R7iQ",
+          "page": 43,
+          "cid": 60375232,
+          "title": "43 后响复韵母 ve",
+          "localFile": "web/assets/pronunciation-clips/bilibili-source/43-普通话 汉语拼音 声韵调 动程图 p43 43 后响复韵母 ve.mp4",
+          "displayTitle": "Final ve source clip"
+        }
+      },
+      "an": {
+        "unit": "an",
+        "type": "final",
+        "title": "Final an Pronunciation Demo",
+        "notes": "Start with a, then touch the tongue tip to the upper gum ridge for the front nasal n.",
+        "url": "./assets/pronunciation-clips/final-an.mp4",
+        "source": {
+          "kind": "bilibili",
+          "bvid": "BV1Dt411R7iQ",
+          "page": 44,
+          "cid": 60375237,
+          "title": "44 前鼻音韵母 an",
+          "localFile": "web/assets/pronunciation-clips/bilibili-source/44-普通话 汉语拼音 声韵调 动程图 p44 44 前鼻音韵母 an.mp4",
+          "displayTitle": "Final an source clip"
+        }
+      },
+      "en": {
+        "unit": "en",
+        "type": "final",
+        "title": "Final en Pronunciation Demo",
+        "notes": "Start with e, then touch the tongue tip to the upper gum ridge for the front nasal n.",
+        "url": "./assets/pronunciation-clips/final-en.mp4",
+        "source": {
+          "kind": "bilibili",
+          "bvid": "BV1Dt411R7iQ",
+          "page": 45,
+          "cid": 60375240,
+          "title": "45 前鼻音韵母 en",
+          "localFile": "web/assets/pronunciation-clips/bilibili-source/45-普通话 汉语拼音 声韵调 动程图 p45 45 前鼻音韵母 en.mp4",
+          "displayTitle": "Final en source clip"
+        }
+      },
+      "ian": {
+        "unit": "ian",
+        "type": "final",
+        "title": "Final ian Pronunciation Demo",
+        "notes": "Start with i, transition into an, and complete the front nasal ending.",
+        "url": "./assets/pronunciation-clips/final-ian.mp4",
+        "source": {
+          "kind": "bilibili",
+          "bvid": "BV1Dt411R7iQ",
+          "page": 46,
+          "cid": 60375243,
+          "title": "46 前鼻音韵母 ian",
+          "localFile": "web/assets/pronunciation-clips/bilibili-source/46-普通话 汉语拼音 声韵调 动程图 p46 46 前鼻音韵母 ian.mp4",
+          "displayTitle": "Final ian source clip"
+        }
+      },
+      "uan": {
+        "unit": "uan",
+        "type": "final",
+        "title": "Final uan Pronunciation Demo",
+        "notes": "Start with u, transition into an, and keep the rounded onset clear.",
+        "url": "./assets/pronunciation-clips/final-uan.mp4",
+        "source": {
+          "kind": "bilibili",
+          "bvid": "BV1Dt411R7iQ",
+          "page": 47,
+          "cid": 60375248,
+          "title": "47 前鼻音韵母 uan",
+          "localFile": "web/assets/pronunciation-clips/bilibili-source/47-普通话 汉语拼音 声韵调 动程图 p47 47 前鼻音韵母 uan.mp4",
+          "displayTitle": "Final uan source clip"
+        }
+      },
+      "van": {
+        "unit": "van",
+        "type": "final",
+        "title": "Final van Pronunciation Demo",
+        "notes": "Start with ü, then transition into an. Used in yuan, juan, quan, and xuan.",
+        "url": "./assets/pronunciation-clips/final-van.mp4",
+        "source": {
+          "kind": "bilibili",
+          "bvid": "BV1Dt411R7iQ",
+          "page": 48,
+          "cid": 60375250,
+          "title": "48 前鼻音韵母 van",
+          "localFile": "web/assets/pronunciation-clips/bilibili-source/48-普通话 汉语拼音 声韵调 动程图 p48 48 前鼻音韵母 van.mp4",
+          "displayTitle": "Final van source clip"
+        }
+      },
+      "in": {
+        "unit": "in",
+        "type": "final",
+        "title": "Final in Pronunciation Demo",
+        "notes": "Start with i, then touch the tongue tip to the upper gum ridge for the front nasal n.",
+        "url": "./assets/pronunciation-clips/final-in.mp4",
+        "source": {
+          "kind": "bilibili",
+          "bvid": "BV1Dt411R7iQ",
+          "page": 49,
+          "cid": 60375251,
+          "title": "49 前鼻音韵母 in",
+          "localFile": "web/assets/pronunciation-clips/bilibili-source/49-普通话 汉语拼音 声韵调 动程图 p49 49 前鼻音韵母 in.mp4",
+          "displayTitle": "Final in source clip"
+        }
+      },
+      "un": {
+        "unit": "un",
+        "type": "final",
+        "title": "Final un Pronunciation Demo",
+        "notes": "Pronounced like uen: start with rounded u, then finish with the front nasal n.",
+        "url": "./assets/pronunciation-clips/final-un.mp4",
+        "source": {
+          "kind": "bilibili",
+          "bvid": "BV1Dt411R7iQ",
+          "page": 50,
+          "cid": 60375259,
+          "title": "50 前鼻音韵母 un",
+          "localFile": "web/assets/pronunciation-clips/bilibili-source/50-普通话 汉语拼音 声韵调 动程图 p50 50 前鼻音韵母 un.mp4",
+          "displayTitle": "Final un source clip"
+        }
+      },
+      "vn": {
+        "unit": "vn",
+        "type": "final",
+        "title": "Final vn Pronunciation Demo",
+        "notes": "Start with ü, then finish with the front nasal n. Used in yun, jun, qun, and xun.",
+        "url": "./assets/pronunciation-clips/final-vn.mp4",
+        "source": {
+          "kind": "bilibili",
+          "bvid": "BV1Dt411R7iQ",
+          "page": 51,
+          "cid": 60375263,
+          "title": "51 前鼻音韵母 vn",
+          "localFile": "web/assets/pronunciation-clips/bilibili-source/51-普通话 汉语拼音 声韵调 动程图 p51 51 前鼻音韵母 vn.mp4",
+          "displayTitle": "Final vn source clip"
+        }
+      },
+      "ang": {
+        "unit": "ang",
+        "type": "final",
+        "title": "Final ang Pronunciation Demo",
+        "notes": "Start with a, then raise the tongue root into the back nasal ng.",
+        "url": "./assets/pronunciation-clips/final-ang.mp4",
+        "source": {
+          "kind": "bilibili",
+          "bvid": "BV1Dt411R7iQ",
+          "page": 52,
+          "cid": 60375266,
+          "title": "52 后鼻音韵母 ang",
+          "localFile": "web/assets/pronunciation-clips/bilibili-source/52-普通话 汉语拼音 声韵调 动程图 p52 52 后鼻音韵母 ang.mp4",
+          "displayTitle": "Final ang source clip"
+        }
+      },
+      "eng": {
+        "unit": "eng",
+        "type": "final",
+        "title": "Final eng Pronunciation Demo",
+        "notes": "Start with e, then raise the tongue root into the back nasal ng.",
+        "url": "./assets/pronunciation-clips/final-eng.mp4",
+        "source": {
+          "kind": "bilibili",
+          "bvid": "BV1Dt411R7iQ",
+          "page": 53,
+          "cid": 60375268,
+          "title": "53 后鼻音韵母 eng",
+          "localFile": "web/assets/pronunciation-clips/bilibili-source/53-普通话 汉语拼音 声韵调 动程图 p53 53 后鼻音韵母 eng.mp4",
+          "displayTitle": "Final eng source clip"
+        }
+      },
+      "iang": {
+        "unit": "iang",
+        "type": "final",
+        "title": "Final iang Pronunciation Demo",
+        "notes": "Start with i, transition into ang, and complete the back nasal ending.",
+        "url": "./assets/pronunciation-clips/final-iang.mp4",
+        "source": {
+          "kind": "bilibili",
+          "bvid": "BV1Dt411R7iQ",
+          "page": 54,
+          "cid": 60375273,
+          "title": "54 后鼻音韵母 iang",
+          "localFile": "web/assets/pronunciation-clips/bilibili-source/54-普通话 汉语拼音 声韵调 动程图 p54 54 后鼻音韵母 iang.mp4",
+          "displayTitle": "Final iang source clip"
+        }
+      },
+      "ing": {
+        "unit": "ing",
+        "type": "final",
+        "title": "Final ing Pronunciation Demo",
+        "notes": "Start with i, then raise the tongue root into the back nasal ng.",
+        "url": "./assets/pronunciation-clips/final-ing.mp4",
+        "source": {
+          "kind": "bilibili",
+          "bvid": "BV1Dt411R7iQ",
+          "page": 56,
+          "cid": 60375277,
+          "title": "56 后鼻音韵母 ing",
+          "localFile": "web/assets/pronunciation-clips/bilibili-source/56-普通话 汉语拼音 声韵调 动程图 p56 56 后鼻音韵母 ing.mp4",
+          "displayTitle": "Final ing source clip"
+        }
+      },
+      "ong": {
+        "unit": "ong",
+        "type": "final",
+        "title": "Final ong Pronunciation Demo",
+        "notes": "Round the lips for o, then finish with the back nasal ng while keeping the back of the mouth stable.",
+        "url": "./assets/pronunciation-clips/final-ong.mp4",
+        "source": {
+          "kind": "bilibili",
+          "bvid": "BV1Dt411R7iQ",
+          "page": 58,
+          "cid": 60375283,
+          "title": "58 后鼻音韵母 ong",
+          "localFile": "web/assets/pronunciation-clips/bilibili-source/58-普通话 汉语拼音 声韵调 动程图 p58 58 后鼻音韵母 ong.mp4",
+          "displayTitle": "Final ong source clip"
+        }
+      }
+    }
+  },
+  "sources": {
+    "bilibiliSupplement": {
+      "page": "https://www.bilibili.com/video/BV1Dt411R7iQ/",
+      "title": "普通话 汉语拼音 声韵调 动程图",
+      "bvid": "BV1Dt411R7iQ",
+      "aid": 34464551,
+      "importedAt": "2026-06-22T09:24:02.448686+00:00",
+      "note": "User confirmed they have permission to download and use these local teaching clips.",
+      "displayTitle": "Mandarin pinyin articulation source video"
+    }
+  }
+}

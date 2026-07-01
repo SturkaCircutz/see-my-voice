@@ -30,11 +30,31 @@ export interface SyllableFeedback {
   feedback: string;
 }
 
+export interface PinyinDiagnosisIssue {
+  index?: number;
+  type?: string;
+  title?: string;
+  summary?: string;
+  focus?: string;
+  detail?: string;
+  practice?: string[];
+}
+
+export interface PinyinDiagnosis {
+  targetText?: string;
+  heardText?: string;
+  targetPinyin?: string[];
+  heardPinyin?: string[];
+  issues: PinyinDiagnosisIssue[];
+  summary: string;
+}
+
 export interface PronunciationAnalysis {
   heardText: string;
   summary: string;
   scores: ScoreSet;
   syllables: SyllableFeedback[];
+  pinyinDiagnosis?: PinyinDiagnosis | null;
   raw?: unknown;
 }
 

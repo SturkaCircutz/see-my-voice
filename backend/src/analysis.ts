@@ -16,11 +16,31 @@ export interface SyllableFeedback {
   feedback: string;
 }
 
+export interface PinyinDiagnosisIssue {
+  index?: number;
+  type?: string;
+  title?: string;
+  summary?: string;
+  focus?: string;
+  detail?: string;
+  practice?: string[];
+}
+
+export interface PinyinDiagnosis {
+  targetText?: string;
+  heardText?: string;
+  targetPinyin?: string[];
+  heardPinyin?: string[];
+  issues: PinyinDiagnosisIssue[];
+  summary: string;
+}
+
 export interface PronunciationAnalysis {
   heardText: string;
   summary: string;
   scores: ScoreSet;
   syllables: SyllableFeedback[];
+  pinyinDiagnosis?: PinyinDiagnosis | null;
   raw?: unknown;
 }
 
@@ -61,6 +81,34 @@ function normalizeSyllables(result: Record<string, any>): SyllableFeedback[] {
   }));
 }
 
+function stringList(value: unknown): string[] {
+  return Array.isArray(value) ? value.map((item) => String(item)).filter(Boolean) : [];
+}
+
+function normalizePinyinDiagnosis(result: Record<string, any>): PinyinDiagnosis | null {
+  const diagnosis = result?.pinyin_diagnosis;
+  if (!diagnosis || typeof diagnosis !== "object") return null;
+  const source = diagnosis as Record<string, any>;
+  return {
+    targetText: source.target_text ? String(source.target_text) : undefined,
+    heardText: source.heard_text ? String(source.heard_text) : undefined,
+    targetPinyin: stringList(source.target_pinyin),
+    heardPinyin: stringList(source.heard_pinyin),
+    issues: Array.isArray(source.issues)
+      ? source.issues.map((issue: Record<string, any>) => ({
+          index: Number.isFinite(Number(issue.index)) ? Number(issue.index) : undefined,
+          type: issue.type ? String(issue.type) : undefined,
+          title: issue.title ? String(issue.title) : undefined,
+          summary: issue.summary ? String(issue.summary) : undefined,
+          focus: issue.focus ? String(issue.focus) : undefined,
+          detail: issue.detail ? String(issue.detail) : undefined,
+          practice: stringList(issue.practice),
+        }))
+      : [],
+    summary: String(source.summary || ""),
+  };
+}
+
 export function normalizePronunciationAnalysis(payload: unknown): PronunciationAnalysis {
   // Translate the Python/FunASR response into the stable contract consumed by the Next.js UI.
   const result = payload && typeof payload === "object" ? payload as Record<string, any> : {};
@@ -80,6 +128,7 @@ export function normalizePronunciationAnalysis(payload: unknown): PronunciationA
     ),
     scores,
     syllables: normalizeSyllables(result),
+    pinyinDiagnosis: normalizePinyinDiagnosis(result),
     raw: payload,
   };
 }
