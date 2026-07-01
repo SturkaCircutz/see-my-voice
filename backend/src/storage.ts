@@ -1,10 +1,11 @@
 import { mkdir, writeFile } from "node:fs/promises";
-import { fileURLToPath } from "node:url";
+import { tmpdir } from "node:os";
 import { basename, extname, join } from "node:path";
 import { ObjectId } from "mongodb";
 
-const backendRoot = fileURLToPath(new URL("..", import.meta.url));
-const audioRoot = join(backendRoot, ".uploads", "attempt-audio");
+const audioRoot = process.env.VERCEL
+  ? join(tmpdir(), "see-my-voice", "attempt-audio")
+  : join(process.cwd(), ".uploads", "attempt-audio");
 
 function extensionFromFilename(filename: string): string {
   const extension = extname(basename(filename)).toLowerCase();
