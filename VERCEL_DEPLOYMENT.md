@@ -13,6 +13,8 @@ Deploy this repository as two Vercel projects:
 
 This split matches the repo shape: the frontend is a Next.js app, while the API is a separate Express server.
 
+The root `vercel.json` is for a frontend project created from the repository root. It builds only the `frontend` workspace and rewrites `/api/*` to the separately deployed backend through `BACKEND_URL`. If you set Vercel's Root Directory to `frontend` or `backend`, Vercel uses the matching subdirectory `vercel.json` instead.
+
 ## Backend Environment Variables
 
 Set these on the backend Vercel project:
@@ -39,6 +41,14 @@ NEXT_PUBLIC_API_BASE_URL=https://<your-backend-project>.vercel.app
 ```
 
 The frontend API helper prefixes all `/api/...` calls with this value.
+
+If deploying the frontend from the repository root with the root `vercel.json`, set this instead of `NEXT_PUBLIC_API_BASE_URL`:
+
+```bash
+BACKEND_URL=https://<your-backend-project>.vercel.app
+```
+
+That keeps browser requests same-origin while Vercel proxies `/api/*` to the backend.
 
 ## Deployment Order
 
