@@ -92,7 +92,7 @@ function GeneratedMouthDiagram({ syllable }: { syllable: LegacySyllable }) {
         <span className={`absolute top-[97px] left-1/2 h-[18px] w-[52px] -translate-x-1/2 rounded-[50%] bg-[#df776b] ${roundClass} ${wideClass}`} />
       </div>
       <span className="absolute right-2 bottom-2 grid min-w-[52px] rounded-[10px] bg-[rgba(255,254,250,0.88)] px-[7px] py-[5px] text-center text-[var(--navy)] shadow-[0_8px_18px_rgba(25,26,47,0.12)]">
-        <strong className="font-[var(--serif)] text-[25px] leading-none">{syllable.character}</strong>
+        <strong className="font-(family-name:--serif) text-[25px] leading-none">{syllable.character}</strong>
         <span className="text-[10px] text-[var(--muted)]">{syllable.pinyin}</span>
       </span>
     </div>

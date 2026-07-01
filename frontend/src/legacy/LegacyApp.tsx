@@ -128,10 +128,43 @@ type TaskProgressState = Record<string, Record<string, TaskStepProgress>>;
 
 interface LocalAccountState {
   isLoggedIn: boolean;
+  isRegistered?: boolean;
   username: string;
   displayName: string;
   password: string;
+  avatarDataUrl?: string;
+  lastLoginAt?: string;
+  registeredAt?: string;
+  entryAssessmentCompleted?: boolean;
 }
+
+interface StoredLegacyState {
+  role?: Role;
+  currentRole?: Role;
+  studentView?: StudentView;
+  currentView?: StudentView | "teacher" | "home";
+  teacherView?: TeacherView;
+  teacherStudentFilter?: TeacherStudentFilter;
+  targetText?: string;
+  assessmentSession?: EntryAssessmentSession;
+  assessmentProfiles?: AssessmentProfile[];
+  selectedSyllableId?: string;
+  selectedStudentId?: string;
+  teacherStudents?: TeacherStudent[];
+  selectedToneDrill?: string;
+  practiceBackView?: "" | "toneDrill";
+  publishedTasks?: StudentTaskPackage[];
+  taskSubmissions?: TaskSubmission[];
+  taskStepProgress?: TaskProgressState;
+  selectedTaskId?: string;
+  activeTaskExerciseId?: string;
+  activeTaskItemIndex?: number;
+  selectedReviewId?: string;
+  account?: LocalAccountState;
+  chatThreads?: ChatThread[];
+}
+
+const STORAGE_KEY = "see-my-voice-practice-state";
 
 const fallbackAnalysis: PronunciationAnalysis = {
   heardText: "Waiting for recording analysis",
@@ -577,6 +610,59 @@ function toneFillClass(tone: string) {
   return colors[tone] || "bg-[var(--green)]";
 }
 
+function isRole(value: unknown): value is Role {
+  return value === "guest" || value === "student" || value === "teacher";
+}
+
+function isStudentView(value: unknown): value is StudentView {
+  return [
+    "home",
+    "practice",
+    "tasks",
+    "detail",
+    "progress",
+    "chat",
+    "account",
+    "taskDetail",
+    "entryAssessment",
+    "toneDrill",
+    "teachingClip",
+  ].includes(String(value));
+}
+
+function isTeacherView(value: unknown): value is TeacherView {
+  return [
+    "home",
+    "students",
+    "tasks",
+    "assessmentEditor",
+    "taskPackageEditor",
+    "reviews",
+    "reviewEditor",
+    "chat",
+    "account",
+  ].includes(String(value));
+}
+
+function todayDateKey() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function asArray<T>(value: unknown, fallback: T[]) {
+  return Array.isArray(value) ? (value as T[]) : fallback;
+}
+
+function loadStoredLegacyState(): StoredLegacyState | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) as StoredLegacyState : null;
+  } catch {
+    window.localStorage.removeItem(STORAGE_KEY);
+    return null;
+  }
+}
+
 // Props keep the legacy UI connected to auth and practice state owned by the app shell.
 interface LegacyAppProps {
   user: AuthUser | null;
@@ -624,9 +710,14 @@ export function LegacyApp({
   const [lastRecordingUrl, setLastRecordingUrl] = React.useState("");
   const [localAccount, setLocalAccount] = React.useState<LocalAccountState>({
     isLoggedIn: false,
+    isRegistered: false,
     username: "",
     displayName: "Chen Xiaohe",
     password: "",
+    avatarDataUrl: "",
+    lastLoginAt: "",
+    registeredAt: "",
+    entryAssessmentCompleted: false,
   });
   const [teachingClipPlan, setTeachingClipPlan] = React.useState<TeachingClipPlan | null>(null);
   const [selectedClipSegmentIndex, setSelectedClipSegmentIndex] = React.useState(0);
@@ -637,6 +728,113 @@ export function LegacyApp({
   const recordingUrlRef = React.useRef("");
   const recordingContextRef = React.useRef<RecordingContext>("practice");
   const activeTaskRecordingRef = React.useRef<{ taskId: string; exerciseId: string; itemIndex: number } | null>(null);
+  const [storageReady, setStorageReady] = React.useState(false);
+
+  React.useEffect(() => {
+    const stored = loadStoredLegacyState();
+    if (stored) {
+      const storedRole = isRole(stored.role) ? stored.role : isRole(stored.currentRole) ? stored.currentRole : null;
+      const storedStudentView = isStudentView(stored.studentView)
+        ? stored.studentView
+        : isStudentView(stored.currentView)
+          ? stored.currentView
+          : null;
+
+      if (storedRole) setRole(storedRole);
+      if (storedStudentView) setStudentView(storedStudentView);
+      if (isTeacherView(stored.teacherView)) setTeacherView(stored.teacherView);
+      if (storedRole === "teacher" && stored.currentView === "account") setTeacherView("account");
+      if (stored.teacherStudentFilter === "all" || stored.teacherStudentFilter === "attention") {
+        setTeacherStudentFilter(stored.teacherStudentFilter);
+      }
+      if (typeof stored.targetText === "string") setTargetText(stored.targetText);
+      if (stored.assessmentSession && typeof stored.assessmentSession === "object") {
+        setAssessmentSession({ ...defaultAssessmentSession(), ...stored.assessmentSession });
+      }
+      setLocalAssessmentProfiles(asArray<AssessmentProfile>(stored.assessmentProfiles, assessmentProfiles));
+      if (typeof stored.selectedSyllableId === "string") setSelectedSyllableId(stored.selectedSyllableId);
+      if (typeof stored.selectedStudentId === "string") setSelectedStudentId(stored.selectedStudentId);
+      setLocalTeacherStudents(asArray<TeacherStudent>(stored.teacherStudents, teacherStudents));
+      if (typeof stored.selectedToneDrill === "string") setSelectedToneDrill(stored.selectedToneDrill);
+      if (stored.practiceBackView === "" || stored.practiceBackView === "toneDrill") setPracticeBackView(stored.practiceBackView);
+      setPublishedTasks(asArray<StudentTaskPackage>(stored.publishedTasks, []));
+      setTaskSubmissions(asArray<TaskSubmission>(stored.taskSubmissions, []));
+      if (stored.taskStepProgress && typeof stored.taskStepProgress === "object") {
+        setTaskStepProgress(stored.taskStepProgress);
+      }
+      if (typeof stored.selectedTaskId === "string") setSelectedTaskId(stored.selectedTaskId);
+      if (typeof stored.activeTaskExerciseId === "string") setActiveTaskExerciseId(stored.activeTaskExerciseId);
+      if (Number.isFinite(Number(stored.activeTaskItemIndex))) setActiveTaskItemIndex(Number(stored.activeTaskItemIndex));
+      if (typeof stored.selectedReviewId === "string") setSelectedReviewId(stored.selectedReviewId);
+      if (stored.account && typeof stored.account === "object") {
+        setLocalAccount((current) => ({ ...current, ...stored.account }));
+        setAccountAvatar(stored.account.avatarDataUrl || "");
+      }
+      setLocalChatThreads(asArray<ChatThread>(stored.chatThreads, chatThreads));
+    }
+    setStorageReady(true);
+  }, []);
+
+  React.useEffect(() => {
+    if (!storageReady) return;
+    try {
+      const account = { ...localAccount, avatarDataUrl: accountAvatar };
+      window.localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({
+          role,
+          currentRole: role,
+          studentView,
+          currentView: role === "teacher" && teacherView !== "account" ? "teacher" : role === "teacher" ? "account" : role === "guest" ? "home" : studentView,
+          teacherView,
+          teacherStudentFilter,
+          targetText,
+          assessmentSession,
+          assessmentProfiles: localAssessmentProfiles,
+          selectedSyllableId,
+          selectedStudentId,
+          teacherStudents: localTeacherStudents,
+          selectedToneDrill,
+          practiceBackView,
+          publishedTasks,
+          taskSubmissions,
+          taskStepProgress,
+          selectedTaskId,
+          activeTaskExerciseId,
+          activeTaskItemIndex,
+          selectedReviewId,
+          account,
+          chatThreads: localChatThreads,
+        }),
+      );
+    } catch {
+      // Storage can fail in private windows; the demo still works for this session.
+    }
+  }, [
+    accountAvatar,
+    activeTaskExerciseId,
+    activeTaskItemIndex,
+    assessmentSession,
+    localAssessmentProfiles,
+    localAccount,
+    localChatThreads,
+    localTeacherStudents,
+    practiceBackView,
+    publishedTasks,
+    role,
+    selectedReviewId,
+    selectedStudentId,
+    selectedSyllableId,
+    selectedTaskId,
+    selectedToneDrill,
+    studentView,
+    storageReady,
+    targetText,
+    taskStepProgress,
+    taskSubmissions,
+    teacherStudentFilter,
+    teacherView,
+  ]);
 
   React.useEffect(() => {
     // A signed-in visitor should land in the student flow instead of the guest role picker.
@@ -685,11 +883,16 @@ export function LegacyApp({
   }
 
   function loginLocalAccount(nextRole: Exclude<Role, "guest">, username: string, password: string) {
+    const dateKey = todayDateKey();
     setLocalAccount({
+      ...localAccount,
       isLoggedIn: true,
+      isRegistered: true,
       username,
       displayName: username || localAccount.displayName || "User",
       password,
+      lastLoginAt: dateKey,
+      registeredAt: localAccount.registeredAt || dateKey,
     });
     setRole(nextRole);
     setPracticeBackView("");
@@ -709,11 +912,6 @@ export function LegacyApp({
   // Start microphone capture, then submit the collected blob when recording stops.
   async function startRecording(context: RecordingContext = "practice") {
     setMessage("");
-    if (!user) {
-      setStudentView("account");
-      showToast("Log in before recording.");
-      return;
-    }
     if (!navigator.mediaDevices?.getUserMedia) {
       setMessage("This browser does not support microphone recording.");
       return;
@@ -752,6 +950,23 @@ export function LegacyApp({
     setBusy(true);
     let createdAttemptId = "";
     try {
+      if (!user) {
+        setAnalysis(fallbackAnalysis);
+        setTeachingClipPlan(null);
+        setSelectedClipSegmentIndex(0);
+        if (context === "entryAssessment") {
+          completeAssessmentItem(fallbackAssessmentResult(assessmentSession));
+          showToast("This item is recorded. Continue to the next item.");
+        } else if (context === "task") {
+          completeTaskRecording(fallbackAnalysis, recordingUrlRef.current);
+          showToast("This step is saved. Continue to the next step.");
+        } else {
+          showToast("Analysis complete.");
+        }
+        setMessage("");
+        return;
+      }
+
       const { attempt } = await createPracticeAttempt(targetText);
       createdAttemptId = attempt.id;
       setAttempts((current) => [attempt, ...current]);
@@ -1282,8 +1497,8 @@ export function LoadingShell() {
 // Shared frame for the mobile-style legacy screens.
 function PhoneShell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="block min-h-screen p-0 sm:grid sm:place-items-center sm:px-4 sm:py-7">
-      <div className="relative h-[100dvh] min-h-[620px] w-full overflow-hidden bg-[var(--paper)] sm:h-[min(884px,calc(100vh-56px))] sm:min-h-[690px] sm:w-[min(100%,410px)] sm:rounded-[46px] sm:border-[9px] sm:border-[var(--navy)] sm:shadow-[var(--shadow)]">
+    <div className="grid min-h-screen place-items-center px-4 py-7 max-[639px]:p-0">
+      <div className="relative h-[min(884px,calc(100vh-56px))] min-h-[690px] w-[min(100%,410px)] overflow-hidden rounded-[46px] border-[9px] border-[var(--navy)] bg-[var(--paper)] shadow-[var(--shadow)] max-[639px]:h-[100dvh] max-[639px]:min-h-[620px] max-[639px]:w-full max-[639px]:rounded-none max-[639px]:border-0 max-[639px]:shadow-none">
         {children}
       </div>
     </div>
@@ -1294,7 +1509,7 @@ function PhoneShell({ children }: { children: React.ReactNode }) {
 function HomeScreen({ onSelectRole }: { onSelectRole: (role: Exclude<Role, "guest">) => void }) {
   return (
     <section
-      className={cn(screenClass, "flex min-h-full flex-col bg-[linear-gradient(180deg,rgba(25,26,47,0.96),rgba(25,26,47,0.92)_46%,var(--paper)_46%),var(--paper)]")}
+      className={cn(screenClass, "flex min-h-full flex-col [background:linear-gradient(180deg,rgba(25,26,47,0.96),rgba(25,26,47,0.92)_46%,var(--paper)_46%),var(--paper)]")}
       data-screen="home"
     >
       <header className="min-h-[315px] px-[22px] pt-[38px] pb-[30px] text-[var(--ink)]">
@@ -1353,7 +1568,7 @@ function BrandHeader({
       </div>
       <div className="flex items-center justify-between">
         <h1 className="m-0 text-2xl font-semibold tracking-normal">
-          <span className="font-[var(--serif)] text-[var(--red)]">VoiceSight</span> · {progress ? "My Progress" : "See My Voice"}
+          <span className="font-(family-name:--serif) text-[var(--red)]">VoiceSight</span> · {progress ? "My Progress" : "See My Voice"}
         </h1>
         {progress ? (
           <button className="min-h-9 rounded-full border border-[rgba(255,255,255,0.2)] px-[11px] py-[7px] text-xs text-[rgba(255,255,255,0.72)]" type="button">
@@ -1468,7 +1683,7 @@ function PracticeScreen({
             Custom Practice
           </label>
           <input
-            className="block w-full border-0 bg-transparent text-center font-[var(--serif)] text-[37px] leading-[1.25] font-normal tracking-[0.08em] text-white placeholder:text-[rgba(255,255,255,0.34)] focus:outline-0"
+            className="block w-full border-0 bg-transparent text-center font-(family-name:--serif) text-[37px] leading-[1.25] font-normal tracking-[0.08em] text-white placeholder:text-[rgba(255,255,255,0.34)] focus:outline-0"
             id="target-text"
             value={targetText}
             onChange={(event) => onTextChange(event.target.value)}
@@ -1554,7 +1769,7 @@ function PracticeScreen({
                 onClick={() => onSelectSyllable(item.id)}
               >
                 <span>
-                  <strong className="block font-[var(--serif)] text-[30px] leading-none">{item.character}</strong>
+                  <strong className="block font-(family-name:--serif) text-[30px] leading-none">{item.character}</strong>
                   <span className="mt-[5px] block text-[11px] text-[var(--muted)]">
                     {item.pinyin} · {item.tone} · {Math.round(item.score)}
                   </span>
@@ -1625,7 +1840,7 @@ function PinyinDiagnosisCard({
               return (
                 <details className="rounded-[14px] border border-[var(--line)] bg-[#fbfaf7] p-3" key={`${issue.index ?? index}-${issue.type || "issue"}`}>
                   <summary className="grid cursor-pointer grid-cols-[auto_1fr] items-center gap-2 text-left">
-                    <span className="font-[var(--serif)] text-[30px] leading-none text-[var(--red)]">{summary.character}</span>
+                    <span className="font-(family-name:--serif) text-[30px] leading-none text-[var(--red)]">{summary.character}</span>
                     <span>
                       <strong className="block text-[13px] text-[var(--ink)]">{summary.shortIssue}</strong>
                       <small className="block text-[11px] text-[var(--muted)]">{summary.label}</small>
@@ -1686,7 +1901,7 @@ function DetailScreen({
               {syllable.pinyin} · {syllable.tone} · Current {Math.round(syllable.score)}
             </p>
           </div>
-          <div className="font-[var(--serif)] text-[64px] leading-none text-[var(--red)]" aria-hidden="true">
+          <div className="font-(family-name:--serif) text-[64px] leading-none text-[var(--red)]" aria-hidden="true">
             {syllable.character}
           </div>
         </div>
@@ -1709,7 +1924,7 @@ function DetailScreen({
                 aria-pressed={item.id === syllable.id}
                 key={item.id}
               >
-                <strong className="font-[var(--serif)] text-[22px] leading-none">{item.character}</strong>
+                <strong className="font-(family-name:--serif) text-[22px] leading-none">{item.character}</strong>
                 <span className={`text-[10px] font-extrabold leading-none ${item.id === syllable.id ? "text-[var(--green)]" : "text-[var(--muted)]"}`}>{item.pinyin}</span>
               </button>
             ))}
@@ -1830,7 +2045,7 @@ function ProgressScreen({
                 return (
                   <button className="w-full rounded-[14px] border border-[var(--line)] bg-[var(--surface)] px-3.5 py-3 text-left" type="button" key={attempt.id}>
                     <span className="flex items-center justify-between gap-3">
-                      <strong className="font-[var(--serif)] text-[23px]">{attempt.targetText || attempt.text}</strong>
+                      <strong className="font-(family-name:--serif) text-[23px]">{attempt.targetText || attempt.text}</strong>
                       <span className="text-[10px] text-[var(--muted)]">
                         {attempt.status === "complete"
                           ? `${Math.round(score)} · ${statusFromScore(score)}`
@@ -2096,7 +2311,7 @@ function ToneDrillScreen({
             <h1 className="mt-[18px] mb-1.5 text-[28px] leading-none text-white">{drill.label}</h1>
             <p className="m-0 max-w-[250px] text-[13px] leading-[1.55] text-[rgba(255,255,255,0.48)]">{drill.description}</p>
           </div>
-          <div className="font-[var(--serif)] text-[88px] leading-[0.9] text-[var(--red)]" aria-hidden="true">
+          <div className="font-(family-name:--serif) text-[88px] leading-[0.9] text-[var(--red)]" aria-hidden="true">
             {drill.tone}
           </div>
         </div>
@@ -2109,7 +2324,7 @@ function ToneDrillScreen({
         </section>
         <div className="grid grid-cols-3 gap-2.5">
           {drill.words.map((word) => (
-            <button className="min-h-[84px] rounded-2xl border border-[var(--line)] bg-[var(--surface)] font-[var(--serif)] text-4xl text-[var(--ink)] shadow-[inset_0_-1px_rgba(207,200,189,0.2)] active:bg-[var(--green-soft)]" type="button" key={word} onClick={() => onChooseWord(word)}>
+            <button className="min-h-[84px] rounded-2xl border border-[var(--line)] bg-[var(--surface)] font-(family-name:--serif) text-4xl text-[var(--ink)] shadow-[inset_0_-1px_rgba(207,200,189,0.2)] active:bg-[var(--green-soft)]" type="button" key={word} onClick={() => onChooseWord(word)}>
               {word}
             </button>
           ))}
@@ -2173,7 +2388,7 @@ function TeachingClipScreen({
             <h1 className="m-0 text-xl text-white">{plan.title}</h1>
             <p className="mt-[5px] mb-0 text-xs text-[rgba(255,255,255,0.48)]">Target sentence: {plan.targetText}</p>
           </div>
-          <div className="font-[var(--serif)] text-[64px] leading-none text-[var(--red)]" aria-hidden="true">
+          <div className="font-(family-name:--serif) text-[64px] leading-none text-[var(--red)]" aria-hidden="true">
             {plan.targetSyllable.character}
           </div>
         </div>
@@ -2432,7 +2647,7 @@ function StudentTaskContent({
           ? "Record Again and Submit"
           : "Start Recording and Submit";
     return (
-      <section className={cn(panelClass, "grid gap-3 border-[rgba(32,154,120,0.24)] bg-[linear-gradient(135deg,rgba(32,154,120,0.1),transparent_52%),#fff]")}>
+      <section className={cn(panelClass, "grid gap-3 border-[rgba(32,154,120,0.24)] [background:linear-gradient(135deg,rgba(32,154,120,0.1),transparent_52%),#fff]")}>
         <button className={`${secondaryTeacherButtonClass} justify-self-start`} type="button" onClick={onBackToSteps}>
           Back to Tasks
         </button>
@@ -2507,7 +2722,7 @@ function StudentTaskContent({
 
   return (
     <>
-      <section className={cn(panelClass, "grid gap-3 border-[rgba(32,154,120,0.24)] bg-[linear-gradient(135deg,rgba(32,154,120,0.1),transparent_52%),#fff]")}>
+      <section className={cn(panelClass, "grid gap-3 border-[rgba(32,154,120,0.24)] [background:linear-gradient(135deg,rgba(32,154,120,0.1),transparent_52%),#fff]")}>
         <span className={modelKickerClass}>Practice Pack</span>
         <div className="grid grid-cols-[1fr_auto] items-start gap-2.5">
           <div>
@@ -4067,7 +4282,7 @@ function AccountScreen({
         </div>
       </header>
       <div className={contentClass}>
-        <section className={cn(panelClass, "grid gap-3.5 border-[rgba(32,154,120,0.22)] bg-[linear-gradient(135deg,rgba(32,154,120,0.09),transparent_48%),var(--surface)]")} aria-labelledby="account-profile-title">
+        <section className={cn(panelClass, "grid gap-3.5 border-[rgba(32,154,120,0.22)] [background:linear-gradient(135deg,rgba(32,154,120,0.09),transparent_48%),var(--surface)]")} aria-labelledby="account-profile-title">
           <div className="grid grid-cols-[auto_1fr] items-center gap-3.5">
             <label className="grid cursor-pointer justify-items-center gap-[7px] text-[11px] font-extrabold text-[var(--green)]" aria-label="Change avatar">
               <Avatar name={displayName} src={avatarDataUrl} className="grid size-[58px] place-items-center rounded-full bg-[var(--green)] text-[23px] font-black text-white object-cover" />
@@ -4182,24 +4397,31 @@ function AppNav({
   // Guests stay on the role picker and do not need tab navigation.
   if (role === "guest") return <nav className="hidden" aria-label="Main pages" hidden />;
 
+  const activeTeacherView =
+    teacherView === "assessmentEditor" || teacherView === "taskPackageEditor"
+      ? "tasks"
+      : teacherView === "reviewEditor"
+        ? "reviews"
+        : teacherView;
+
   // Teachers use the management tabs from legacy data.
   if (role === "teacher") {
     return (
       <nav
-        className="absolute inset-x-0 bottom-0 z-[5] grid grid-cols-6 border-t border-[rgba(207,200,189,0.92)] bg-[rgba(255,254,250,0.94)] px-2.5 pt-[7px] pb-[calc(7px+env(safe-area-inset-bottom))] backdrop-blur-2xl"
+        className="absolute inset-x-0 bottom-0 z-[5] grid grid-cols-6 border-t border-[rgba(207,200,189,0.92)] bg-[rgba(255,254,250,0.94)] px-2.5 pt-[7px] pb-[calc(7px+env(safe-area-inset-bottom))] backdrop-blur-[16px]"
         aria-label="Main pages"
       >
         {teacherNavItems.map((item) => (
           <button
             className={`grid min-h-[51px] place-items-center content-center gap-px rounded-xl text-[11px] ${
-              item.view === teacherView
+              item.view === activeTeacherView
                 ? "bg-[var(--red-soft)] font-extrabold text-[var(--red)]"
                 : "text-[var(--muted)]"
             }`}
             type="button"
             key={item.view}
             data-teacher-view={item.view}
-            aria-current={item.view === teacherView ? "page" : "false"}
+            aria-current={item.view === activeTeacherView ? "page" : "false"}
             onClick={() => onTeacherView(item.view)}
           >
             <span className="text-[9px] tracking-[0.12em]">{item.index}</span>
@@ -4211,12 +4433,14 @@ function AppNav({
   }
 
   // Learners use the practice-focused tabs from legacy data.
-  const activeStudentView = ["entryAssessment", "toneDrill", "teachingClip"].includes(studentView)
+  const activeStudentView = ["detail", "entryAssessment", "toneDrill", "teachingClip"].includes(studentView)
     ? "practice"
+    : studentView === "taskDetail"
+      ? "tasks"
     : studentView;
   return (
     <nav
-      className="absolute inset-x-0 bottom-0 z-[5] grid grid-cols-5 border-t border-[rgba(207,200,189,0.92)] bg-[rgba(255,254,250,0.94)] px-2.5 pt-[7px] pb-[calc(7px+env(safe-area-inset-bottom))] backdrop-blur-2xl"
+      className="absolute inset-x-0 bottom-0 z-[5] grid grid-cols-5 border-t border-[rgba(207,200,189,0.92)] bg-[rgba(255,254,250,0.94)] px-2.5 pt-[7px] pb-[calc(7px+env(safe-area-inset-bottom))] backdrop-blur-[16px]"
       aria-label="Main pages"
     >
       {studentNavItems.map((item) => (
