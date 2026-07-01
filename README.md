@@ -1,99 +1,96 @@
 # See My Voice
 
-See My Voice is a Mandarin pronunciation practice prototype for foreign learners. This `english-version` branch keeps the interface, teacher workflow, and documentation in English while preserving Mandarin characters, pinyin, and sample sentences as practice content.
+See My Voice is a Mandarin pronunciation practice app for foreign learners. The current branch keeps the original prototype workflow available while moving the main product toward a production-shaped TypeScript stack.
 
-This branch keeps two runnable app paths:
+Current main app:
 
-- `frontend/` and `backend/`: the TypeScript account-based app path with Next.js, Express, MongoDB, JWT auth, and a pronunciation proxy.
-- `web/`, `src/`, `tests/`, and `tools/`: the original local Python analysis prototype and its static browser UI.
+```text
+Next.js React frontend
+  -> Express API
+  -> MongoDB
+  -> Python/FunASR pronunciation analysis service
+```
 
-The Python prototype is still used for the current FunASR pronunciation workflow. Do not remove it unless the branch is intentionally moving fully to the TypeScript app.
+The React frontend now mirrors the old `web/` interface using TypeScript and Tailwind. The Python prototype remains in the repository because it still contains the local FunASR analysis service and the original static UI.
 
 ## Repository Layout
 
 ```text
 .
-├── backend/                           # Express API, MongoDB, JWT auth
-├── frontend/                          # Next.js + React app
-├── samples/                           # Sample/evaluation manifests
-├── src/                               # Python pronunciation and ASR analysis code
-├── tests/                             # Python tests
-├── tools/                             # Clip, image, and analysis helper scripts
-├── web/                               # Static browser app and local Python API server
-├── index.html                         # Redirects static hosting root to web/
-├── package.json                       # Node workspace scripts
-├── package-lock.json                  # Node lockfile
-└── requirements.txt                   # Python dependencies
+├── frontend/              # Next.js + React + Tailwind UI
+├── backend/               # Express API, MongoDB, JWT auth
+├── web/                   # Original static UI and local Python HTTP API
+├── src/                   # Python pronunciation, ASR, and analysis code
+├── tests/                 # Python analysis tests
+├── tools/                 # Clip, image, and analysis helper scripts
+├── samples/               # Sample audio and evaluation manifests
+├── VERCEL_DEPLOYMENT.md   # Detailed Vercel deployment guide
+├── vercel.json            # Root frontend deployment config
+├── package.json           # Node workspace scripts
+└── requirements.txt       # Python dependencies
 ```
 
-## Branch State
+## Current App Flow
 
-- Primary development branch: `main`
-- Current stable version tag: `v4.0`
-- Compatibility branch: `seemyvoice-4.0`
-- TypeScript app: run locally from the root workspace scripts.
-
-Use short-lived branches for new work:
+Practice flow:
 
 ```text
-feature/<short-name>
-fix/<short-name>
-chore/<short-name>
+1. User logs in.
+2. User records audio in the Next.js frontend.
+3. Frontend uploads text and audio to the Express backend.
+4. Backend stores attempt metadata and audio.
+5. Backend calls the Python pronunciation service when configured.
+6. Python returns scores, pinyin diagnosis, tone timing, and syllable feedback.
+7. Backend stores the normalized result.
+8. Frontend renders the result from backend data.
 ```
 
-## TypeScript App
-
-The TypeScript app has a Next.js frontend and an Express backend.
-
-Backend capabilities:
-
-- Register and login users.
-- Store users and login events in MongoDB.
-- Hash passwords with bcrypt.
-- Issue JWTs.
-- Store practice attempts, uploaded recording metadata, analysis results, tasks, submissions, reviews, and chat records in MongoDB.
-- Call the Python pronunciation analysis service through `PRONUNCIATION_API_URL` when configured.
-
-Frontend capabilities:
-
-- Account login/register screens.
-- Practice screen with microphone recording.
-- Practice attempts loaded from the backend after login.
-- Progress and detail screens.
-- API calls through `/api/*` routes.
-
-### Target Structure
-
-The production-shaped path is:
+Teacher flow:
 
 ```text
-Next.js frontend
-  -> Express API
-  -> MongoDB source of truth
-  -> Python/FunASR pronunciation service
-  -> local development audio storage now, object storage later
+Teacher creates task
+  -> backend stores task
+Student completes task
+  -> backend stores submission and analysis
+Teacher reviews submission
+  -> backend stores feedback
+Student sees feedback in task/progress views
 ```
 
-The first migrated slice is practice attempts:
+Some teacher/task/chat screens still use sample data or local demo state while backend persistence is being filled in.
+
+## Requirements
+
+- Node.js and npm
+- MongoDB for the backend
+- Python 3 for the local pronunciation prototype
+
+For local MongoDB, use a running instance at:
 
 ```text
-1. Frontend creates `/api/attempts`.
-2. Frontend uploads recording to `/api/attempts/:attemptId/analyze`.
-3. Backend stores the audio under `backend/.uploads/` for local development.
-4. Backend sends the audio and target text to `PRONUNCIATION_API_URL`.
-5. Backend stores the normalized analysis result on the attempt.
-6. Frontend displays the stored attempt in progress.
+mongodb://127.0.0.1:27017
 ```
 
-The `web/` prototype remains the richer local FunASR workflow while teacher/task/chat screens are migrated into backend-backed Next.js screens.
+For deployment, use MongoDB Atlas or another hosted MongoDB provider.
 
-### Environment
+## Install
 
-Install Node dependencies:
+From the repository root:
 
 ```bash
 npm install
 ```
+
+Optional Python setup for the local FunASR/prototype service:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+```
+
+## Environment
 
 Create backend config:
 
@@ -101,9 +98,9 @@ Create backend config:
 cp backend/.env.example backend/.env
 ```
 
-Edit `backend/.env`:
+Default local backend values:
 
-```text
+```env
 PORT=8080
 MONGODB_URI=mongodb://127.0.0.1:27017
 MONGODB_DB=see_my_voice
@@ -115,10 +112,21 @@ SEED_NAME=Jiawen
 PRONUNCIATION_API_URL=
 ```
 
-The seed variables are optional. If `SEED_USERNAME` and `SEED_PASSWORD` are set, the backend creates or updates that user during startup.
-For local analysis with the Python prototype, set `PRONUNCIATION_API_URL=http://127.0.0.1:4173` after starting `web/server.py`.
+Create frontend config:
 
-### Run
+```bash
+cp frontend/.env.example frontend/.env.local
+```
+
+Default local frontend value:
+
+```env
+NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8080
+```
+
+`PRONUNCIATION_API_URL` is optional for starting the backend. Logged-in backend recording analysis will fail until this points to a running pronunciation service; local/demo UI flows can still show fallback practice data.
+
+## Run The TypeScript App
 
 Start the backend:
 
@@ -138,44 +146,17 @@ Open:
 http://127.0.0.1:3000
 ```
 
-For local development, set the browser API base URL to the Express backend:
+Backend health check:
 
 ```text
-NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8080
+http://127.0.0.1:8080/api/health
 ```
 
-Without `NEXT_PUBLIC_API_BASE_URL`, the frontend calls same-origin `/api/*`, which only works when a deployment layer routes those requests to the backend.
+## Run Pronunciation Analysis Locally
 
-### Verify
+The Python prototype serves the local `/api/analyze` endpoint used by the backend.
 
-```bash
-npm run typecheck
-npm run build
-```
-
-The backend needs a reachable MongoDB instance for runtime startup. Typechecking does not require MongoDB.
-
-## Python Web Prototype
-
-The `web/` app serves the original static UI and local Python API. It calls the analysis modules in `src/`.
-
-Python API endpoints:
-
-- `GET /api/health`
-- `GET /api/text-info?text=...`
-- `POST /api/analyze`
-- `POST /api/tts`
-
-Install Python dependencies:
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
-```
-
-Run locally:
+Start it:
 
 ```bash
 cd web
@@ -188,52 +169,120 @@ Open:
 http://127.0.0.1:4173
 ```
 
-The server defaults `SEE_MY_VOICE_DIR` to the repository root, so setting it explicitly is only needed when running from an unusual checkout layout.
+Then set this in `backend/.env`:
 
-For Windows:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File tools\start_web_server.ps1
+```env
+PRONUNCIATION_API_URL=http://127.0.0.1:4173
 ```
 
-The browser reads `window.SEE_MY_VOICE_API_BASE` from `web/config.js`.
+Restart the backend after changing `.env`.
 
-- Local same-origin server: `window.SEE_MY_VOICE_API_BASE = "";`
-- Hosted static frontend with separate backend: set it to the public HTTPS backend origin.
+Python API endpoints:
 
-## Analysis Scripts
+```text
+GET  /api/health
+GET  /api/text-info?text=...
+POST /api/analyze
+POST /api/tts
+```
 
-Run one Stage 1 tone/timing analysis:
+## Verify
+
+TypeScript checks:
+
+```bash
+npm run typecheck
+```
+
+Production build:
+
+```bash
+npm run build
+```
+
+Python tests:
+
+```bash
+python -m unittest discover tests
+```
+
+Web prototype tests:
+
+```bash
+cd web
+node --test tests/state.test.js tests/integration.test.js
+```
+
+## Deployment
+
+The recommended Vercel deployment uses two projects:
+
+```text
+backend project
+  Root Directory: backend
+  Build Command: npm run build
+
+frontend project
+  Root Directory: frontend
+  Build Command: npm run build
+```
+
+Backend environment variables:
+
+```env
+MONGODB_URI=mongodb+srv://...
+MONGODB_DB=see_my_voice
+JWT_SECRET=<long-random-secret>
+FRONTEND_ORIGIN=https://<your-frontend-project>.vercel.app
+PRONUNCIATION_API_URL=https://<your-pronunciation-service>
+SEED_USERNAME=<optional-demo-user>
+SEED_PASSWORD=<optional-demo-password>
+SEED_NAME=<optional-demo-display-name>
+```
+
+Frontend environment variable:
+
+```env
+NEXT_PUBLIC_API_BASE_URL=https://<your-backend-project>.vercel.app
+```
+
+There is also a root `vercel.json` for deploying the frontend from the repository root. In that mode, set:
+
+```env
+BACKEND_URL=https://<your-backend-project>.vercel.app
+```
+
+Full deployment steps are in `VERCEL_DEPLOYMENT.md`.
+
+## Useful Analysis Commands
+
+Run Stage 1 tone/timing analysis:
 
 ```bash
 python src/stage1_pronunciation.py --text "我要吃饭" --audio samples/sample.wav
 ```
 
-Run one ASR baseline:
+Run ASR baseline:
 
 ```bash
 python src/run_asr_baseline.py single --audio samples/sample.wav --text "我要吃饭"
 ```
 
-Run one combined Stage 2B report:
+Run combined Stage 2B report:
 
 ```bash
 python src/run_stage2b_combined.py single --audio samples/sample.wav --text "我要吃饭"
 ```
 
-Batch commands write generated output folders that are intentionally ignored by git.
-
 ## Pronunciation Clips
 
-The web app reads generated clip metadata from:
+The prototype reads clip metadata from:
 
 ```text
 web/assets/pronunciation-clips/manifest.json
 ```
 
-Generated clips live beside that manifest as `initial-<unit>.mp4` and `final-<unit>.mp4`.
-
-Useful commands:
+Useful clip commands:
 
 ```bash
 python tools/auto_segment_pronunciation_source.py
@@ -247,46 +296,30 @@ Manual clip demo:
 http://127.0.0.1:4173/?demoClip=1
 ```
 
-## Tests
-
-Python tests:
-
-```bash
-python -m unittest discover tests
-```
-
-Web state and integration tests:
-
-```bash
-cd web
-node --test tests/state.test.js tests/integration.test.js
-```
-
-TypeScript checks:
-
-```bash
-npm run typecheck
-```
-
 ## Generated Files
 
-These files and directories are local outputs and should not be committed:
+Do not commit local outputs:
 
-- `.venv/`
-- `node_modules/`
-- `backend/dist/`
-- `frontend/.next/`
-- `*.tsbuildinfo`
-- `__pycache__/`
-- `web/.analysis_debug/`
-- `web/.tts_cache/`
-- `stage1_plots/`
-- `asr_baseline_results/`
-- `stage2b_combined_results/`
-- `stage2b_eval_results/`
-- `stage3a_label_results/`
-- `stage3b_dataset/`
-- `stage3c_ctc_inspection/`
-- local recordings such as `*.wav`, `*.m4a`, and `*.mp3`
+```text
+.venv/
+node_modules/
+backend/dist/
+backend/.uploads/
+frontend/.next/
+*.tsbuildinfo
+__pycache__/
+web/.analysis_debug/
+web/.tts_cache/
+stage1_plots/
+asr_baseline_results/
+stage2b_combined_results/
+stage2b_eval_results/
+stage3a_label_results/
+stage3b_dataset/
+stage3c_ctc_inspection/
+*.wav
+*.m4a
+*.mp3
+```
 
 Do not commit API keys, access tokens, private recordings, generated debug output, or machine-specific paths.
