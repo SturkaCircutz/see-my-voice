@@ -7,6 +7,7 @@ import {
   fetchPracticeAttempts,
   getToken,
   loginUser,
+  registerUser,
   setToken,
 } from "../api";
 import { LegacyApp } from "../LegacyApp";
@@ -34,10 +35,33 @@ function App() {
   }, [user]);
 
   // Store the JWT in localStorage through the shared API helper.
-  function handleAuthed(payload: { token: string; user: AuthUser }) {
+  const handleAuthed = React.useCallback((payload: { token: string; user: AuthUser }) => {
     setToken(payload.token);
     setUser(payload.user);
-  }
+  }, []);
+
+  const authenticateAccount = React.useCallback(
+    async (username: string, password: string) => {
+      try {
+        handleAuthed(await loginUser({ username, password }));
+        return;
+      } catch (loginError) {
+        const message = loginError instanceof Error ? loginError.message : "";
+        if (!message.toLowerCase().includes("incorrect")) throw loginError;
+      }
+
+      try {
+        handleAuthed(await registerUser({ username, password, name: username }));
+      } catch (registerError) {
+        const message = registerError instanceof Error ? registerError.message : "";
+        if (message.toLowerCase().includes("already registered")) {
+          throw new Error("That account already exists. Check the password and try again.");
+        }
+        throw registerError;
+      }
+    },
+    [handleAuthed],
+  );
 
   // Clear all user-scoped UI state when the session ends.
   function handleLogout() {
@@ -52,9 +76,7 @@ function App() {
       user={user}
       attempts={attempts}
       setAttempts={setAttempts}
-      onLogin={(username, password) =>
-        loginUser({ username, password }).then(handleAuthed)
-      }
+      onLogin={authenticateAccount}
       onLogout={handleLogout}
     />
   );

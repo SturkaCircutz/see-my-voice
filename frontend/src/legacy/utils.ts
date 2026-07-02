@@ -20,7 +20,19 @@ export function normalizeSyllables(items?: SyllableFeedback[]): LegacySyllable[]
 
 // Prefer the newest completed attempt when no fresh in-session analysis exists.
 export function latestCompleteAnalysis(attempts: PracticeAttempt[]): PronunciationAnalysis | null {
-  return attempts.find((attempt) => attempt.analysis)?.analysis || null;
+  return attempts.find((attempt) => attempt.analysis && isUsableAnalysis(attempt.analysis))?.analysis || null;
+}
+
+export function isUsableAnalysis(analysis: PronunciationAnalysis): boolean {
+  const raw = analysis.raw;
+  const speechRegion = raw && typeof raw === "object"
+    ? (raw as { tone_timing?: { speech_region?: { reason?: string } } }).tone_timing?.speech_region
+    : null;
+  const noSpeechEnergy = speechRegion?.reason === "No clear speech energy was detected.";
+  const hasAnySyllableSignal = analysis.syllables.some((syllable) => syllable.score > 0);
+  const hasAnyScoreSignal = analysis.scores.overall > 0 || analysis.scores.tone > 0 || analysis.scores.clarity > 0;
+
+  return !noSpeechEnergy || hasAnySyllableSignal || hasAnyScoreSignal;
 }
 
 // Scores can live on the nested analysis or legacy attempt shape.

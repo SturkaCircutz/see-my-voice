@@ -65,6 +65,7 @@ import {
   syllableStatusPillClass,
   toastClass,
   toastVisibleClass,
+  warnStatusPillClass,
 } from "./styles";
 import {
   attemptScore,
@@ -192,6 +193,63 @@ const assessmentSectionClass = `${panelClass} grid gap-3.5`;
 const teacherFilterButtonBaseClass = "min-h-[38px] rounded-[10px] bg-[#f2eee7] px-2.5 py-2 text-left text-xs font-extrabold text-[var(--navy)]";
 type TeacherStudentFilter = "all" | "attention";
 type RecordingContext = "practice" | "entryAssessment" | "task";
+
+declare global {
+  interface Window {
+    webkitAudioContext?: typeof AudioContext;
+  }
+}
+
+const databaseSections = [
+  {
+    collection: "users",
+    section: "Account",
+    data: "Learner and teacher profiles, login counters, and session identity.",
+    documents: 1,
+  },
+  {
+    collection: "login_events",
+    section: "Authentication",
+    data: "Register and login activity used for account history.",
+    documents: 2,
+  },
+  {
+    collection: "practice_attempts",
+    section: "Practice Today",
+    data: "Target text, recording status, audio key, scores, and pronunciation feedback.",
+    documents: 3,
+  },
+  {
+    collection: "tasks",
+    section: "Teacher Tasks",
+    data: "Practice packs assigned by a teacher to a learner.",
+    documents: 0,
+  },
+  {
+    collection: "task_submissions",
+    section: "Student Submissions",
+    data: "Completed task recordings linked back to attempts.",
+    documents: 0,
+  },
+  {
+    collection: "reviews",
+    section: "Teacher Review",
+    data: "Teacher feedback and optional scores for submitted work.",
+    documents: 0,
+  },
+  {
+    collection: "chat_threads",
+    section: "Messages",
+    data: "Conversation containers for learner-teacher chat.",
+    documents: 0,
+  },
+  {
+    collection: "chat_messages",
+    section: "Messages",
+    data: "Individual chat messages inside each thread.",
+    documents: 0,
+  },
+] as const;
 const progressWidthClasses = [
   "w-0",
   "w-[5%]",
@@ -724,9 +782,12 @@ export function LegacyApp({
   // Recording and toast refs hold browser objects that should not trigger rerenders.
   const mediaRecorder = React.useRef<MediaRecorder | null>(null);
   const chunks = React.useRef<Blob[]>([]);
+  const audioContextRef = React.useRef<AudioContext | null>(null);
+  const recordingSignalRef = React.useRef({ peak: 0, hasSignal: false });
   const toastTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const recordingUrlRef = React.useRef("");
   const recordingContextRef = React.useRef<RecordingContext>("practice");
+  const accountSyncAttemptedRef = React.useRef(false);
   const activeTaskRecordingRef = React.useRef<{ taskId: string; exerciseId: string; itemIndex: number } | null>(null);
   const [storageReady, setStorageReady] = React.useState(false);
 
@@ -842,10 +903,28 @@ export function LegacyApp({
   }, [role, user]);
 
   React.useEffect(() => {
+    if (!storageReady || user || accountSyncAttemptedRef.current) return;
+    if (!localAccount.isLoggedIn || !localAccount.username || !localAccount.password) return;
+
+    accountSyncAttemptedRef.current = true;
+    Promise.resolve(onLogin(localAccount.username, localAccount.password))
+      .then(() => showToast("Account saved to MongoDB."))
+      .catch(() => showToast("Sign in again to save this account to MongoDB."));
+  }, [
+    storageReady,
+    user,
+    localAccount.isLoggedIn,
+    localAccount.username,
+    localAccount.password,
+    onLogin,
+  ]);
+
+  React.useEffect(() => {
     // Clean up timers and microphone capture if the legacy app unmounts.
     return () => {
       if (toastTimer.current) clearTimeout(toastTimer.current);
       if (mediaRecorder.current?.state === "recording") mediaRecorder.current.stop();
+      audioContextRef.current?.close().catch(() => undefined);
       if (recordingUrlRef.current) URL.revokeObjectURL(recordingUrlRef.current);
     };
   }, []);
@@ -918,7 +997,38 @@ export function LegacyApp({
     }
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     chunks.current = [];
+    recordingSignalRef.current = { peak: 0, hasSignal: false };
     const recorder = new MediaRecorder(stream);
+    mediaRecorder.current = recorder;
+    let monitorSignal: (() => void) | null = null;
+    try {
+      const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
+      const audioContext = new AudioContextCtor();
+      const source = audioContext.createMediaStreamSource(stream);
+      const analyser = audioContext.createAnalyser();
+      analyser.fftSize = 2048;
+      source.connect(analyser);
+      const samples = new Float32Array(analyser.fftSize);
+      let animationFrame = 0;
+      monitorSignal = () => {
+        analyser.getFloatTimeDomainData(samples);
+        let peak = 0;
+        for (const sample of samples) peak = Math.max(peak, Math.abs(sample));
+        recordingSignalRef.current.peak = Math.max(recordingSignalRef.current.peak, peak);
+        if (peak > 0.01) recordingSignalRef.current.hasSignal = true;
+        if (mediaRecorder.current?.state === "recording") {
+          if (monitorSignal) animationFrame = window.requestAnimationFrame(monitorSignal);
+        }
+      };
+      audioContextRef.current = audioContext;
+      stream.getTracks()[0]?.addEventListener("ended", () => {
+        if (animationFrame) window.cancelAnimationFrame(animationFrame);
+        audioContext.close().catch(() => undefined);
+        if (audioContextRef.current === audioContext) audioContextRef.current = null;
+      });
+    } catch {
+      // Some browsers restrict audio analysis; the backend still validates silent uploads.
+    }
     // MediaRecorder delivers audio in chunks until the user taps finish.
     recorder.addEventListener("dataavailable", (event) => {
       if (event.data.size > 0) chunks.current.push(event.data);
@@ -926,15 +1036,22 @@ export function LegacyApp({
     recorder.addEventListener("stop", () => {
       stream.getTracks().forEach((track) => track.stop());
       const blob = new Blob(chunks.current, { type: recorder.mimeType || "audio/webm" });
+      audioContextRef.current?.close().catch(() => undefined);
+      audioContextRef.current = null;
+      if (!recordingSignalRef.current.hasSignal) {
+        setMessage("No voice was detected. Check that your microphone is not muted, then record again.");
+        showToast("No voice detected.");
+        return;
+      }
       if (recordingUrlRef.current) URL.revokeObjectURL(recordingUrlRef.current);
       const recordingUrl = URL.createObjectURL(blob);
       recordingUrlRef.current = recordingUrl;
       setLastRecordingUrl(recordingUrl);
       void submitRecording(blob, recordingContextRef.current);
     });
-    mediaRecorder.current = recorder;
     recordingContextRef.current = context;
     recorder.start();
+    monitorSignal?.();
     setRecording(true);
   }
 
@@ -1545,6 +1662,37 @@ function HomeScreen({ onSelectRole }: { onSelectRole: (role: Exclude<Role, "gues
           <strong className="text-[25px] tracking-normal text-[var(--ink)]">Mandarin Practice Management</strong>
           <p className="m-0 text-sm leading-[1.6] text-[var(--muted)]">Learner management, practice packs, recording reviews, and feedback chat.</p>
         </button>
+        <DatabaseOverview />
+      </div>
+    </section>
+  );
+}
+
+function DatabaseOverview() {
+  return (
+    <section className={cn(panelClass, "grid gap-3")} aria-labelledby="database-overview-title">
+      <div className="grid gap-1">
+        <span className={modelKickerClass}>Online Database</span>
+        <strong className="text-[17px] text-[var(--ink)]" id="database-overview-title">see_my_voice collections</strong>
+      </div>
+      <div className="overflow-hidden rounded-[12px] border border-[var(--line)] bg-white">
+        <img
+          className="block h-auto w-full"
+          src="/assets/see-my-voice-database.png"
+          alt="MongoDB Atlas see_my_voice database collection list"
+        />
+      </div>
+      <div className="grid gap-2">
+        {databaseSections.map((item) => (
+          <article className="grid gap-1 rounded-[12px] border border-[var(--line)] bg-[#fbfaf7] px-3 py-2.5" key={item.collection}>
+            <div className="grid grid-cols-[1fr_auto] items-center gap-2">
+              <strong className="text-[12px] text-[var(--ink)]">{item.section}</strong>
+              <span className={item.documents ? statusPillClass : warnStatusPillClass}>{item.documents} docs</span>
+            </div>
+            <code className="text-[11px] font-bold text-[var(--green)]">{item.collection}</code>
+            <p className="m-0 text-[11px] leading-[1.45] text-[var(--muted)]">{item.data}</p>
+          </article>
+        ))}
       </div>
     </section>
   );
@@ -1636,6 +1784,7 @@ function PracticeScreen({
 }: PracticeScreenProps) {
   // Copy and focus data are derived from the current recording and analysis state.
   const hasAnalysis = analysis !== fallbackAnalysis;
+  const hasOverallScore = Number.isFinite(scores.overall) && hasAnalysis;
   const recordCopy = busy
     ? "Analyzing..."
     : recording
@@ -1729,7 +1878,7 @@ function PracticeScreen({
           <div className="mb-[7px] grid grid-cols-[1fr_auto] items-end gap-3">
             <div>
               <span className={modelKickerClass}>Current Score</span>
-              <strong className="mt-0.5 block text-lg">{scores.overall ? `${Math.round(scores.overall)} ` : "Generated After Recording"}</strong>
+              <strong className="mt-0.5 block text-lg">{hasOverallScore ? `${Math.round(scores.overall)} ` : "Generated After Recording"}</strong>
             </div>
           <span className="block text-[11px] font-bold text-[var(--muted)]">{hasAnalysis && focusSyllable ? `Focus: ${focusSyllable.character}` : "Tone · Clarity · Rhythm"}</span>
           </div>
@@ -4224,7 +4373,8 @@ function AccountScreen({
   const [username, setUsername] = React.useState(user?.username || localAccount.username || "jiawen");
   const [password, setPassword] = React.useState(localAccount.password || "");
   const [busy, setBusy] = React.useState(false);
-  const signedIn = Boolean(user || localAccount.isLoggedIn);
+  const [formMessage, setFormMessage] = React.useState("");
+  const signedIn = Boolean(user);
   const displayName = user?.name || localAccount.displayName || (role === "teacher" ? "Ms. Wang" : "Chen Xiaohe");
   const participantId = role === "teacher" ? "teacher-main" : "student-chen";
   const unread = accountChatThreads
@@ -4242,16 +4392,12 @@ function AccountScreen({
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setBusy(true);
+    setFormMessage("");
     try {
-      if (user) {
-        onLocalLogin(role, username, password);
-        return;
-      }
-      try {
-        await onLogin(username, password);
-      } catch {
-        onLocalLogin(role, username, password);
-      }
+      await onLogin(username, password);
+      onLocalLogin(role, username, password);
+    } catch (error) {
+      setFormMessage(error instanceof Error ? error.message : "Account could not be saved.");
     } finally {
       setBusy(false);
     }
@@ -4290,9 +4436,9 @@ function AccountScreen({
               <span>Change avatar</span>
             </label>
             <div>
-              <span className={modelKickerClass}>{signedIn ? "Signed In" : "Local Demo Account"}</span>
+              <span className={modelKickerClass}>{signedIn ? "Signed In" : "MongoDB Account"}</span>
               <h2 className="m-0 text-[23px] text-[var(--ink)]" id="account-profile-title">{displayName}</h2>
-              <p className="m-0 text-[13px] leading-[1.7] text-[var(--muted)]">Current: {role === "teacher" ? "Teacher" : "Learner"}. Avatar and chat identity are saved in this browser.</p>
+              <p className="m-0 text-[13px] leading-[1.7] text-[var(--muted)]">Current: {role === "teacher" ? "Teacher" : "Learner"}. Account sign-in is saved in MongoDB; avatar and chat identity stay in this browser.</p>
             </div>
           </div>
           <div className="grid grid-cols-3 gap-2" aria-label="Account status">
@@ -4315,7 +4461,7 @@ function AccountScreen({
           <div className="grid grid-cols-[1fr_auto] items-start gap-2.5">
             <div>
               <span className={modelKickerClass}>Account Settings</span>
-              <h2 className="m-0 text-[23px] text-[var(--ink)]" id="account-login-title">{signedIn ? "Update Login Info" : "Log In to Demo Account"}</h2>
+              <h2 className="m-0 text-[23px] text-[var(--ink)]" id="account-login-title">{signedIn ? "Update Login Info" : "Log In or Create Account"}</h2>
             </div>
             <span className={statusPillClass}>{signedIn ? "Saved" : "Not Signed In"}</span>
           </div>
@@ -4362,8 +4508,13 @@ function AccountScreen({
               />
             </label>
             <button className={primaryTeacherButtonClass} type="submit" disabled={busy}>
-              {busy ? "Connecting..." : signedIn ? "Save Account" : "Log In"}
+              {busy ? "Connecting..." : signedIn ? "Save Account" : "Log In or Create"}
             </button>
+            {formMessage && (
+              <p className="m-0 rounded-xl bg-[var(--red-soft)] px-3 py-2 text-xs font-bold leading-[1.5] text-[var(--red)]">
+                {formMessage}
+              </p>
+            )}
             {signedIn && (
               <button className={secondaryTeacherButtonClass} type="button" onClick={onLogout}>
                 Log Out
@@ -4373,7 +4524,7 @@ function AccountScreen({
         </section>
 
         <section className="px-1 pt-0.5 pb-1.5 text-[11px] leading-[1.6] text-[var(--muted)]" aria-label="Local data note">
-          This is a local demo account and does not connect to a real authentication system. Clearing browser data also removes the avatar, account, and chat history.
+          Account credentials are stored by the backend in MongoDB. Clearing browser data removes only the local avatar, navigation state, and chat draft data.
         </section>
       </div>
     </section>

@@ -39,6 +39,7 @@ try:
     from stage1_pronunciation import (  # noqa: E402
         estimate_f0,
         f0_values_in_window,
+        ensure_recording_has_voice,
         load_audio,
         normalize_f0_shape,
         save_json,
@@ -648,6 +649,7 @@ class VoiceHandler(SimpleHTTPRequestHandler):
             raw_audio.write_bytes(audio_bytes)
             wav_audio = temp_path / "recording.wav"
             audio_for_model = browser_audio_to_wav(raw_audio, wav_audio)
+            ensure_recording_has_voice(audio_for_model)
 
             plot_dir = temp_path / "plots"
             model = get_model()

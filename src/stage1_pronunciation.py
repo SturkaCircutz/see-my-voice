@@ -23,6 +23,8 @@ from scipy.signal import resample_poly
 
 SAMPLE_RATE = 16_000
 HOP_LENGTH = 160
+MIN_RECORDING_PEAK = 1e-5
+MIN_RECORDING_RMS = 1e-7
 
 MANDARIN_INITIALS = [
     "zh",
@@ -164,6 +166,38 @@ def load_audio(path: Path, sample_rate: int = SAMPLE_RATE) -> tuple[np.ndarray, 
     if peak > 0:
         audio = audio / peak
     return audio.astype(np.float32), sr
+
+
+def recording_signal_stats(path: Path) -> dict[str, float]:
+    """Measure decoded audio before normalization so silence is not scored as speech."""
+    audio, sr = read_audio_file(path)
+    mono = np.mean(audio, axis=1)
+    finite = mono[np.isfinite(mono)]
+    duration = len(mono) / sr if sr else 0.0
+
+    if len(finite) == 0:
+        return {
+            "duration_seconds": duration,
+            "peak": 0.0,
+            "rms": 0.0,
+        }
+
+    return {
+        "duration_seconds": duration,
+        "peak": float(np.max(np.abs(finite))),
+        "rms": float(np.sqrt(np.mean(finite.astype(float) ** 2))),
+    }
+
+
+def ensure_recording_has_voice(path: Path) -> dict[str, float]:
+    """Reject empty or muted recordings before producing misleading zero scores."""
+    stats = recording_signal_stats(path)
+    if stats["peak"] < MIN_RECORDING_PEAK or stats["rms"] < MIN_RECORDING_RMS:
+        raise ValueError(
+            "No voice was detected in this recording. Check that the microphone is not muted, "
+            "then record again while speaking clearly."
+        )
+    return stats
 
 
 def estimate_f0(audio: np.ndarray, sr: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -823,6 +857,7 @@ def analyze_pronunciation_stage1(
         raise FileNotFoundError(f"Audio file not found: {audio_path}")
 
     syllable_parts = text_to_syllable_parts(text)
+    signal_stats = ensure_recording_has_voice(audio_path)
     audio, sr = load_audio(audio_path)
     duration = len(audio) / sr if sr else 0.0
     f0_times, f0, voiced_prob = estimate_f0(audio, sr)
@@ -874,6 +909,8 @@ def analyze_pronunciation_stage1(
             "path": str(audio_path),
             "sample_rate": sr,
             "duration_seconds": duration,
+            "input_peak": signal_stats["peak"],
+            "input_rms": signal_stats["rms"],
             "voiced_f0_frames": voiced_frames,
             "total_f0_frames": int(len(f0)),
             "mean_voicing_probability": float(np.nanmean(voiced_prob))
