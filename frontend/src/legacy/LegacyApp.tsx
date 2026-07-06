@@ -6,6 +6,9 @@ import {
   createPracticeAttempt,
   fetchPracticeAttempts,
 } from "../api";
+import { AppNav } from "./AppNav";
+import { HomeScreen, PhoneShell } from "./AppShell";
+import { AccountScreen } from "./AccountScreen";
 import { ArticulationReference } from "./ArticulationReference";
 import {
   chatThreads,
@@ -14,11 +17,9 @@ import {
   entryAssessmentItems,
   pinyinByText,
   questionBankPackages,
-  studentNavItems,
   studentTaskPackages,
   assessmentProfiles,
   studentQuickReplies,
-  teacherNavItems,
   teacherQuickReplies,
   teacherStudents,
   toneDrills,
@@ -35,11 +36,83 @@ import {
   type TeacherStudent,
   type TeacherView,
 } from "./data";
-import type { AuthUser, PinyinDiagnosisIssue, PracticeAttempt, PronunciationAnalysis, ScoreSet } from "../types";
+import type { AuthUser, PracticeAttempt, PronunciationAnalysis, ScoreSet } from "../types";
+import {
+  assessmentResultFromAnalysis,
+  buildAssessmentProfileFromSession,
+  cleanEditorText,
+  countFromEditor,
+  customTeacherStep,
+  defaultAssessmentSession,
+  fallbackAssessmentResult,
+  nextAssessmentSession,
+  practiceItemsFromEditor,
+  taskDraftFromSteps,
+} from "./assessmentHelpers";
+import {
+  assessmentSectionClass,
+  assessmentStepClass,
+  assessmentStepNumberClass,
+  fallbackAnalysis,
+  primaryTeacherButtonClass,
+  secondaryTeacherButtonClass,
+  STORAGE_KEY,
+  teacherFilterButtonBaseClass,
+  teacherReviewHeadingClass,
+  teacherReviewScoreClass,
+  teacherScorePillClass,
+  teacherScoreStripClass,
+  teacherTagClass,
+  teacherTagListClass,
+  teacherTaskMetaClass,
+  teacherTaskMetaItemClass,
+  templateFieldClass,
+  templateInputClass,
+} from "./legacyAppConstants";
+import type {
+  LocalAccountState,
+  RecordingContext,
+  TaskProgressState,
+  TaskStepProgress,
+  TeacherStudentFilter,
+  TeachingClipPlan,
+} from "./legacyAppTypes";
+import {
+  asArray,
+  isRole,
+  isStudentView,
+  isTeacherView,
+  loadStoredLegacyState,
+  progressWidthClass,
+  todayDateKey,
+} from "./legacyState";
+import {
+  assessmentProfileForStudent,
+  assessmentTaskForStudent,
+  buildTaskSubmission,
+  commonTeacherFocusTags,
+  recommendedTaskForStudent,
+  stepFromQuestionBank,
+  taskPracticeItemsForExercise,
+  teacherDashboardNeedsAttention,
+  teacherStudentAttentionReasons,
+} from "./taskHelpers";
+import {
+  buildTeachingClipPlan,
+  diagnosisDetailLines,
+  diagnosisIssueSummary,
+  scoreFillClass,
+  toneFillClass,
+} from "./teachingClipHelpers";
+import {
+  progressCalendarDays,
+  progressChartLabels,
+  progressChartScores,
+  ProgressTrendChart,
+} from "./progressHelpers";
 import { Avatar, Score } from "./ui";
 import {
   appHeaderBaseClass,
-  appHeaderClass,
   brandAccentClass,
   brandClass,
   brandRowClass,
@@ -65,17 +138,13 @@ import {
   syllableStatusPillClass,
   toastClass,
   toastVisibleClass,
-  warnStatusPillClass,
 } from "./styles";
 import {
   attemptScore,
-  clipSourceForUnit,
   clipSourceFor,
   getFocusSyllable,
   latestCompleteAnalysis,
-  levelFromScore,
   normalizeSyllables,
-  pinyinPartsFor,
   statusFromScore,
   statusTime,
   teacherViewLabel,
@@ -85,639 +154,9 @@ import {
   unreadCount,
 } from "./utils";
 
-interface TeachingClipSegment {
-  title: string;
-  guidanceText: string;
-  syllable: LegacySyllable;
-  issue?: PinyinDiagnosisIssue;
-  clipType: "initial" | "final";
-  clipUnit: string;
-  clipUrl: string;
-  videoTitle: string;
-  practiceWords: string[];
-}
-
-interface TeachingClipPlan {
-  title: string;
-  targetText: string;
-  focusIssue?: PinyinDiagnosisIssue;
-  targetSyllable: LegacySyllable;
-  segments: TeachingClipSegment[];
-}
-
-interface TaskStepProgress {
-  completed: boolean;
-  completedAt: string;
-  exerciseId: string;
-  exerciseTitle: string;
-  targetText: string;
-  recordingUrl: string;
-  aiScores: ScoreSet;
-  aiSummary: string;
-  totalItems: number;
-  completedItems: number;
-  items?: {
-    targetText: string;
-    recordingUrl: string;
-    aiScores: ScoreSet;
-    aiSummary: string;
-    completed: boolean;
-  }[];
-}
-
-type TaskProgressState = Record<string, Record<string, TaskStepProgress>>;
-
-interface LocalAccountState {
-  isLoggedIn: boolean;
-  isRegistered?: boolean;
-  username: string;
-  displayName: string;
-  password: string;
-  avatarDataUrl?: string;
-  lastLoginAt?: string;
-  registeredAt?: string;
-  entryAssessmentCompleted?: boolean;
-}
-
-interface StoredLegacyState {
-  role?: Role;
-  currentRole?: Role;
-  studentView?: StudentView;
-  currentView?: StudentView | "teacher" | "home";
-  teacherView?: TeacherView;
-  teacherStudentFilter?: TeacherStudentFilter;
-  targetText?: string;
-  assessmentSession?: EntryAssessmentSession;
-  assessmentProfiles?: AssessmentProfile[];
-  selectedSyllableId?: string;
-  selectedStudentId?: string;
-  teacherStudents?: TeacherStudent[];
-  selectedToneDrill?: string;
-  practiceBackView?: "" | "toneDrill";
-  publishedTasks?: StudentTaskPackage[];
-  taskSubmissions?: TaskSubmission[];
-  taskStepProgress?: TaskProgressState;
-  selectedTaskId?: string;
-  activeTaskExerciseId?: string;
-  activeTaskItemIndex?: number;
-  selectedReviewId?: string;
-  account?: LocalAccountState;
-  chatThreads?: ChatThread[];
-}
-
-const STORAGE_KEY = "see-my-voice-practice-state";
-
-const fallbackAnalysis: PronunciationAnalysis = {
-  heardText: "Waiting for recording analysis",
-  summary:
-    "Enter a Chinese sentence to practice. After recording, the system will give tone, clarity, and rhythm feedback based on your pronunciation.",
-  scores: defaultScores,
-  syllables: defaultSyllables,
-};
-
-const primaryTeacherButtonClass = "w-full rounded-[13px] bg-[var(--navy)] text-[13px] font-extrabold text-white";
-const secondaryTeacherButtonClass = "w-full rounded-xl border border-[rgba(53,84,110,0.22)] bg-white text-xs font-extrabold text-[var(--navy)]";
-const teacherTaskMetaClass = "flex flex-wrap gap-1.5";
-const teacherTaskMetaItemClass = "rounded-full bg-[var(--green-soft)] px-2 py-[5px] text-[10px] font-extrabold text-[var(--green)]";
-const teacherScoreStripClass = "grid grid-cols-3 gap-1.5";
-const teacherScorePillClass = "rounded-[9px] bg-[rgba(53,84,110,0.08)] px-1.5 py-[7px] text-center text-[10px] font-extrabold text-[var(--navy)]";
-const teacherReviewHeadingClass = "grid grid-cols-[1fr_auto] items-start gap-2.5";
-const teacherReviewScoreClass = "min-w-12 text-right text-lg font-black text-[var(--red)]";
-const teacherTagListClass = "flex flex-wrap gap-1.5";
-const teacherTagClass = "rounded-full bg-[var(--amber-soft)] px-[9px] py-1.5 text-[11px] font-bold text-[var(--amber)]";
-const templateFieldClass = "grid gap-[7px] text-xs font-black text-[var(--muted)]";
-const templateInputClass = "w-full rounded-xl border border-[var(--line)] bg-[#fbfaf7] px-[13px] py-3 font-extrabold leading-[1.55] text-[var(--ink)]";
-const assessmentStepClass = "grid grid-cols-[42px_minmax(0,1fr)] items-start gap-3";
-const assessmentStepNumberClass = "grid size-[38px] place-items-center rounded-full bg-[var(--navy)] font-black text-white";
-const assessmentSectionClass = `${panelClass} grid gap-3.5`;
-const teacherFilterButtonBaseClass = "min-h-[38px] rounded-[10px] bg-[#f2eee7] px-2.5 py-2 text-left text-xs font-extrabold text-[var(--navy)]";
-type TeacherStudentFilter = "all" | "attention";
-type RecordingContext = "practice" | "entryAssessment" | "task";
-
 declare global {
   interface Window {
     webkitAudioContext?: typeof AudioContext;
-  }
-}
-
-const databaseSections = [
-  {
-    collection: "users",
-    section: "Account",
-    data: "Learner and teacher profiles, login counters, and session identity.",
-    documents: 1,
-  },
-  {
-    collection: "login_events",
-    section: "Authentication",
-    data: "Register and login activity used for account history.",
-    documents: 2,
-  },
-  {
-    collection: "practice_attempts",
-    section: "Practice Today",
-    data: "Target text, recording status, audio key, scores, and pronunciation feedback.",
-    documents: 3,
-  },
-  {
-    collection: "tasks",
-    section: "Teacher Tasks",
-    data: "Practice packs assigned by a teacher to a learner.",
-    documents: 0,
-  },
-  {
-    collection: "task_submissions",
-    section: "Student Submissions",
-    data: "Completed task recordings linked back to attempts.",
-    documents: 0,
-  },
-  {
-    collection: "reviews",
-    section: "Teacher Review",
-    data: "Teacher feedback and optional scores for submitted work.",
-    documents: 0,
-  },
-  {
-    collection: "chat_threads",
-    section: "Messages",
-    data: "Conversation containers for learner-teacher chat.",
-    documents: 0,
-  },
-  {
-    collection: "chat_messages",
-    section: "Messages",
-    data: "Individual chat messages inside each thread.",
-    documents: 0,
-  },
-] as const;
-const progressWidthClasses = [
-  "w-0",
-  "w-[5%]",
-  "w-[10%]",
-  "w-[15%]",
-  "w-[20%]",
-  "w-[25%]",
-  "w-[30%]",
-  "w-[35%]",
-  "w-[40%]",
-  "w-[45%]",
-  "w-1/2",
-  "w-[55%]",
-  "w-[60%]",
-  "w-[65%]",
-  "w-[70%]",
-  "w-3/4",
-  "w-[80%]",
-  "w-[85%]",
-  "w-[90%]",
-  "w-[95%]",
-  "w-full",
-];
-
-function progressWidthClass(value: number) {
-  const bucket = Math.min(progressWidthClasses.length - 1, Math.max(0, Math.round(value / 5)));
-  return progressWidthClasses[bucket];
-}
-
-function defaultAssessmentSession(): EntryAssessmentSession {
-  return {
-    active: false,
-    currentIndex: 0,
-    results: [],
-    completed: false,
-  };
-}
-
-function todayKey() {
-  return new Date().toISOString().slice(0, 10);
-}
-
-function cleanEditorText(value: string, fallback: string) {
-  return value.trim() || fallback;
-}
-
-function countFromEditor(value: string | number, fallback = 1) {
-  const count = Number(value);
-  return Number.isFinite(count) && count > 0 ? count : fallback;
-}
-
-function practiceItemsFromEditor(value: string) {
-  return value
-    .split(/\n+/)
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
-
-function taskDraftFromSteps(
-  task: StudentTaskPackage,
-  edits: Pick<StudentTaskPackage, "title" | "goal" | "teacherNote" | "exerciseSet">,
-): StudentTaskPackage {
-  const editedItems = edits.exerciseSet.flatMap((exercise) => exercise.practiceItems).filter(Boolean);
-  const firstPracticeText = editedItems[0] || edits.exerciseSet.find((exercise) => exercise.targetText)?.targetText || task.practiceText;
-  return {
-    ...task,
-    title: cleanEditorText(edits.title, task.title),
-    goal: cleanEditorText(edits.goal, task.goal),
-    teacherNote: cleanEditorText(edits.teacherNote || "", task.teacherNote || ""),
-    practiceText: firstPracticeText,
-    requiredSubmissions: Math.max(1, edits.exerciseSet.filter((exercise) => exercise.requiresSubmission).length),
-    exerciseSet: edits.exerciseSet,
-  };
-}
-
-function assessmentResultFromAnalysis(
-  session: EntryAssessmentSession,
-  analysisResult: PronunciationAnalysis,
-): EntryAssessmentResult | null {
-  const item = entryAssessmentItems[session.currentIndex] || entryAssessmentItems[0];
-  if (!item) return null;
-  return {
-    ...item,
-    score: analysisResult.scores?.overall || 70,
-    note: analysisResult.summary || `${item.focus} needs continued observation.`,
-  };
-}
-
-function fallbackAssessmentResult(session: EntryAssessmentSession): EntryAssessmentResult | null {
-  const item = entryAssessmentItems[session.currentIndex] || entryAssessmentItems[0];
-  if (!item) return null;
-  const existingCount = session.results.length;
-  return {
-    ...item,
-    score: Math.max(62, 86 - existingCount * 4),
-    note: `${item.focus} needs continued observation.`,
-  };
-}
-
-function nextAssessmentSession(
-  session: EntryAssessmentSession,
-  result: EntryAssessmentResult,
-): EntryAssessmentSession {
-  const existingResults = session.results.filter((row) => row.id !== result.id);
-  const results = [...existingResults, result];
-  const completed = results.length >= entryAssessmentItems.length;
-  return {
-    active: true,
-    currentIndex: completed ? Math.max(entryAssessmentItems.length - 1, 0) : Math.min(session.currentIndex + 1, entryAssessmentItems.length - 1),
-    results,
-    completed,
-  };
-}
-
-function buildAssessmentProfileFromSession(
-  student: TeacherStudent,
-  session: EntryAssessmentSession,
-  existingCount: number,
-): AssessmentProfile {
-  const results = session.results;
-  const averageScore = results.length
-    ? Math.round(results.reduce((total, row) => total + Number(row.score || 0), 0) / results.length)
-    : student.latestScore;
-  const issueTags = results
-    .filter((row) => Number(row.score || 0) < 80)
-    .map((row) => row.focus)
-    .slice(0, 4);
-  const selectedTags = issueTags.length ? issueTags : student.focusTags;
-
-  return {
-    id: `assessment-${student.id}-${existingCount + 1}`,
-    studentId: student.id,
-    studentName: student.name,
-    completedAt: todayKey(),
-    status: "Needs Teacher Confirmation",
-    overallScore: averageScore,
-    issueTags: selectedTags,
-    issueCategories: [...new Set(results.map((row) => row.title).filter(Boolean))],
-    profileSummary: results.length
-      ? `${student.name} completed ${results.length} entry assessment items, with overall reference score ${averageScore}. Key observations: ${selectedTags.slice(0, 2).join("、")}.`
-      : `${student.name}'s entry assessment shows: ${student.assessmentSummary}`,
-    recommendation: results.length
-      ? `Start by practicing around ${selectedTags.slice(0, 2).join("、")} with short, frequent sessions. Publish the initial practice pack after teacher confirmation.`
-      : "Keep short daily repetition first and observe changes in stability.",
-    itemResults: results,
-  };
-}
-
-function teacherStudentAttentionReasons(student: TeacherStudent) {
-  const reasons = [];
-  if (Number(student.overdueTasks || 0) > 0) reasons.push("Task incomplete");
-  if (student.latestScore < 70) reasons.push("Recent score is low");
-  if (student.trend === "Needs Attention") reasons.push("Trend needs attention");
-  if (student.pendingSubmissions > 0) reasons.push("Recording awaiting review");
-  return reasons;
-}
-
-function teacherDashboardNeedsAttention(student: TeacherStudent) {
-  return student.trend === "Needs Attention" || Number(student.overdueTasks || 0) > 0 || student.latestScore < 70;
-}
-
-function commonTeacherFocusTags(students: TeacherStudent[]) {
-  const counts = students
-    .flatMap((student) => student.focusTags)
-    .reduce<Record<string, number>>((items, tag) => {
-      items[tag] = (items[tag] || 0) + 1;
-      return items;
-    }, {});
-
-  return Object.entries(counts)
-    .sort((left, right) => right[1] - left[1])
-    .slice(0, 4)
-    .map(([tag, count]) => ({ tag, count }));
-}
-
-function recommendedTaskForStudent(student?: TeacherStudent): StudentTaskPackage | null {
-  if (!student) return null;
-  const baseTask = studentTaskPackages[0];
-  if (!baseTask) return null;
-  return {
-    ...baseTask,
-    id: `task-${student.id}-${baseTask.id}`,
-    title: `${student.name} · ${baseTask.title}`,
-    targetStudentId: student.id,
-    focusTag: student.focusTags[0] || baseTask.reviewTags?.[0] || "Pronunciation Focus",
-    status: "Published",
-    reviewTags: student.focusTags.length ? student.focusTags.slice(0, 3) : baseTask.reviewTags,
-  };
-}
-
-function assessmentTaskForStudent(student?: TeacherStudent, profile?: AssessmentProfile | null): StudentTaskPackage | null {
-  if (!student) return null;
-  const bankPackage = questionBankPackages[0];
-  return {
-    id: `initial-task-${profile?.id || student.id}`,
-    title: `${profile?.studentName || student.name} · Entry Assessment Practice Pack`,
-    goal: profile?.recommendation || "Start with focused pronunciation practice from the entry assessment.",
-    status: "Published",
-    suggestedDue: "Due this week",
-    requiredSubmissions: 1,
-    practiceText: bankPackage.targetText || "我要喝水",
-    targetStudentId: student.id,
-    focusTag: profile?.issueTags[0] || student.focusTags[0] || "Entry Assessment Reinforcement",
-    teacherNote: "This task was generated from the entry assessment profile and published after teacher confirmation.",
-    reviewTags: (profile?.issueTags.length ? profile.issueTags : student.focusTags).slice(0, 3),
-    exerciseSet: [
-      {
-        id: "assessment-listen",
-        type: "Demo",
-        title: "Listen to Standard Pronunciation and Observe Movement",
-        instruction: "Listen to the standard pronunciation and observe mouth shape, tongue position, and rhythm.",
-        targetText: bankPackage.targetText,
-        requiredCount: 2,
-        requiresSubmission: false,
-        sourceMode: "bank",
-        bankPackageId: bankPackage.id,
-        practiceItems: bankPackage.items,
-      },
-      {
-        id: "assessment-focus",
-        type: "Repeat",
-        title: "Slow Repetition of Focus Sound",
-        instruction: "Slow down the unstable focus sound from the assessment and keep the movement complete.",
-        targetText: bankPackage.targetText,
-        requiredCount: student.latestScore < 70 ? 5 : 3,
-        requiresSubmission: false,
-        sourceMode: "bank",
-        bankPackageId: bankPackage.id,
-        practiceItems: bankPackage.items,
-      },
-      {
-        id: "assessment-submit",
-        type: "Submit",
-        title: "Full Short-Sentence Recording Submission",
-        instruction: "Read the full sentence, record, and submit. The teacher will review it in the review center.",
-        targetText: bankPackage.targetText,
-        requiredCount: 1,
-        requiresSubmission: true,
-        sourceMode: "bank",
-        bankPackageId: bankPackage.id,
-        practiceItems: bankPackage.items,
-      },
-    ],
-  };
-}
-
-function assessmentProfileForStudent(profiles: AssessmentProfile[], student?: TeacherStudent) {
-  if (!profiles.length) return null;
-  return [...profiles].reverse().find((profile) => profile.studentId === student?.id) || profiles[profiles.length - 1] || null;
-}
-
-function taskPracticeItemsForExercise(exercise: StudentTaskStep, task: StudentTaskPackage) {
-  if (exercise.practiceItems.length) return exercise.practiceItems;
-  return [exercise.targetText || task.practiceText].filter(Boolean);
-}
-
-function buildTaskSubmission(task: StudentTaskPackage, progress: Record<string, TaskStepProgress>, scores: ScoreSet, submissionCount: number): TaskSubmission | null {
-  const completedSteps = task.exerciseSet.filter((exercise) => progress[exercise.id]?.completed);
-  if (!task.exerciseSet.length || completedSteps.length < task.exerciseSet.length) return null;
-  const submitExercise = task.exerciseSet.find((exercise) => exercise.requiresSubmission) || task.exerciseSet.at(-1);
-  const savedSubmitStep = submitExercise ? progress[submitExercise.id] : Object.values(progress).at(-1);
-  if (!submitExercise || !savedSubmitStep) return null;
-  const student = teacherStudents.find((item) => item.id === task.targetStudentId) || teacherStudents[0];
-  return {
-    id: `submission-${task.id}-${submissionCount + 1}`,
-    taskId: task.id,
-    studentId: task.targetStudentId || student.id,
-    studentName: student.name,
-    taskTitle: task.title,
-    exerciseTitle: savedSubmitStep.exerciseTitle || submitExercise.title,
-    targetText: savedSubmitStep.targetText || task.practiceText,
-    heardText: savedSubmitStep.targetText || task.practiceText,
-    status: "Needs Teacher Feedback",
-    aiScores: savedSubmitStep.aiScores || scores,
-    aiSummary: savedSubmitStep.aiSummary || "AI first-pass review is complete and waiting for teacher feedback.",
-    submittedAt: statusTime(),
-    recordingUrl: savedSubmitStep.recordingUrl,
-  };
-}
-
-function customTeacherStep(index: number): StudentTaskStep {
-  return {
-    id: `custom-${Date.now()}-${index + 1}`,
-    type: "Practice",
-    title: "New Practice Step",
-    instruction: "Complete this step from your teacher.",
-    targetText: "",
-    requiredCount: 1,
-    requiresSubmission: false,
-    sourceMode: "custom",
-    bankPackageId: "",
-    practiceItems: [],
-  };
-}
-
-function stepFromQuestionBank(step: StudentTaskStep, packageId: string): StudentTaskStep {
-  const bank = questionBankPackages.find((pack) => pack.id === packageId) || questionBankPackages[0];
-  return {
-    ...step,
-    title: bank.title,
-    instruction: bank.description,
-    targetText: bank.targetText,
-    sourceMode: "bank",
-    bankPackageId: bank.id,
-    practiceItems: bank.items,
-  };
-}
-
-function diagnosisIssueSummary(issue: PinyinDiagnosisIssue, syllables: LegacySyllable[]) {
-  const syllable = syllables.find((item, index) => Number(issue.index) === index);
-  const character = syllable?.character || issue.practice?.[0] || "this sound";
-  const toneText = issue.type === "tone" && syllable?.tone ? `Tone ${syllable.tone.replace("T", "")}` : "";
-  const typeText = issue.type === "initial"
-    ? "Initial"
-    : issue.type === "final"
-      ? "Final"
-      : issue.type === "tone"
-        ? "Tone"
-        : "Pronunciation";
-
-  return {
-    character,
-    shortIssue: toneText ? `${toneText} may need work` : `${issue.focus || typeText} may need work`,
-    label: toneText || issue.focus || issue.title || "Pronunciation focus",
-  };
-}
-
-function diagnosisDetailLines(issue: PinyinDiagnosisIssue) {
-  return [
-    issue.summary,
-    issue.detail,
-  ].filter(Boolean);
-}
-
-function issuePriority(issue?: PinyinDiagnosisIssue) {
-  if (["initial", "final", "syllable", "missing"].includes(issue?.type || "")) return 0;
-  if (issue?.type === "tone") return 1;
-  return 2;
-}
-
-function teachingIssuesFor(analysis: PronunciationAnalysis) {
-  return [...(analysis.pinyinDiagnosis?.issues || [])]
-    .filter((issue) => issue.type !== "extra")
-    .sort((left, right) => {
-      const leftIndex = Number(left.index ?? 0);
-      const rightIndex = Number(right.index ?? 0);
-      if (leftIndex !== rightIndex) return leftIndex - rightIndex;
-      return issuePriority(left) - issuePriority(right);
-    });
-}
-
-function clipTargetFor(issue: PinyinDiagnosisIssue | undefined, syllable: LegacySyllable) {
-  const parts = pinyinPartsFor(syllable);
-  if (issue?.type === "initial" && parts.initial) return { type: "initial" as const, unit: parts.initial };
-  if (issue?.type === "final" && parts.final) return { type: "final" as const, unit: parts.final };
-  if (parts.final) return { type: "final" as const, unit: parts.final };
-  return { type: "initial" as const, unit: parts.initial };
-}
-
-function buildTeachingClipPlan(analysis: PronunciationAnalysis, syllables: LegacySyllable[], targetText: string): TeachingClipPlan | null {
-  const issues = teachingIssuesFor(analysis);
-  const rows = issues.length
-    ? issues.map((issue) => ({
-        issue,
-        syllable: syllables[Number(issue.index ?? 0)] || getFocusSyllable(syllables) || syllables[0],
-      }))
-    : [{
-        issue: undefined,
-        syllable: getFocusSyllable(syllables) || syllables[0],
-      }];
-  const segments = rows
-    .filter((row): row is { issue?: PinyinDiagnosisIssue; syllable: LegacySyllable } => Boolean(row.syllable))
-    .map(({ issue, syllable }) => {
-      const target = clipTargetFor(issue, syllable);
-      const label = `${target.type === "initial" ? "Initial" : "Final"} ${target.unit}`;
-      return {
-        title: `${syllable.character} / ${syllable.pinyin}`,
-        guidanceText: issue?.summary || issue?.detail || syllable.feedback || "Use the demo video to reinforce this syllable.",
-        syllable,
-        issue,
-        clipType: target.type,
-        clipUnit: target.unit,
-        clipUrl: clipSourceForUnit(target.type, target.unit),
-        practiceWords: issue?.practice?.length ? issue.practice : [syllable.character, targetText].filter(Boolean),
-        videoTitle: `${label} Pronunciation Demo`,
-      };
-    });
-
-  if (!segments.length) return null;
-  const primarySegment = segments[0];
-  return {
-    title: segments.length > 1
-      ? `${targetText || primarySegment.title} Personalized Teaching Video`
-      : `${primarySegment.title} Personalized Teaching Video`,
-    targetText,
-    focusIssue: primarySegment.issue,
-    targetSyllable: primarySegment.syllable,
-    segments,
-  };
-}
-
-function scoreFillClass(score: number) {
-  const level = levelFromScore(score);
-  if (level === "focus") return "bg-[var(--red)]";
-  if (level === "warn") return "bg-[var(--amber)]";
-  return "bg-[var(--green)]";
-}
-
-function toneFillClass(tone: string) {
-  const colors: Record<string, string> = {
-    "1": "bg-[var(--green)]",
-    "2": "bg-[#f39b54]",
-    "3": "bg-[#2fa692]",
-    "4": "bg-[#35546e]",
-  };
-  return colors[tone] || "bg-[var(--green)]";
-}
-
-function isRole(value: unknown): value is Role {
-  return value === "guest" || value === "student" || value === "teacher";
-}
-
-function isStudentView(value: unknown): value is StudentView {
-  return [
-    "home",
-    "practice",
-    "tasks",
-    "detail",
-    "progress",
-    "chat",
-    "account",
-    "taskDetail",
-    "entryAssessment",
-    "toneDrill",
-    "teachingClip",
-  ].includes(String(value));
-}
-
-function isTeacherView(value: unknown): value is TeacherView {
-  return [
-    "home",
-    "students",
-    "tasks",
-    "assessmentEditor",
-    "taskPackageEditor",
-    "reviews",
-    "reviewEditor",
-    "chat",
-    "account",
-  ].includes(String(value));
-}
-
-function todayDateKey() {
-  return new Date().toISOString().slice(0, 10);
-}
-
-function asArray<T>(value: unknown, fallback: T[]) {
-  return Array.isArray(value) ? (value as T[]) : fallback;
-}
-
-function loadStoredLegacyState(): StoredLegacyState | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) as StoredLegacyState : null;
-  } catch {
-    window.localStorage.removeItem(STORAGE_KEY);
-    return null;
   }
 }
 
@@ -737,11 +176,13 @@ export function LegacyApp({
   onLogin,
   onLogout,
 }: LegacyAppProps) {
-  // Role and view state decide which legacy screen is visible inside the phone shell.
+  // Navigation state controls which legacy screen is visible.
   const [role, setRole] = React.useState<Role>(user ? "student" : "guest");
   const [studentView, setStudentView] = React.useState<StudentView>("practice");
   const [teacherView, setTeacherView] = React.useState<TeacherView>("home");
   const [teacherStudentFilter, setTeacherStudentFilter] = React.useState<TeacherStudentFilter>("all");
+
+  // Practice state follows the current text, latest analysis, and recorder status.
   const [targetText, setTargetText] = React.useState("我要吃饭");
   const [analysis, setAnalysis] = React.useState<PronunciationAnalysis | null>(null);
   const [assessmentSession, setAssessmentSession] = React.useState<EntryAssessmentSession>(() => defaultAssessmentSession());
@@ -756,6 +197,8 @@ export function LegacyApp({
   const [editingStudentSummaryId, setEditingStudentSummaryId] = React.useState("");
   const [selectedToneDrill, setSelectedToneDrill] = React.useState("3");
   const [practiceBackView, setPracticeBackView] = React.useState<"" | "toneDrill">("");
+
+  // Teacher/task/chat state is local until each screen is fully backed by the API.
   const [publishedTasks, setPublishedTasks] = React.useState<StudentTaskPackage[]>([]);
   const [taskSubmissions, setTaskSubmissions] = React.useState<TaskSubmission[]>([]);
   const [taskStepProgress, setTaskStepProgress] = React.useState<TaskProgressState>({});
@@ -779,6 +222,7 @@ export function LegacyApp({
   });
   const [teachingClipPlan, setTeachingClipPlan] = React.useState<TeachingClipPlan | null>(null);
   const [selectedClipSegmentIndex, setSelectedClipSegmentIndex] = React.useState(0);
+
   // Recording and toast refs hold browser objects that should not trigger rerenders.
   const mediaRecorder = React.useRef<MediaRecorder | null>(null);
   const chunks = React.useRef<Blob[]>([]);
@@ -1598,106 +1042,6 @@ export function LegacyApp({
   );
 }
 
-// Lightweight loading view used while the app shell resolves initial data.
-export function LoadingShell() {
-  return (
-    <PhoneShell>
-      <main id="app" className="h-full overflow-x-hidden overflow-y-auto overscroll-contain pb-[92px]">
-        <section className={cn(screenClass, "grid place-content-center gap-2.5 font-bold text-[var(--muted)]")}>
-          <span>Loading See My Voice</span>
-        </section>
-      </main>
-    </PhoneShell>
-  );
-}
-
-// Shared frame for the mobile-style legacy screens.
-function PhoneShell({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="grid min-h-screen place-items-center px-4 py-7 max-[639px]:p-0">
-      <div className="relative h-[min(884px,calc(100vh-56px))] min-h-[690px] w-[min(100%,410px)] overflow-hidden rounded-[46px] border-[9px] border-[var(--navy)] bg-[var(--paper)] shadow-[var(--shadow)] max-[639px]:h-[100dvh] max-[639px]:min-h-[620px] max-[639px]:w-full max-[639px]:rounded-none max-[639px]:border-0 max-[639px]:shadow-none">
-        {children}
-      </div>
-    </div>
-  );
-}
-
-// Entry screen lets visitors choose the learner or teacher experience.
-function HomeScreen({ onSelectRole }: { onSelectRole: (role: Exclude<Role, "guest">) => void }) {
-  return (
-    <section
-      className={cn(screenClass, "flex min-h-full flex-col [background:linear-gradient(180deg,rgba(25,26,47,0.96),rgba(25,26,47,0.92)_46%,var(--paper)_46%),var(--paper)]")}
-      data-screen="home"
-    >
-      <header className="min-h-[315px] px-[22px] pt-[38px] pb-[30px] text-[var(--ink)]">
-        <div className="mb-[21px] flex items-center justify-between text-xs font-bold tracking-[0.04em] text-[rgba(41,40,59,0.72)]">
-          <span>{statusTime()}</span>
-          <span>VoiceSight · See My Voice</span>
-        </div>
-        <div>
-          <h1 className="mt-[70px] mb-2 text-[42px] font-bold tracking-normal text-[var(--red)] shadow-none [text-shadow:0_8px_24px_rgba(207,75,49,0.16)]">
-            See My Voice
-          </h1>
-          <p className="m-0 max-w-[270px] text-[15px] font-bold leading-[1.7] text-[rgba(41,40,59,0.72)]">
-            Mandarin pronunciation practice for foreign learners
-          </p>
-        </div>
-      </header>
-      <div className="grid gap-3.5 px-[18px] pb-6">
-        <button
-          className="grid min-h-[156px] content-start gap-2 rounded-[18px] border border-[rgba(32,154,120,0.28)] bg-[var(--surface)] p-[22px] text-left shadow-[0_18px_42px_rgba(25,26,47,0.1)]"
-          type="button"
-          onClick={() => onSelectRole("student")}
-        >
-          <span className={modelKickerClass}>Learner</span>
-          <strong className="text-[25px] tracking-normal text-[var(--ink)]">Practice Today</strong>
-          <p className="m-0 text-sm leading-[1.6] text-[var(--muted)]">Recording analysis, pronunciation details, teaching clips, and progress tracking.</p>
-        </button>
-        <button
-          className="grid min-h-[156px] content-start gap-2 rounded-[18px] border border-[rgba(207,75,49,0.28)] bg-[var(--surface)] p-[22px] text-left shadow-[0_18px_42px_rgba(25,26,47,0.1)]"
-          type="button"
-          onClick={() => onSelectRole("teacher")}
-        >
-          <span className={modelKickerClass}>Teacher</span>
-          <strong className="text-[25px] tracking-normal text-[var(--ink)]">Mandarin Practice Management</strong>
-          <p className="m-0 text-sm leading-[1.6] text-[var(--muted)]">Learner management, practice packs, recording reviews, and feedback chat.</p>
-        </button>
-        <DatabaseOverview />
-      </div>
-    </section>
-  );
-}
-
-function DatabaseOverview() {
-  return (
-    <section className={cn(panelClass, "grid gap-3")} aria-labelledby="database-overview-title">
-      <div className="grid gap-1">
-        <span className={modelKickerClass}>Online Database</span>
-        <strong className="text-[17px] text-[var(--ink)]" id="database-overview-title">see_my_voice collections</strong>
-      </div>
-      <div className="overflow-hidden rounded-[12px] border border-[var(--line)] bg-white">
-        <img
-          className="block h-auto w-full"
-          src="/assets/see-my-voice-database.png"
-          alt="MongoDB Atlas see_my_voice database collection list"
-        />
-      </div>
-      <div className="grid gap-2">
-        {databaseSections.map((item) => (
-          <article className="grid gap-1 rounded-[12px] border border-[var(--line)] bg-[#fbfaf7] px-3 py-2.5" key={item.collection}>
-            <div className="grid grid-cols-[1fr_auto] items-center gap-2">
-              <strong className="text-[12px] text-[var(--ink)]">{item.section}</strong>
-              <span className={item.documents ? statusPillClass : warnStatusPillClass}>{item.documents} docs</span>
-            </div>
-            <code className="text-[11px] font-bold text-[var(--green)]">{item.collection}</code>
-            <p className="m-0 text-[11px] leading-[1.45] text-[var(--muted)]">{item.data}</p>
-          </article>
-        ))}
-      </div>
-    </section>
-  );
-}
-
 // Header is reused by practice and progress screens with small mode differences.
 function BrandHeader({
   progress = false,
@@ -2239,111 +1583,6 @@ function ProgressScreen({
         </button>
       </div>
     </section>
-  );
-}
-
-function progressCalendarDays(attempts: PracticeAttempt[], count = 14) {
-  const practiced = new Set(
-    attempts
-      .map((attempt) => new Date(attempt.createdAt))
-      .filter((date) => !Number.isNaN(date.getTime()))
-      .map((date) => date.toISOString().slice(0, 10)),
-  );
-  const today = new Date();
-  const selectedDate = today.toISOString().slice(0, 10);
-  return Array.from({ length: count }, (_, offset) => {
-    const date = new Date(today);
-    date.setDate(today.getDate() - (count - 1 - offset));
-    const key = date.toISOString().slice(0, 10);
-    return {
-      date: key,
-      label: progressDateLabel(key),
-      practiced: practiced.has(key),
-      today: key === selectedDate,
-      selected: key === selectedDate,
-    };
-  });
-}
-
-function progressChartScores(attempts: PracticeAttempt[]) {
-  const attemptScores = attempts
-    .slice(0, 7)
-    .map((attempt) => Math.round(attemptScore(attempt)))
-    .reverse();
-  const fallbackScores = [60, 64, 67, 70, 72, 74, 76];
-  return attemptScores.length ? [...Array(Math.max(0, 7 - attemptScores.length)).fill(0), ...attemptScores] : fallbackScores;
-}
-
-function progressChartLabels(attempts: PracticeAttempt[], count: number) {
-  const attemptLabels = attempts
-    .slice(0, count)
-    .map((attempt) => progressDateLabel(attempt.createdAt))
-    .reverse();
-  if (attemptLabels.length) return [...Array(Math.max(0, count - attemptLabels.length)).fill(""), ...attemptLabels];
-  return recentProgressLabels(count);
-}
-
-function recentProgressLabels(count: number) {
-  const today = new Date();
-  return Array.from({ length: count }, (_, index) => {
-    const date = new Date(today);
-    date.setDate(today.getDate() - (count - 1 - index));
-    return progressDateLabel(date.toISOString());
-  });
-}
-
-function progressDateLabel(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  return `${date.getMonth() + 1}/${date.getDate()}`;
-}
-
-function ProgressTrendChart({
-  scores,
-  labels,
-  latestScore,
-}: {
-  scores: number[];
-  labels: string[];
-  latestScore: number;
-}) {
-  const min = 50;
-  const max = 90;
-  const width = 320;
-  const height = 124;
-  const padding = { top: 15, right: 13, bottom: 25, left: 13 };
-  const innerWidth = width - padding.left - padding.right;
-  const innerHeight = height - padding.top - padding.bottom;
-  const normalized = scores.map((score) => (score > 0 ? 100 - ((score - min) / (max - min)) * 100 : 100));
-  const points = normalized.map((value, index) => {
-    const x = padding.left + (innerWidth * index) / Math.max(normalized.length - 1, 1);
-    const y = padding.top + (innerHeight * value) / 100;
-    return { x, y, value };
-  });
-  const polyline = points.map((point) => `${point.x},${point.y}`).join(" ");
-
-  return (
-    <svg className="block h-[124px] w-full" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="This week overall score line chart">
-      {[0, 1, 2].map((row) => {
-        const y = padding.top + (innerHeight * row) / 2;
-        return <line x1={padding.left} x2={width - padding.right} y1={y} y2={y} stroke="#ece8e0" strokeWidth="1" key={row} />;
-      })}
-      <polyline points={polyline} fill="none" stroke="#cf4b31" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-      {points.map((point, index) => (
-        <circle cx={point.x} cy={point.y} r={index === points.length - 1 ? 4 : 3} fill="#cf4b31" key={`${point.x}-${point.y}`} />
-      ))}
-      {labels.map((label, index) => {
-        const x = padding.left + (innerWidth * index) / Math.max(labels.length - 1, 1);
-        return (
-          <text x={x} y={height - 6} fill="#aaa6ad" fontSize="10" textAnchor="middle" key={label}>
-            {label}
-          </text>
-        );
-      })}
-      <text x={width - padding.right} y="11" fill="#cf4b31" fontSize="11" fontWeight="700" textAnchor="end">
-        {latestScore ? `${latestScore} ` : "No Practice"}
-      </text>
-    </svg>
   );
 }
 
@@ -4342,275 +3581,3 @@ function StudentChatTools({ onCreateStudentDirectChat }: { onCreateStudentDirect
 }
 
 // Account screen handles login/register state while preserving the legacy account layout.
-function AccountScreen({
-  role,
-  user,
-  attempts,
-  publishedTasks,
-  chatThreads: accountChatThreads,
-  avatarDataUrl,
-  localAccount,
-  onRoleChange,
-  onLogin,
-  onLocalLogin,
-  onLogout,
-  onAvatarChange,
-}: {
-  role: Exclude<Role, "guest">;
-  user: AuthUser | null;
-  attempts: PracticeAttempt[];
-  publishedTasks: StudentTaskPackage[];
-  chatThreads: ChatThread[];
-  avatarDataUrl: string;
-  localAccount: LocalAccountState;
-  onRoleChange: (role: Exclude<Role, "guest">) => void;
-  onLogin: (username: string, password: string) => Promise<void> | void;
-  onLocalLogin: (role: Exclude<Role, "guest">, username: string, password: string) => void;
-  onLogout: () => void;
-  onAvatarChange: (avatarDataUrl: string) => void;
-}) {
-  // Local form state is only for the account controls on this screen.
-  const [username, setUsername] = React.useState(user?.username || localAccount.username || "jiawen");
-  const [password, setPassword] = React.useState(localAccount.password || "");
-  const [busy, setBusy] = React.useState(false);
-  const [formMessage, setFormMessage] = React.useState("");
-  const signedIn = Boolean(user);
-  const displayName = user?.name || localAccount.displayName || (role === "teacher" ? "Ms. Wang" : "Chen Xiaohe");
-  const participantId = role === "teacher" ? "teacher-main" : "student-chen";
-  const unread = accountChatThreads
-    .filter((thread) => thread.memberIds.includes(participantId))
-    .reduce((sum, thread) => sum + unreadCount(thread, participantId), 0);
-  const hasTodayTask = publishedTasks.some((task) => task.status === "Published");
-  const accountInputClass = "w-full min-w-0 rounded-xl border border-[rgba(53,84,110,0.18)] bg-white px-3 py-[11px] text-[var(--ink)]";
-  const accountFieldClass = "grid gap-[5px] text-[11px] font-extrabold text-[var(--muted)]";
-  const accountToggleClass = (selected: boolean) =>
-    `grid min-h-[42px] cursor-pointer place-items-center rounded-[11px] text-[13px] font-black ${
-      selected ? "bg-[var(--green)] text-white" : "bg-transparent text-[var(--muted)]"
-    }`;
-
-  // Submit delegates real auth work to callbacks supplied by the app shell.
-  async function submit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setBusy(true);
-    setFormMessage("");
-    try {
-      await onLogin(username, password);
-      onLocalLogin(role, username, password);
-    } catch (error) {
-      setFormMessage(error instanceof Error ? error.message : "Account could not be saved.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  function updateAvatar(event: React.ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.addEventListener("load", () => onAvatarChange(String(reader.result || "")));
-    reader.readAsDataURL(file);
-  }
-
-  return (
-    <section className={screenClass} data-screen="account">
-      <header className={appHeaderClass}>
-        <div className={statusRowClass}>
-          <span>{statusTime()}</span>
-          <span>Account</span>
-        </div>
-        <div className={brandRowClass}>
-          <div>
-            <h1 className={brandClass}>
-              <span className={brandAccentClass}>VoiceSight</span> Account
-            </h1>
-            <p className="mt-[7px] mb-0 text-xs text-[rgba(255,255,255,0.54)]">Current: {role === "teacher" ? "Teacher" : "Learner"}</p>
-          </div>
-        </div>
-      </header>
-      <div className={contentClass}>
-        <section className={cn(panelClass, "grid gap-3.5 border-[rgba(32,154,120,0.22)] [background:linear-gradient(135deg,rgba(32,154,120,0.09),transparent_48%),var(--surface)]")} aria-labelledby="account-profile-title">
-          <div className="grid grid-cols-[auto_1fr] items-center gap-3.5">
-            <label className="grid cursor-pointer justify-items-center gap-[7px] text-[11px] font-extrabold text-[var(--green)]" aria-label="Change avatar">
-              <Avatar name={displayName} src={avatarDataUrl} className="grid size-[58px] place-items-center rounded-full bg-[var(--green)] text-[23px] font-black text-white object-cover" />
-              <input className="absolute size-px opacity-0" type="file" accept="image/*" onChange={updateAvatar} />
-              <span>Change avatar</span>
-            </label>
-            <div>
-              <span className={modelKickerClass}>{signedIn ? "Signed In" : "MongoDB Account"}</span>
-              <h2 className="m-0 text-[23px] text-[var(--ink)]" id="account-profile-title">{displayName}</h2>
-              <p className="m-0 text-[13px] leading-[1.7] text-[var(--muted)]">Current: {role === "teacher" ? "Teacher" : "Learner"}. Account sign-in is saved in MongoDB; avatar and chat identity stay in this browser.</p>
-            </div>
-          </div>
-          <div className="grid grid-cols-3 gap-2" aria-label="Account status">
-            <div className="grid gap-0.5 rounded-[13px] bg-[rgba(255,255,255,0.72)] px-2 py-2.5 text-center">
-              <strong className="text-xl leading-none text-[var(--navy)]">{Math.max(1, attempts.length || 1)}</strong>
-              <span className="text-[10px] font-extrabold text-[var(--muted)]">Practice Streak</span>
-            </div>
-            <div className="grid gap-0.5 rounded-[13px] bg-[rgba(255,255,255,0.72)] px-2 py-2.5 text-center">
-              <strong className="text-xl leading-none text-[var(--navy)]">{unread}</strong>
-              <span className="text-[10px] font-extrabold text-[var(--muted)]">Unread Messages</span>
-            </div>
-            <div className="grid gap-0.5 rounded-[13px] bg-[rgba(255,255,255,0.72)] px-2 py-2.5 text-center">
-              <strong className="text-xl leading-none text-[var(--navy)]">{hasTodayTask ? "Yes" : "No"}</strong>
-              <span className="text-[10px] font-extrabold text-[var(--muted)]">Today Tasks</span>
-            </div>
-          </div>
-        </section>
-
-        <section className={cn(panelClass, "grid gap-3.5")} aria-labelledby="account-login-title">
-          <div className="grid grid-cols-[1fr_auto] items-start gap-2.5">
-            <div>
-              <span className={modelKickerClass}>Account Settings</span>
-              <h2 className="m-0 text-[23px] text-[var(--ink)]" id="account-login-title">{signedIn ? "Update Login Info" : "Log In or Create Account"}</h2>
-            </div>
-            <span className={statusPillClass}>{signedIn ? "Saved" : "Not Signed In"}</span>
-          </div>
-          <form className="grid gap-2.5" onSubmit={submit}>
-            <div className="grid grid-cols-2 gap-2 rounded-[14px] bg-[#f4f1eb] p-1" role="radiogroup" aria-label="Choose login role">
-              <label className={accountToggleClass(role === "student")}>
-                <input
-                  className="pointer-events-none absolute opacity-0"
-                  type="radio"
-                  name="login-role"
-                  value="student"
-                  checked={role === "student"}
-                  onChange={() => onRoleChange("student")}
-                />
-                <span>Learner</span>
-              </label>
-              <label className={accountToggleClass(role === "teacher")}>
-                <input
-                  className="pointer-events-none absolute opacity-0"
-                  type="radio"
-                  name="login-role"
-                  value="teacher"
-                  checked={role === "teacher"}
-                  onChange={() => onRoleChange("teacher")}
-                />
-                <span>Teacher</span>
-              </label>
-            </div>
-            <label className={accountFieldClass}>
-              <span>Account</span>
-              <input className={accountInputClass} value={username} onChange={(event) => setUsername(event.target.value)} required autoComplete="username" placeholder="Enter account" />
-            </label>
-            <label className={accountFieldClass}>
-              <span>Password</span>
-              <input
-                className={accountInputClass}
-                type="password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                minLength={3}
-                required={!signedIn}
-                autoComplete="current-password"
-                placeholder="Enter password"
-              />
-            </label>
-            <button className={primaryTeacherButtonClass} type="submit" disabled={busy}>
-              {busy ? "Connecting..." : signedIn ? "Save Account" : "Log In or Create"}
-            </button>
-            {formMessage && (
-              <p className="m-0 rounded-xl bg-[var(--red-soft)] px-3 py-2 text-xs font-bold leading-[1.5] text-[var(--red)]">
-                {formMessage}
-              </p>
-            )}
-            {signedIn && (
-              <button className={secondaryTeacherButtonClass} type="button" onClick={onLogout}>
-                Log Out
-              </button>
-            )}
-          </form>
-        </section>
-
-        <section className="px-1 pt-0.5 pb-1.5 text-[11px] leading-[1.6] text-[var(--muted)]" aria-label="Local data note">
-          Account credentials are stored by the backend in MongoDB. Clearing browser data removes only the local avatar, navigation state, and chat draft data.
-        </section>
-      </div>
-    </section>
-  );
-}
-
-// Bottom navigation switches between role-specific legacy views.
-function AppNav({
-  role,
-  studentView,
-  teacherView,
-  onStudentView,
-  onTeacherView,
-}: {
-  role: Role;
-  studentView: StudentView;
-  teacherView: TeacherView;
-  onStudentView: (view: StudentView) => void;
-  onTeacherView: (view: TeacherView) => void;
-}) {
-  // Guests stay on the role picker and do not need tab navigation.
-  if (role === "guest") return <nav className="hidden" aria-label="Main pages" hidden />;
-
-  const activeTeacherView =
-    teacherView === "assessmentEditor" || teacherView === "taskPackageEditor"
-      ? "tasks"
-      : teacherView === "reviewEditor"
-        ? "reviews"
-        : teacherView;
-
-  // Teachers use the management tabs from legacy data.
-  if (role === "teacher") {
-    return (
-      <nav
-        className="absolute inset-x-0 bottom-0 z-[5] grid grid-cols-6 border-t border-[rgba(207,200,189,0.92)] bg-[rgba(255,254,250,0.94)] px-2.5 pt-[7px] pb-[calc(7px+env(safe-area-inset-bottom))] backdrop-blur-[16px]"
-        aria-label="Main pages"
-      >
-        {teacherNavItems.map((item) => (
-          <button
-            className={`grid min-h-[51px] place-items-center content-center gap-px rounded-xl text-[11px] ${
-              item.view === activeTeacherView
-                ? "bg-[var(--red-soft)] font-extrabold text-[var(--red)]"
-                : "text-[var(--muted)]"
-            }`}
-            type="button"
-            key={item.view}
-            data-teacher-view={item.view}
-            aria-current={item.view === activeTeacherView ? "page" : "false"}
-            onClick={() => onTeacherView(item.view)}
-          >
-            <span className="text-[9px] tracking-[0.12em]">{item.index}</span>
-            <span>{item.label}</span>
-          </button>
-        ))}
-      </nav>
-    );
-  }
-
-  // Learners use the practice-focused tabs from legacy data.
-  const activeStudentView = ["detail", "entryAssessment", "toneDrill", "teachingClip"].includes(studentView)
-    ? "practice"
-    : studentView === "taskDetail"
-      ? "tasks"
-    : studentView;
-  return (
-    <nav
-      className="absolute inset-x-0 bottom-0 z-[5] grid grid-cols-5 border-t border-[rgba(207,200,189,0.92)] bg-[rgba(255,254,250,0.94)] px-2.5 pt-[7px] pb-[calc(7px+env(safe-area-inset-bottom))] backdrop-blur-[16px]"
-      aria-label="Main pages"
-    >
-      {studentNavItems.map((item) => (
-        <button
-          className={`grid min-h-[51px] place-items-center content-center gap-px rounded-xl text-[11px] ${
-            item.view === activeStudentView
-              ? "bg-[var(--red-soft)] font-extrabold text-[var(--red)]"
-              : "text-[var(--muted)]"
-          }`}
-          type="button"
-          key={item.view}
-          data-view={item.view}
-          aria-current={item.view === activeStudentView ? "page" : "false"}
-          onClick={() => onStudentView(item.view)}
-        >
-          <span className="text-[9px] tracking-[0.12em]">{item.index}</span>
-          <span>{item.label}</span>
-        </button>
-      ))}
-    </nav>
-  );
-}

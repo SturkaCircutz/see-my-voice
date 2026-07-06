@@ -1,1 +1,2 @@
-export { LegacyApp, LoadingShell } from "./legacy/LegacyApp";
+export { LoadingShell } from "./legacy/AppShell";
+export { LegacyApp } from "./legacy/LegacyApp";
