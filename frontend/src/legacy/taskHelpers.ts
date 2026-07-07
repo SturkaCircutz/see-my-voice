@@ -46,7 +46,7 @@ export function recommendedTaskForStudent(student?: TeacherStudent): StudentTask
   const focusTag = student.focusTags[0] || bankPackage?.focusTags?.[0] || "Teacher assigned practice";
   return {
     id: `draft-task-${student.id}`,
-    title: `${student.name} · Practice Pack`,
+    title: "Personalized Practice Pack",
     goal: `Practice ${focusTag}.`,
     status: "Draft",
     suggestedDue: "Due this week",
@@ -101,7 +101,7 @@ export function assessmentTaskForStudent(student?: TeacherStudent, profile?: Ass
   const bankPackage = questionBankPackages[0];
   return {
     id: `initial-task-${profile?.id || student.id}`,
-    title: `${profile?.studentName || student.name} · Entry Assessment Practice Pack`,
+    title: "Entry Assessment Practice Pack",
     goal: profile?.recommendation || "Start with focused pronunciation practice from the entry assessment.",
     status: "Published",
     suggestedDue: "Due this week",

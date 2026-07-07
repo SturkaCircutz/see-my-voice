@@ -1,6 +1,5 @@
 import React from "react";
 import type { Role } from "./data";
-import { databaseSections } from "./legacyAppConstants";
 import {
   brandAccentClass,
   cn,
@@ -8,7 +7,6 @@ import {
   panelClass,
   screenClass,
   statusPillClass,
-  warnStatusPillClass,
 } from "./styles";
 import { statusTime } from "./utils";
 
@@ -235,35 +233,51 @@ export function HomeScreen({ onSelectRole }: { onSelectRole: (role: Exclude<Role
           <strong className="text-[25px] tracking-normal text-[var(--ink)] lg:text-[30px]">Mandarin Practice Management</strong>
           <p className="m-0 text-sm leading-[1.6] text-[var(--muted)]">Learner management, practice packs, recording reviews, and feedback chat.</p>
         </button>
-        <DatabaseOverview />
+        <ProductOverview />
       </div>
     </section>
   );
 }
 
-function DatabaseOverview() {
+function ProductOverview() {
+  const productSections = [
+    {
+      section: "Accounts",
+      status: "Synced",
+      detail: "Secure sign-in keeps learner and teacher workspaces available across sessions.",
+    },
+    {
+      section: "Practice History",
+      status: "Tracked",
+      detail: "Recordings, pronunciation scores, and progress trends stay connected to each user.",
+    },
+    {
+      section: "Assignments",
+      status: "Ready",
+      detail: "Teachers can publish practice packs, review submissions, and send feedback.",
+    },
+  ];
+
   return (
-    <section className={cn(panelClass, "grid gap-3 lg:grid-cols-[minmax(0,0.95fr)_minmax(260px,1.05fr)] lg:items-start")} aria-labelledby="database-overview-title">
+    <section className={cn(panelClass, "grid gap-3 lg:grid-cols-[minmax(0,0.95fr)_minmax(260px,1.05fr)] lg:items-start")} aria-labelledby="product-overview-title">
       <div className="grid gap-1">
-        <span className={modelKickerClass}>Online Database</span>
-        <strong className="text-[17px] text-[var(--ink)]" id="database-overview-title">see_my_voice collections</strong>
+        <span className={modelKickerClass}>Connected Workspace</span>
+        <strong className="text-[17px] text-[var(--ink)]" id="product-overview-title">Practice data stays in sync</strong>
       </div>
-      <div className="overflow-hidden rounded-[12px] border border-[var(--line)] bg-white lg:row-span-2">
-        <img
-          className="block h-auto w-full"
-          src="/assets/see-my-voice-database.png"
-          alt="MongoDB Atlas see_my_voice database collection list"
-        />
+      <div className="grid min-h-[172px] content-center gap-3 rounded-[14px] border border-[rgba(32,154,120,0.16)] bg-[linear-gradient(135deg,rgba(32,154,120,0.11),rgba(207,75,49,0.08)_52%,rgba(255,255,255,0.76))] p-4 lg:row-span-2">
+        <span className="text-[42px] font-black leading-none text-[var(--green)]">AI</span>
+        <p className="m-0 max-w-[28rem] text-[13px] font-bold leading-[1.6] text-[var(--ink)]">
+          VoiceSight keeps practice, feedback, and progress connected for every user without exposing storage details in the interface.
+        </p>
       </div>
       <div className="grid gap-2">
-        {databaseSections.map((item) => (
-          <article className="grid gap-1 rounded-[12px] border border-[var(--line)] bg-[#fbfaf7] px-3 py-2.5" key={item.collection}>
+        {productSections.map((item) => (
+          <article className="grid gap-1 rounded-[12px] border border-[var(--line)] bg-[#fbfaf7] px-3 py-2.5" key={item.section}>
             <div className="grid grid-cols-[1fr_auto] items-center gap-2">
               <strong className="text-[12px] text-[var(--ink)]">{item.section}</strong>
-              <span className={item.documents ? statusPillClass : warnStatusPillClass}>{item.documents} docs</span>
+              <span className={statusPillClass}>{item.status}</span>
             </div>
-            <code className="text-[11px] font-bold text-[var(--green)]">{item.collection}</code>
-            <p className="m-0 text-[11px] leading-[1.45] text-[var(--muted)]">{item.data}</p>
+            <p className="m-0 text-[11px] leading-[1.45] text-[var(--muted)]">{item.detail}</p>
           </article>
         ))}
       </div>

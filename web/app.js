@@ -249,7 +249,7 @@ function threadLastMessage(thread) {
 
 function chatThreadDisplayTitle(thread, role, appState = state) {
   if (!thread || thread.type === "class") return thread?.title || "Class Group";
-  if (role === "student") return appState.teacherDashboard?.teacherName || "Ms. Wang";
+  if (role === "student") return appState.teacherDashboard?.teacherName || "Coach";
   const studentId = (thread.memberIds || []).find((id) => id !== "teacher-main");
   const student = getTeacherStudents(appState).find((item) => item.id === studentId);
   return student?.name || thread.title || "Student Chat";
@@ -1048,7 +1048,7 @@ function renderHome() {
 function renderAccount() {
   const currentLabel = state.currentRole === "teacher" ? "Teacher" : state.currentRole === "student" ? "Learner" : "Not selected";
   const account = state.account || {};
-  const displayName = account.displayName || (state.currentRole === "teacher" ? state.teacherDashboard?.teacherName : "Chen Xiaohe") || "User";
+  const displayName = account.displayName || (state.currentRole === "teacher" ? state.teacherDashboard?.teacherName : "Learner") || "User";
   const streak = getStreak(state);
   const unread = getTotalUnreadChatCount(state, state.currentRole === "teacher" ? "teacher" : "student");
   const todayTask = getTodayStudentTask(state);
@@ -1582,7 +1582,7 @@ function renderChatPage({ teacher = false } = {}) {
   const role = teacher ? "teacher" : "student";
   const threads = getChatThreads(state, role);
   const selectedThread = getSelectedChatThread(state, role) || threads[0] || null;
-  const participantId = teacher ? "teacher-main" : "student-chen";
+  const participantId = teacher ? "teacher-main" : "learner-b";
   const showThread = state.chatMode === "thread" && selectedThread;
   const shellOpen = teacher ? "" : `<section class="screen chat-screen" data-screen="chat">${brandHeader()}`;
   const shellClose = teacher ? "" : `</section>`;
@@ -2089,7 +2089,7 @@ function renderTeacherTasksPage(selectedStudent, recommendedTask, publishedTask,
             <div class="teacher-review-heading">
               <div>
                 <span class="model-kicker">Entry Assessment Profile</span>
-                <strong id="teacher-assessment-title">${escapeHtml(assessmentProfile.studentName)} · ${escapeHtml(assessmentProfile.status)}</strong>
+                <strong id="teacher-assessment-title">Entry Assessment · ${escapeHtml(assessmentProfile.status)}</strong>
               </div>
               <span class="teacher-review-score">${assessmentProfile.overallScore} </span>
             </div>
@@ -2350,7 +2350,7 @@ function renderAssessmentTemplateEditor(assessmentProfile) {
       <section class="panel assessment-editor-hero">
         <div>
           <span class="model-kicker">Entry Assessment Practice Pack Template</span>
-          <h2 id="assessment-editor-title">${escapeHtml(assessmentProfile.studentName)}'s Initial Practice Pack</h2>
+          <h2 id="assessment-editor-title">Initial Practice Pack</h2>
           <p>AI has generated a draft. Edit it for the learner, then submit it to the learner.</p>
         </div>
         <span class="teacher-review-score">${assessmentProfile.overallScore} </span>
@@ -2387,7 +2387,7 @@ function renderAssessmentTemplateEditor(assessmentProfile) {
         </div>
         <label class="template-field">
           <span>Task Title</span>
-          <input data-field="assessment-task-title" value="${escapeHtml(`${assessmentProfile.studentName} · Entry Assessment Practice Pack`)}">
+          <input data-field="assessment-task-title" value="Entry Assessment Practice Pack">
         </label>
         <div class="teacher-step-editor-list" data-step-editor-list>
           ${assessmentExerciseSet.map((exercise, index) => renderTeacherStepEditor(exercise, index)).join("")}

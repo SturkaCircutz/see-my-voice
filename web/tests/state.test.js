@@ -202,7 +202,7 @@ test("teacher dashboard starts with student profiles and review workload", () =>
   assert.equal(summary.studentCount, 3);
   assert.equal(summary.pendingSubmissions, 0);
   assert.equal(summary.overdueTasks, 1);
-  assert.equal(getSelectedTeacherStudent(state).name, "Lin Yiyi");
+  assert.equal(getSelectedTeacherStudent(state).name, "Learner A");
 });
 
 test("teacher class progress summarizes completion and attention", () => {
@@ -227,7 +227,7 @@ test("teacher class progress summarizes completion and attention", () => {
   assert.equal(progress.taskCoverageRate, 0);
   assert.equal(progress.averageLatestScore, 73);
   assert.ok(progress.commonFocusTags.some((item) => item.tag === "Unstable f onset"));
-  assert.ok(progress.attentionStudents.some((student) => student.id === "student-chen"));
+  assert.ok(progress.attentionStudents.some((student) => student.id === "learner-b"));
 
   state = reduceState(state, { type: "PUBLISH_RECOMMENDED_TASK" });
   state = completeAllTaskStepsAndSubmit(state, result);
@@ -243,15 +243,15 @@ test("teacher view navigation and student selection update teacher profile", () 
   assert.equal(state.currentView, "teacher");
   state = reduceState(state, { type: "NAVIGATE_TEACHER", view: "students" });
   assert.equal(state.teacherView, "students");
-  state = reduceState(state, { type: "SELECT_TEACHER_STUDENT", studentId: "student-chen" });
+  state = reduceState(state, { type: "SELECT_TEACHER_STUDENT", studentId: "learner-b" });
   assert.equal(state.currentView, "teacher");
-  assert.equal(getSelectedTeacherStudent(state).name, "Chen Xiaohe");
+  assert.equal(getSelectedTeacherStudent(state).name, "Learner B");
 });
 
 test("teacher can edit selected student stage profile comment", () => {
-  let state = reduceState(createInitialState(), { type: "SELECT_TEACHER_STUDENT", studentId: "student-chen" });
+  let state = reduceState(createInitialState(), { type: "SELECT_TEACHER_STUDENT", studentId: "learner-b" });
   state = reduceState(state, { type: "EDIT_TEACHER_STUDENT_SUMMARY" });
-  assert.equal(state.editingTeacherStudentSummaryId, "student-chen");
+  assert.equal(state.editingTeacherStudentSummaryId, "learner-b");
   state = reduceState(state, {
     type: "UPDATE_TEACHER_STUDENT_SUMMARY",
     summary: "Tone 3 is more stable than last week; short-sentence pauses still need teacher observation.",
@@ -296,7 +296,7 @@ test("parent companion summary remains internal while parent page is not navigab
   assert.match(summary.todayTitle, /Initial Practice|Entry Assessment|Practice Pack/);
   assert.ok(summary.practiceItems.length > 0);
   assert.match(summary.teacherAdvice, /companion practice/);
-  assert.match(summary.weeklyPlainReport, /Lin Yiyi practiced 5 times this week/);
+  assert.match(summary.weeklyPlainReport, /Learner A practiced 5 times this week/);
 });
 
 test("recommended task package stays teacher feedback completed before publishing", () => {
@@ -307,7 +307,7 @@ test("recommended task package stays teacher feedback completed before publishin
   assert.match(taskPackage.title, /Initial Practice/);
   assert.ok(taskPackage.exerciseSet.some((item) => item.title.includes("Short-Sentence Recording Submission")));
 
-  state = reduceState(state, { type: "SELECT_TEACHER_STUDENT", studentId: "student-chen" });
+  state = reduceState(state, { type: "SELECT_TEACHER_STUDENT", studentId: "learner-b" });
   taskPackage = buildRecommendedTaskPackage(getSelectedTeacherStudent(state));
   assert.match(taskPackage.title, /Tone Practice/);
   assert.equal(taskPackage.repeatCount, 5);
@@ -321,14 +321,14 @@ test("teacher can publish a recommended task to the student today task", () => {
   state = reduceState(state, { type: "PUBLISH_RECOMMENDED_TASK" });
   let todayTask = getTodayStudentTask(state);
   assert.equal(todayTask.status, "Published");
-  assert.equal(todayTask.targetStudentId, "student-lin");
+  assert.equal(todayTask.targetStudentId, "learner-a");
   assert.match(todayTask.title, /Initial Practice/);
 
-  state = reduceState(state, { type: "SELECT_TEACHER_STUDENT", studentId: "student-chen" });
+  state = reduceState(state, { type: "SELECT_TEACHER_STUDENT", studentId: "learner-b" });
   state = reduceState(state, { type: "PUBLISH_RECOMMENDED_TASK" });
   todayTask = getTodayStudentTask(state);
   assert.equal(state.publishedTasks.length, 2);
-  assert.ok(state.publishedTasks.some((task) => task.targetStudentId === "student-chen"));
+  assert.ok(state.publishedTasks.some((task) => task.targetStudentId === "learner-b"));
   assert.equal(todayTask.status, "Published");
 });
 
@@ -340,8 +340,8 @@ test("student entry assessment creates a teacher-confirmed initial task", () => 
   assert.equal(state.account.entryAssessmentCompleted, true);
   assert.equal(getPendingAssessmentProfiles(state).length, 1);
   assert.equal(getTeacherDashboardSummary(state).pendingAssessments, 1);
-  assert.equal(getSelectedAssessmentProfile(state).studentName, "Lin Yiyi");
-  assert.match(getSelectedAssessmentProfile(state).profileSummary, /entry assessment/);
+  assert.equal(getSelectedAssessmentProfile(state).studentName, "Learner A");
+  assert.match(getSelectedAssessmentProfile(state).profileSummary, /entry assessment/i);
 
   state = reduceState(state, { type: "PUBLISH_ASSESSMENT_TASK" });
   const profile = getSelectedAssessmentProfile(state);
@@ -418,7 +418,7 @@ test("published task analysis creates a teacher review submission", () => {
   assert.equal(state.activeTaskPracticeId, "");
   assert.equal(state.currentView, "taskDetail");
   assert.equal(getTeacherDashboardSummary(state).pendingSubmissions, 1);
-  assert.equal(submissions[0].studentId, "student-lin");
+  assert.equal(submissions[0].studentId, "learner-a");
   assert.equal(submissions[0].exerciseTitle, "Short-Sentence Recording Submission");
   assert.equal(submissions[0].recordingUrl, "blob:student-recording");
   assert.ok(
@@ -490,7 +490,7 @@ test("teacher assessment report summarizes profile and reviewed submissions", ()
   };
   let state = createInitialState();
   let report = buildStudentAssessmentReport(state);
-  assert.equal(report.studentName, "Lin Yiyi");
+  assert.equal(report.studentName, "Learner A");
   assert.equal(report.averageAiScore, 72);
   assert.equal(report.teacherAverage, null);
   assert.ok(report.focusAreas.includes("Unstable f onset"));

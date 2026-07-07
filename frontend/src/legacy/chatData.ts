@@ -3,16 +3,16 @@ import type { ChatThread } from "./types";
 // Sample chat threads keep the chat layout visible in the React port.
 export const chatThreads: ChatThread[] = [
   {
-    id: "chat-direct-chen",
-    title: "Ms. Wang",
+    id: "chat-direct-sample",
+    title: "Coach",
     type: "direct",
     unread: 1,
     lastMessage: "Finish the f + an short-sentence recording first today.",
-    memberIds: ["student-chen", "teacher-main"],
+    memberIds: ["learner-b", "teacher-main"],
     messages: [
       {
         id: "m1",
-        sender: "Ms. Wang",
+        sender: "Coach",
         senderId: "teacher-main",
         body: "Finish the f + an short-sentence recording first today. Reading a little slower is fine.",
         time: "08:30",
@@ -21,11 +21,11 @@ export const chatThreads: ChatThread[] = [
       },
       {
         id: "m1-reply",
-        sender: "Chen Xiaohe",
-        senderId: "student-chen",
+        sender: "Learner B",
+        senderId: "learner-b",
         body: "I finished the first recording. Please review it again.",
         time: "08:46",
-        readBy: ["student-chen", "teacher-main"],
+        readBy: ["learner-b", "teacher-main"],
         relatedText: "我要吃饭",
       },
     ],
@@ -36,15 +36,15 @@ export const chatThreads: ChatThread[] = [
     type: "class",
     unread: 0,
     lastMessage: "After today's recordings, I will listen to them one by one.",
-    memberIds: ["student-chen", "student-lin", "student-qiao", "teacher-main"],
+    memberIds: ["learner-b", "learner-a", "learner-c", "teacher-main"],
     messages: [
       {
         id: "m2",
-        sender: "Ms. Wang",
+        sender: "Coach",
         senderId: "teacher-main",
         body: "Everyone, after you finish today's assigned recordings, I will listen to them one by one.",
         time: "09:05",
-        readBy: ["teacher-main", "student-chen", "student-lin", "student-qiao"],
+        readBy: ["teacher-main", "learner-b", "learner-a", "learner-c"],
       },
     ],
   },

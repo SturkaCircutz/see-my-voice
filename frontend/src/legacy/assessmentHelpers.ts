@@ -120,8 +120,8 @@ export function buildAssessmentProfileFromSession(
     issueTags: selectedTags,
     issueCategories: [...new Set(results.map((row) => row.title).filter(Boolean))],
     profileSummary: results.length
-      ? `${student.name} completed ${results.length} entry assessment items, with overall reference score ${averageScore}. Key observations: ${selectedTags.slice(0, 2).join("、")}.`
-      : `${student.name}'s entry assessment shows: ${student.assessmentSummary}`,
+      ? `Entry assessment completed with ${results.length} items and an overall reference score of ${averageScore}. Key observations: ${selectedTags.slice(0, 2).join("、")}.`
+      : `Entry assessment shows: ${student.assessmentSummary}`,
     recommendation: results.length
       ? `Start by practicing around ${selectedTags.slice(0, 2).join("、")} with short, frequent sessions. Publish the initial practice pack after teacher confirmation.`
       : "Keep short daily repetition first and observe changes in stability.",

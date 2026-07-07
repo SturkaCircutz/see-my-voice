@@ -221,7 +221,7 @@ function learnerAccountToTeacherStudent(account: AuthUser, index: number): Teach
     overdueTasks: 0,
     lastPracticeAt: account.lastLoginAt ? new Date(account.lastLoginAt).toLocaleDateString() : "No practice yet",
     focusTags: ["Teacher assigned practice"],
-    assessmentSummary: `MongoDB learner account: ${account.username}`,
+    assessmentSummary: `Registered learner account: ${account.username}`,
     trend: index === 0 ? "Needs Attention" : "Stable",
   };
 }
@@ -287,7 +287,7 @@ export function LegacyApp({
     isLoggedIn: false,
     isRegistered: false,
     username: "",
-    displayName: "Chen Xiaohe",
+    displayName: "Learner",
     password: "",
     avatarDataUrl: "",
     lastLoginAt: "",
@@ -2858,7 +2858,7 @@ function TeacherTasks({
 
       <section className={cn(panelClass, "grid gap-2.5")} aria-label="AI Assisted Tasks">
         <span className={modelKickerClass}>Task Center</span>
-        <strong className="text-[15px]">{draftStudent ? `${draftStudent.name}'s Published Practice Packs` : "No learner selected"}</strong>
+        <strong className="text-[15px]">{draftStudent ? "Published Practice Packs" : "No learner selected"}</strong>
         {learnerTasks.length ? (
           <div className="grid gap-2.5">
             {learnerTasks.map((task) => (
@@ -2892,7 +2892,7 @@ function TeacherTasks({
               <div>
                 <span className={modelKickerClass}>Entry Assessment Profile</span>
                 <strong className="block text-[var(--ink)]" id="teacher-assessment-title">
-                  {assessmentProfile.studentName} · {assessmentProfile.status}
+                  Entry Assessment · {assessmentProfile.status}
                 </strong>
               </div>
               <span className={teacherReviewScoreClass}>{assessmentProfile.overallScore}</span>
@@ -3041,7 +3041,7 @@ function TaskPackageEditorScreen({
       <section className={cn(panelClass, "grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3")}>
         <div>
           <span className={modelKickerClass}>Practice Pack Review Template</span>
-          <h2 className="mt-1 mb-0 text-[22px] text-[var(--ink)]" id="task-package-editor-title">{student.name}'s Practice Task</h2>
+          <h2 className="mt-1 mb-0 text-[22px] text-[var(--ink)]" id="task-package-editor-title">Personalized Practice Task</h2>
           <p className="m-0 leading-[1.55] text-[var(--muted)]">The system only drafts the pack. Confirm the target, practice load, and learner-facing instructions before publishing.</p>
         </div>
         <span className={teacherReviewScoreClass}>{student.latestScore}</span>
@@ -3172,14 +3172,14 @@ function AssessmentTemplateEditorScreen({
   const [assessmentExerciseSet, setAssessmentExerciseSet] = React.useState<StudentTaskStep[]>(initialAssessmentExerciseSet);
   const [profileSummary, setProfileSummary] = React.useState(profile?.profileSummary || "");
   const [assessmentRecommendation, setAssessmentRecommendation] = React.useState(profile?.recommendation || "");
-  const [assessmentTaskTitle, setAssessmentTaskTitle] = React.useState(profile ? `${profile.studentName} · Entry Assessment Practice Pack` : "");
+  const [assessmentTaskTitle, setAssessmentTaskTitle] = React.useState(profile ? "Entry Assessment Practice Pack" : "");
   const [assessmentTeacherNote, setAssessmentTeacherNote] = React.useState("Your teacher adjusted this practice pack based on your entry assessment. Today, do not rush. Slow down the target sound, say it completely, and your teacher will listen again after you record.");
 
   React.useEffect(() => {
     setAssessmentExerciseSet(initialAssessmentExerciseSet);
     setProfileSummary(profile?.profileSummary || "");
     setAssessmentRecommendation(profile?.recommendation || "");
-    setAssessmentTaskTitle(profile ? `${profile.studentName} · Entry Assessment Practice Pack` : "");
+    setAssessmentTaskTitle(profile ? "Entry Assessment Practice Pack" : "");
     setAssessmentTeacherNote("Your teacher adjusted this practice pack based on your entry assessment. Today, do not rush. Slow down the target sound, say it completely, and your teacher will listen again after you record.");
   }, [profile?.id]);
 
@@ -3240,7 +3240,7 @@ function AssessmentTemplateEditorScreen({
       <section className={cn(panelClass, "grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3")}>
         <div>
           <span className={modelKickerClass}>Entry Assessment Practice Pack Template</span>
-          <h2 className="mt-1 mb-0 text-[22px] text-[var(--ink)]" id="assessment-editor-title">{profile.studentName}'s Initial Practice Pack</h2>
+          <h2 className="mt-1 mb-0 text-[22px] text-[var(--ink)]" id="assessment-editor-title">Initial Practice Pack</h2>
           <p className="m-0 leading-[1.55] text-[var(--muted)]">AI has generated a draft. Edit it for the learner, then submit it to the learner.</p>
         </div>
         <span className={teacherReviewScoreClass}>{profile.overallScore}</span>
@@ -3499,7 +3499,7 @@ function TeacherReviewEditorScreen({
   );
 }
 
-// Chat screen renders Mongo-backed conversations for the signed-in account.
+// Chat screen renders synced conversations for the signed-in account.
 function ChatScreen({
   teacher,
   user,

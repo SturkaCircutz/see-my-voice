@@ -71,7 +71,7 @@ export interface LocalAccountState {
 export type TeacherStudentFilter = "all" | "attention";
 export type RecordingContext = "practice" | "entryAssessment" | "task";
 
-// This is the browser-saved legacy UI state, not the backend database schema.
+// This is the browser-saved legacy UI state, not the backend API schema.
 export interface StoredLegacyState {
   role?: Role;
   currentRole?: Role;

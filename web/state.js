@@ -179,7 +179,7 @@ function defaultAccount() {
     isLoggedIn: false,
     isRegistered: false,
     username: "",
-    displayName: "Chen Xiaohe",
+    displayName: "Learner",
     password: "",
     avatarDataUrl: "",
     lastLoginAt: "",
@@ -191,17 +191,17 @@ function defaultAccount() {
 function defaultChatThreads() {
   return [
     {
-      id: "chat-direct-chen",
+      id: "chat-direct-sample",
       type: "direct",
-      title: "Chen Xiaohe",
-      memberIds: ["teacher-main", "student-chen"],
+      title: "Learner B",
+      memberIds: ["teacher-main", "learner-b"],
       createdAt: todayKey(),
       messages: [
         {
-          id: "msg-direct-chen-1",
+          id: "msg-direct-sample-1",
           senderId: "teacher-main",
           senderRole: "teacher",
-          senderName: "Ms. Wang",
+          senderName: "Coach",
           body: "Finish the f + an short-sentence recording first today. Reading a little slower is fine.",
           createdAt: "08:30",
           readBy: ["teacher-main"],
@@ -212,14 +212,14 @@ function defaultChatThreads() {
       id: "chat-class-main",
       type: "class",
       title: "Qiyin Class 1 Group Chat",
-      memberIds: ["teacher-main", "student-lin", "student-chen", "student-qiao"],
+      memberIds: ["teacher-main", "learner-a", "learner-b", "learner-c"],
       createdAt: todayKey(),
       messages: [
         {
           id: "msg-class-1",
           senderId: "teacher-main",
           senderRole: "teacher",
-          senderName: "Ms. Wang",
+          senderName: "Coach",
           body: "Everyone, after you finish today's assigned recordings, I will listen to them one by one.",
           createdAt: "09:05",
           readBy: ["teacher-main"],
@@ -262,11 +262,11 @@ function defaultPracticeHistory() {
 
 export const teacherDashboard = {
   className: "Qiyin Class 1",
-  teacherName: "Ms. Wang",
+  teacherName: "Coach",
   students: [
     {
-      id: "student-lin",
-      name: "Lin Yiyi",
+      id: "learner-a",
+      name: "Learner A",
       age: 8,
       stage: "Initial Stabilization Stage",
       learnerProfile: "English-speaking beginner; classroom repetition is steady",
@@ -281,8 +281,8 @@ export const teacherDashboard = {
       trend: "Improving",
     },
     {
-      id: "student-chen",
-      name: "Chen Xiaohe",
+      id: "learner-b",
+      name: "Learner B",
       age: 10,
       stage: "Tone Strengthening Stage",
       learnerProfile: "Intermediate foreign learner; rhythm speeds up in longer Mandarin sentences",
@@ -297,8 +297,8 @@ export const teacherDashboard = {
       trend: "Needs Attention",
     },
     {
-      id: "student-qiao",
-      name: "Qiao An",
+      id: "learner-c",
+      name: "Learner C",
       age: 7,
       stage: "Final Completeness Training",
       learnerProfile: "Beginner foreign learner; practices actively with a study partner",
@@ -464,7 +464,7 @@ export function createInitialState() {
     activeTaskItemIndex: 0,
     taskPracticeSnapshot: null,
     taskDetailMode: false,
-    selectedChatThreadId: "chat-direct-chen",
+    selectedChatThreadId: "chat-direct-sample",
     chatMode: "list",
     assessmentSession: defaultAssessmentSession(),
     account: defaultAccount(),
@@ -1044,7 +1044,7 @@ export function buildRecommendedTaskPackage(student) {
   return {
     id: `task-${student.id}-${primary.category}`,
     status: "Needs Teacher Review",
-    title: `${student.name} · ${primary.category} Practice Pack`,
+    title: `${primary.category} Practice Pack`,
     targetStudentId: student.id,
     focusTag: primary.tag,
     goal: primary.goal,
@@ -1143,7 +1143,7 @@ export function buildAssessmentProfile(student, existingCount = 0) {
     completedAt: todayKey(),
     status: "Needs Teacher Confirmation",
     overallScore: student.latestScore,
-    profileSummary: `${student.name}'s entry assessment shows: ${student.assessmentSummary}`,
+    profileSummary: `Entry assessment shows: ${student.assessmentSummary}`,
     issueTags: focusTags,
     issueCategories: uniqueCategories,
     recommendation: uniqueCategories.length
@@ -1225,7 +1225,7 @@ export function buildInitialTaskFromAssessment(profile, edits = {}) {
   return {
     id: `initial-task-${profile.id}`,
     status: "Published",
-    title: String(edits.title || `${profile.studentName} · Entry Assessment Practice Pack`).trim() || `${profile.studentName} · Entry Assessment Practice Pack`,
+    title: String(edits.title || "Entry Assessment Practice Pack").trim() || "Entry Assessment Practice Pack",
     targetStudentId: profile.studentId,
     focusTag: profile.issueTags[0] || "Entry Assessment Reinforcement",
     goal: String(edits.recommendation || profile.recommendation || "").trim() || profile.recommendation,
@@ -1358,7 +1358,7 @@ export function getSelectedTeacherMessages(state) {
 }
 
 function currentParticipantId(state) {
-  return state.currentRole === "teacher" ? "teacher-main" : "student-chen";
+  return state.currentRole === "teacher" ? "teacher-main" : "learner-b";
 }
 
 function normalizeThreadMessages(thread) {
@@ -1366,7 +1366,7 @@ function normalizeThreadMessages(thread) {
 }
 
 export function getChatThreads(state, role = state.currentRole) {
-  const participantId = role === "teacher" ? "teacher-main" : "student-chen";
+  const participantId = role === "teacher" ? "teacher-main" : "learner-b";
   return (state.chatThreads || []).filter((thread) => (
     (thread.memberIds || []).includes(participantId)
   ));
@@ -1378,7 +1378,7 @@ export function getSelectedChatThread(state, role = state.currentRole) {
 }
 
 export function getUnreadChatCount(state, thread, role = state.currentRole) {
-  const participantId = role === "teacher" ? "teacher-main" : "student-chen";
+  const participantId = role === "teacher" ? "teacher-main" : "learner-b";
   return normalizeThreadMessages(thread).filter((message) => (
     message.senderId !== participantId && !(message.readBy || []).includes(participantId)
   )).length;
@@ -2021,7 +2021,7 @@ export function reduceState(state, action) {
         issueTags: issueTags.length ? issueTags : profile.issueTags,
         issueCategories: [...new Set(results.map((row) => row.title).filter(Boolean))],
         profileSummary: results.length
-          ? `${student.name} completed ${results.length} entry assessment items, with overall reference score ${averageScore}. Key observations: ${(issueTags.length ? issueTags : profile.issueTags).slice(0, 2).join("、")}.`
+          ? `Entry assessment completed with ${results.length} items and an overall reference score of ${averageScore}. Key observations: ${(issueTags.length ? issueTags : profile.issueTags).slice(0, 2).join("、")}.`
           : profile.profileSummary,
         recommendation: results.length
           ? `Start by practicing around ${(issueTags.length ? issueTags : profile.issueTags).slice(0, 2).join("、")} with short, frequent sessions. Publish the initial practice pack after teacher confirmation.`
@@ -2159,8 +2159,8 @@ export function reduceState(state, action) {
       const participantId = currentParticipantId(state);
       const senderRole = state.currentRole === "teacher" ? "teacher" : "student";
       const senderName = senderRole === "teacher"
-        ? state.teacherDashboard?.teacherName || "Ms. Wang"
-        : state.account?.displayName || "Chen Xiaohe";
+        ? state.teacherDashboard?.teacherName || "Coach"
+        : state.account?.displayName || "Learner";
       const threadId = action.threadId || state.selectedChatThreadId || getChatThreads(state)[0]?.id;
       const message = {
         id: `chat-${threadId}-${Date.now()}`,
@@ -2239,8 +2239,8 @@ export function reduceState(state, action) {
       };
     }
     case "CREATE_STUDENT_DIRECT_CHAT": {
-      const studentId = "student-chen";
-      const studentName = state.account?.displayName || "Chen Xiaohe";
+      const studentId = "learner-b";
+      const studentName = state.account?.displayName || "Learner";
       const existing = (state.chatThreads || []).find((thread) => thread.type === "direct" && (thread.memberIds || []).includes(studentId));
       if (existing) return { ...state, selectedChatThreadId: existing.id, chatMode: "thread", currentRole: "student", currentView: "chat" };
       const id = `chat-direct-${studentId}-${Date.now()}`;
@@ -2255,7 +2255,7 @@ export function reduceState(state, action) {
           {
             id,
             type: "direct",
-            title: "Ms. Wang",
+            title: "Coach",
             memberIds: ["teacher-main", studentId],
             createdAt: todayKey(),
             messages: [

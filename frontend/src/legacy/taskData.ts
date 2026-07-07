@@ -1,7 +1,7 @@
 import type { StudentTaskPackage, TaskSubmission } from "./types";
 
-// Default task state must stay empty. Live practice packs are loaded from MongoDB after a teacher publishes them.
+// Default task state must stay empty. Live practice packs load after a teacher publishes them.
 export const studentTaskPackages: StudentTaskPackage[] = [];
 
-// Recording submissions are created by learners after completing a Mongo-backed task.
+// Recording submissions are created by learners after completing an assigned task.
 export const taskSubmissions: TaskSubmission[] = [];

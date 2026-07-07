@@ -1,10 +1,10 @@
 import type { AssessmentProfile, QuestionBankPackage, TeacherStudent } from "./types";
 
-// Sample learners let the teacher pages render before real task APIs exist.
+// Neutral sample learners let the teacher pages render before real task APIs exist.
 export const teacherStudents: TeacherStudent[] = [
   {
-    id: "student-lin",
-    name: "Lin Yiyi",
+    id: "learner-a",
+    name: "Learner A",
     stage: "Initial Stabilization Stage",
     latestScore: 72,
     weeklyPracticeCount: 5,
@@ -16,8 +16,8 @@ export const teacherStudents: TeacherStudent[] = [
     trend: "Improving",
   },
   {
-    id: "student-chen",
-    name: "Chen Xiaohe",
+    id: "learner-b",
+    name: "Learner B",
     stage: "Tone Strengthening Stage",
     latestScore: 66,
     weeklyPracticeCount: 3,
@@ -29,8 +29,8 @@ export const teacherStudents: TeacherStudent[] = [
     trend: "Needs Attention",
   },
   {
-    id: "student-qiao",
-    name: "Qiao An",
+    id: "learner-c",
+    name: "Learner C",
     stage: "Final Completeness Training",
     latestScore: 81,
     weeklyPracticeCount: 6,
@@ -85,12 +85,12 @@ export const questionBankPackages: QuestionBankPackage[] = [
 
 export const assessmentProfiles: AssessmentProfile[] = [
   {
-    id: "assessment-chen",
-    studentName: "Chen Xiaohe",
+    id: "assessment-sample",
+    studentName: "Learner B",
     status: "Needs Teacher Confirmation",
     overallScore: 68,
     issueTags: ["Unstable f onset", "Incomplete final an ending", "Tone 4 fall is not clear"],
     profileSummary: "Entry assessment shows understandable short sentences, but the f onset and final an ending need slow, focused repetition.",
-    recommendation: "Start with f + an practice, then record a short sentence for teacher review.",
+    recommendation: "Start with focused sound practice, then record a short sentence for review.",
   },
 ];

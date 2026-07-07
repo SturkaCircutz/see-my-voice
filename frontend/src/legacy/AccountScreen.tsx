@@ -43,9 +43,9 @@ export function AccountScreen({
   onAvatarChange: (avatarDataUrl: string) => void;
 }) {
   const signedIn = Boolean(user);
-  const displayName = user?.name || localAccount.displayName || (role === "teacher" ? "Ms. Wang" : "Chen Xiaohe");
+  const displayName = user?.name || localAccount.displayName || (role === "teacher" ? "Coach" : "Learner");
   const accountName = user?.username || localAccount.username || "Signed-in user";
-  const participantId = role === "teacher" ? "teacher-main" : "student-chen";
+  const participantId = role === "teacher" ? "teacher-main" : "learner-b";
   const unread = accountChatThreads
     .filter((thread) => thread.memberIds.includes(participantId))
     .reduce((sum, thread) => sum + unreadCount(thread, participantId), 0);
@@ -84,9 +84,9 @@ export function AccountScreen({
               <span>Change avatar</span>
             </label>
             <div>
-              <span className={modelKickerClass}>{signedIn ? "Signed In" : "MongoDB Account"}</span>
+              <span className={modelKickerClass}>{signedIn ? "Signed In" : "Account"}</span>
               <h2 className="m-0 text-[23px] text-[var(--ink)]" id="account-profile-title">{displayName}</h2>
-              <p className="m-0 text-[13px] leading-[1.7] text-[var(--muted)]">Current: {role === "teacher" ? "Teacher" : "Learner"}. Account sign-in is saved in MongoDB; avatar and chat identity stay in this browser.</p>
+              <p className="m-0 text-[13px] leading-[1.7] text-[var(--muted)]">Current: {role === "teacher" ? "Teacher" : "Learner"}. Your account syncs securely; avatar and draft chat preferences stay in this browser.</p>
             </div>
           </div>
           <div className="grid grid-cols-3 gap-2" aria-label="Account status">
@@ -132,7 +132,7 @@ export function AccountScreen({
         </section>
 
         <section className="px-1 pt-0.5 pb-1.5 text-[11px] leading-[1.6] text-[var(--muted)] lg:col-span-2" aria-label="Local data note">
-          Account credentials are stored by the backend in MongoDB. Clearing browser data removes only the local avatar, navigation state, and chat draft data.
+          Your account stays available across sessions. Clearing browser data removes only the local avatar, navigation state, and chat draft data on this device.
         </section>
       </div>
     </section>
