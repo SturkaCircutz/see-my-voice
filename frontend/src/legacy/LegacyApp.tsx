@@ -112,6 +112,7 @@ import {
   progressCalendarDays,
   progressChartLabels,
   progressChartScores,
+  practiceStreakDays,
   ProgressTrendChart,
 } from "./progressHelpers";
 import { Avatar, Score } from "./ui";
@@ -428,7 +429,7 @@ export function LegacyApp({
   const selectedSyllable =
     syllables.find((item) => item.id === selectedSyllableId) || syllables[0] || defaultSyllables[0];
   const pinyin = pinyinByText[targetText] || (analysis ? activeAnalysis.heardText : "Waiting for recording analysis");
-  const streak = Math.max(1, Math.min(9, attempts.length || 1));
+  const streak = practiceStreakDays(attempts);
   const accountDisplayName = user?.name || localAccount.displayName || localAccount.username || (role === "teacher" ? "Teacher" : "Learner");
 
   React.useEffect(() => {
@@ -1009,6 +1010,7 @@ export function LegacyApp({
           role={role}
           user={user}
           attempts={attempts}
+          practiceStreak={streak}
           publishedTasks={publishedTasks}
           chatThreads={localChatThreads}
           avatarDataUrl={accountAvatar}
@@ -1069,6 +1071,7 @@ export function LegacyApp({
         role={role}
         user={user}
         attempts={attempts}
+        practiceStreak={streak}
         publishedTasks={publishedTasks}
         chatThreads={localChatThreads}
         avatarDataUrl={accountAvatar}
@@ -1089,6 +1092,7 @@ export function LegacyApp({
     screen = (
       <ProgressScreen
         attempts={attempts}
+        streak={streak}
         onBack={() => navigateStudent("practice")}
         onOpenToneDrill={(tone) => {
           setSelectedToneDrill(tone);
@@ -1102,6 +1106,7 @@ export function LegacyApp({
         tasks={publishedTasks}
         submissions={taskSubmissions}
         progress={taskStepProgress}
+        streak={streak}
         onPractice={() => navigateStudent("practice")}
         onOpenTask={openStudentTask}
       />
@@ -1118,6 +1123,7 @@ export function LegacyApp({
         activeItemIndex={activeTaskItemIndex}
         recording={recording}
         busy={busy}
+        streak={streak}
         onBackToList={() => setStudentView("tasks")}
         onPractice={() => navigateStudent("practice")}
         onOpenStep={openTaskStep}
@@ -1140,6 +1146,7 @@ export function LegacyApp({
         threads={localChatThreads}
         onThreadsChange={setLocalChatThreads}
         avatarDataUrl={accountAvatar}
+        streak={streak}
       />
     );
   } else if (studentView === "entryAssessment") {
@@ -1148,6 +1155,7 @@ export function LegacyApp({
         session={assessmentSession}
         recording={recording}
         busy={busy}
+        streak={streak}
         onRecord={recording ? stopRecording : () => startRecording("entryAssessment")}
         onComplete={completeEntryAssessment}
       />
@@ -1671,10 +1679,12 @@ function DetailScreen({
 // Progress view summarizes recent attempts without changing practice data.
 function ProgressScreen({
   attempts,
+  streak,
   onBack,
   onOpenToneDrill,
 }: {
   attempts: PracticeAttempt[];
+  streak: number;
   onBack: () => void;
   onOpenToneDrill: (tone: string) => void;
 }) {
@@ -1685,7 +1695,7 @@ function ProgressScreen({
 
   return (
     <section className={screenClass} data-screen="progress">
-      <BrandHeader progress streak={Math.max(1, attempts.length || 1)} />
+      <BrandHeader progress streak={streak} />
       <div className={cn(contentClass, "lg:grid-cols-[minmax(420px,1.2fr)_minmax(320px,0.8fr)] lg:items-start")}>
         <section className="lg:col-span-2" aria-labelledby="trend-title">
           <p className={sectionLabelClass} id="trend-title">
@@ -1785,12 +1795,14 @@ function EntryAssessmentScreen({
   session,
   recording,
   busy,
+  streak,
   onRecord,
   onComplete,
 }: {
   session: EntryAssessmentSession;
   recording: boolean;
   busy: boolean;
+  streak: number;
   onRecord: () => void;
   onComplete: () => void;
 }) {
@@ -1809,7 +1821,7 @@ function EntryAssessmentScreen({
 
   return (
     <section className={screenClass} data-screen="entry-assessment">
-      <BrandHeader streak={1} />
+      <BrandHeader streak={streak} />
       <div className={contentClass}>
         <section className={cn(panelClass, "grid gap-[11px] border-[rgba(239,190,98,0.42)] bg-[#fffaf0]")}>
           <div className="grid grid-cols-[1fr_auto] items-start gap-2.5">
@@ -2023,18 +2035,20 @@ function StudentTasksScreen({
   tasks,
   submissions,
   progress,
+  streak,
   onPractice,
   onOpenTask,
 }: {
   tasks: StudentTaskPackage[];
   submissions: TaskSubmission[];
   progress: TaskProgressState;
+  streak: number;
   onPractice: () => void;
   onOpenTask: (taskId: string) => void;
 }) {
   return (
     <section className={screenClass} data-screen="tasks">
-      <BrandHeader streak={1} />
+      <BrandHeader streak={streak} />
       <div className={cn(contentBaseClass, "gap-[13px]")}>
         {tasks.length ? (
           <div className="grid gap-3" aria-label="Practice pack list">
@@ -2108,6 +2122,7 @@ function StudentTaskDetailScreen({
   activeItemIndex,
   recording,
   busy,
+  streak,
   onBackToList,
   onPractice,
   onOpenStep,
@@ -2126,6 +2141,7 @@ function StudentTaskDetailScreen({
   activeItemIndex: number;
   recording: boolean;
   busy: boolean;
+  streak: number;
   onBackToList: () => void;
   onPractice: () => void;
   onOpenStep: (taskId: string, exerciseId: string) => void;
@@ -2139,7 +2155,7 @@ function StudentTaskDetailScreen({
 
   return (
     <section className={screenClass} data-screen="task-detail">
-      <BrandHeader streak={1} />
+      <BrandHeader streak={streak} />
       <div className={cn(contentBaseClass, "gap-[13px]")}>
         {task ? (
           <StudentTaskContent
@@ -3420,6 +3436,7 @@ function ChatScreen({
   threads: allThreads,
   onThreadsChange,
   avatarDataUrl,
+  streak,
 }: {
   teacher: boolean;
   user: AuthUser;
@@ -3430,6 +3447,7 @@ function ChatScreen({
   threads: ChatThread[];
   onThreadsChange: React.Dispatch<React.SetStateAction<ChatThread[]>>;
   avatarDataUrl: string;
+  streak?: number;
 }) {
   const role = teacher ? "teacher" : "student";
   const participantId = user.id;
@@ -3563,7 +3581,7 @@ function ChatScreen({
 
   return (
     <section className={screenClass} data-screen="chat">
-      {teacher ? <TeacherHeader title="Teacher Chat" subtitle="Messages" className="min-h-[146px]" /> : <BrandHeader streak={1} />}
+      {teacher ? <TeacherHeader title="Teacher Chat" subtitle="Messages" className="min-h-[146px]" /> : <BrandHeader streak={streak || 0} />}
       <div className={cn(contentClass, "px-3.5")}>
         {chatMode === "thread" && selectedThread ? (
           <ChatThreadWindow

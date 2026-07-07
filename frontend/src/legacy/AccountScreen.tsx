@@ -23,6 +23,7 @@ export function AccountScreen({
   role,
   user,
   attempts,
+  practiceStreak,
   publishedTasks,
   chatThreads: accountChatThreads,
   avatarDataUrl,
@@ -33,6 +34,7 @@ export function AccountScreen({
   role: Exclude<Role, "guest">;
   user: AuthUser | null;
   attempts: PracticeAttempt[];
+  practiceStreak: number;
   publishedTasks: StudentTaskPackage[];
   chatThreads: ChatThread[];
   avatarDataUrl: string;
@@ -89,7 +91,7 @@ export function AccountScreen({
           </div>
           <div className="grid grid-cols-3 gap-2" aria-label="Account status">
             <div className="grid gap-0.5 rounded-[13px] bg-[rgba(255,255,255,0.72)] px-2 py-2.5 text-center">
-              <strong className="text-xl leading-none text-[var(--navy)]">{Math.max(1, attempts.length || 1)}</strong>
+              <strong className="text-xl leading-none text-[var(--navy)]">{practiceStreak}</strong>
               <span className="text-[10px] font-extrabold text-[var(--muted)]">Practice Streak</span>
             </div>
             <div className="grid gap-0.5 rounded-[13px] bg-[rgba(255,255,255,0.72)] px-2 py-2.5 text-center">

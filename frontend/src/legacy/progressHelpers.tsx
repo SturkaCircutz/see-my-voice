@@ -1,6 +1,24 @@
 import type { PracticeAttempt } from "../types";
 import { attemptScore } from "./utils";
 
+export function practiceStreakDays(attempts: PracticeAttempt[], now = new Date()) {
+  const practicedDates = new Set(
+    attempts
+      .map((attempt) => new Date(attempt.createdAt))
+      .filter((date) => !Number.isNaN(date.getTime()))
+      .map((date) => date.toISOString().slice(0, 10)),
+  );
+  const cursor = new Date(now);
+  let streak = 0;
+
+  while (practicedDates.has(cursor.toISOString().slice(0, 10))) {
+    streak += 1;
+    cursor.setDate(cursor.getDate() - 1);
+  }
+
+  return streak;
+}
+
 export function progressCalendarDays(attempts: PracticeAttempt[], count = 14) {
   const practiced = new Set(
     attempts
