@@ -39,8 +39,8 @@ function App() {
   }, []);
 
   const authenticateAccount = React.useCallback(
-    async (username: string, password: string) => {
-      return handleAuthed(await loginUser({ username, password }));
+    async (username: string, password: string, role: "student" | "teacher") => {
+      return handleAuthed(await loginUser({ username, password, role }));
     },
     [handleAuthed],
   );

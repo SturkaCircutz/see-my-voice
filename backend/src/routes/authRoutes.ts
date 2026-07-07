@@ -27,6 +27,12 @@ function cleanRole(value: unknown): "student" | "teacher" {
   return value === "teacher" ? "teacher" : "student";
 }
 
+function roleLoginMessage(role: "student" | "teacher"): string {
+  return role === "teacher"
+    ? "This account is registered as a teacher. Use Teacher Login."
+    : "This account is registered as a learner. Use Student Login.";
+}
+
 function readClientMeta(request: AuthenticatedRequest) {
   return {
     ip: request.ip,
@@ -89,10 +95,17 @@ authRoutes.post("/register", async (request, response) => {
 authRoutes.post("/login", async (request, response) => {
   const username = cleanUsername(request.body.username);
   const password = String(request.body.password || "");
+  const requestedRole = cleanRole(request.body.role);
   const user = await usersCollection().findOne({ username });
 
   if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
     response.status(401).json({ error: "Username or password is incorrect." });
+    return;
+  }
+
+  const accountRole = cleanRole(user.role);
+  if (accountRole !== requestedRole) {
+    response.status(403).json({ error: roleLoginMessage(accountRole) });
     return;
   }
 

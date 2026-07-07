@@ -34,6 +34,38 @@ export interface ChatApiMessage {
   createdAt: string;
 }
 
+export interface TaskApiStep {
+  id: string;
+  type: string;
+  title: string;
+  instruction: string;
+  targetText: string;
+  requiredCount: number;
+  requiresSubmission: boolean;
+  practiceItems: string[];
+  sourceMode?: "bank" | "custom";
+  bankPackageId?: string;
+}
+
+export interface TaskApiItem {
+  id: string;
+  teacherId: string;
+  studentId: string;
+  title: string;
+  goal: string;
+  targetText: string;
+  suggestedDue: string;
+  requiredSubmissions: number;
+  practiceText: string;
+  focusTag?: string;
+  teacherNote?: string;
+  reviewTags: string[];
+  exerciseSet: TaskApiStep[];
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface ScoreSet {
   overall: number;
   tone: number;

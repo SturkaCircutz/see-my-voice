@@ -1,4 +1,4 @@
-import type { AuthResponse, AuthUser, ChatApiMessage, ChatApiThread, PracticeAttempt, PronunciationAnalysis } from "./types";
+import type { AuthResponse, AuthUser, ChatApiMessage, ChatApiThread, PracticeAttempt, PronunciationAnalysis, TaskApiItem } from "./types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "";
 const TOKEN_KEY = "see-my-voice-token";
@@ -53,6 +53,7 @@ export function registerUser(input: {
 export function loginUser(input: {
   username: string;
   password: string;
+  role: "student" | "teacher";
 }): Promise<AuthResponse> {
   return request<AuthResponse>("/api/auth/login", {
     method: "POST",
@@ -64,8 +65,8 @@ export function fetchCurrentUser(): Promise<{ user: AuthUser }> {
   return request<{ user: AuthUser }>("/api/auth/me");
 }
 
-export function fetchUsers(): Promise<{ users: AuthUser[] }> {
-  return request<{ users: AuthUser[] }>("/api/users");
+export function fetchUsers(role?: "student" | "teacher"): Promise<{ users: AuthUser[] }> {
+  return request<{ users: AuthUser[] }>(`/api/users${role ? `?role=${role}` : ""}`);
 }
 
 export function fetchChatThreads(): Promise<{ threads: ChatApiThread[] }> {
@@ -91,6 +92,19 @@ export function createChatMessage(threadId: string, body: string): Promise<{ mes
   return request<{ message: ChatApiMessage }>(`/api/chat/threads/${threadId}/messages`, {
     method: "POST",
     body: JSON.stringify({ body }),
+  });
+}
+
+export function fetchTasks(): Promise<{ tasks: TaskApiItem[] }> {
+  return request<{ tasks: TaskApiItem[] }>("/api/tasks");
+}
+
+export function createTask(input: Omit<TaskApiItem, "id" | "teacherId" | "createdAt" | "updatedAt" | "status"> & {
+  studentId: string;
+}): Promise<{ task: TaskApiItem }> {
+  return request<{ task: TaskApiItem }>("/api/tasks", {
+    method: "POST",
+    body: JSON.stringify(input),
   });
 }
 

@@ -46,7 +46,26 @@ export interface TaskDocument {
   teacherId: ObjectId;
   studentId: ObjectId;
   title: string;
+  goal: string;
   targetText: string;
+  suggestedDue: string;
+  requiredSubmissions: number;
+  practiceText: string;
+  focusTag?: string;
+  teacherNote?: string;
+  reviewTags?: string[];
+  exerciseSet: {
+    id: string;
+    type: string;
+    title: string;
+    instruction: string;
+    targetText: string;
+    requiredCount: number;
+    requiresSubmission: boolean;
+    practiceItems: string[];
+    sourceMode?: "bank" | "custom";
+    bankPackageId?: string;
+  }[];
   status: "draft" | "published" | "archived";
   createdAt: Date;
   updatedAt: Date;

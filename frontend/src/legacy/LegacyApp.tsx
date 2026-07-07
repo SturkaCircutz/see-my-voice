@@ -6,6 +6,8 @@ import {
   createPracticeAttempt,
   fetchPracticeAttempts,
   fetchUsers,
+  fetchTasks,
+  createTask,
   fetchChatThreads,
   fetchChatMessages,
   createChatThread,
@@ -25,7 +27,6 @@ import {
   assessmentProfiles,
   studentQuickReplies,
   teacherQuickReplies,
-  teacherStudents,
   toneDrills,
   type AssessmentProfile,
   type ChatThread,
@@ -40,7 +41,7 @@ import {
   type TeacherStudent,
   type TeacherView,
 } from "./data";
-import type { AuthUser, ChatApiMessage, ChatApiThread, PracticeAttempt, PronunciationAnalysis, ScoreSet } from "../types";
+import type { AuthUser, ChatApiMessage, ChatApiThread, PracticeAttempt, PronunciationAnalysis, ScoreSet, TaskApiItem } from "../types";
 import {
   assessmentResultFromAnalysis,
   buildAssessmentProfileFromSession,
@@ -195,13 +196,46 @@ function apiThreadToLegacy(thread: ChatApiThread, messages: ChatApiMessage[] = [
   };
 }
 
+function apiTaskToPackage(task: TaskApiItem): StudentTaskPackage {
+  return {
+    id: task.id,
+    title: task.title,
+    goal: task.goal || task.targetText,
+    status: task.status === "published" ? "Published" : task.status,
+    suggestedDue: task.suggestedDue || "Due this week",
+    requiredSubmissions: task.requiredSubmissions || 1,
+    practiceText: task.practiceText || task.targetText,
+    targetStudentId: task.studentId,
+    focusTag: task.focusTag,
+    teacherNote: task.teacherNote,
+    reviewTags: task.reviewTags || [],
+    exerciseSet: task.exerciseSet || [],
+  };
+}
+
+function learnerAccountToTeacherStudent(account: AuthUser, index: number): TeacherStudent {
+  return {
+    id: account.id,
+    name: account.name || account.username,
+    stage: "Account Learner",
+    latestScore: 70,
+    weeklyPracticeCount: 0,
+    pendingSubmissions: 0,
+    overdueTasks: 0,
+    lastPracticeAt: account.lastLoginAt ? new Date(account.lastLoginAt).toLocaleDateString() : "No practice yet",
+    focusTags: ["Teacher assigned practice"],
+    assessmentSummary: `MongoDB learner account: ${account.username}`,
+    trend: index === 0 ? "Needs Attention" : "Stable",
+  };
+}
+
 // Props keep the legacy UI connected to auth and practice state owned by the app shell.
 interface LegacyAppProps {
   user: AuthUser | null;
   authReady: boolean;
   attempts: PracticeAttempt[];
   setAttempts: React.Dispatch<React.SetStateAction<PracticeAttempt[]>>;
-  onLogin: (username: string, password: string) => Promise<AuthUser> | AuthUser;
+  onLogin: (username: string, password: string, role: Exclude<Role, "guest">) => Promise<AuthUser> | AuthUser;
   onRegister: (username: string, password: string, role: Exclude<Role, "guest">) => Promise<AuthUser> | AuthUser;
   onLogout: () => void;
 }
@@ -231,8 +265,9 @@ export function LegacyApp({
   const [message, setMessage] = React.useState("");
   const [toast, setToast] = React.useState("");
   const [selectedSyllableId, setSelectedSyllableId] = React.useState("fan");
-  const [selectedStudentId, setSelectedStudentId] = React.useState(teacherStudents[0]?.id || "");
-  const [localTeacherStudents, setLocalTeacherStudents] = React.useState<TeacherStudent[]>(teacherStudents);
+  const [selectedStudentId, setSelectedStudentId] = React.useState("");
+  const [taskEditorStudentId, setTaskEditorStudentId] = React.useState("");
+  const [localTeacherStudents, setLocalTeacherStudents] = React.useState<TeacherStudent[]>([]);
   const [editingStudentSummaryId, setEditingStudentSummaryId] = React.useState("");
   const [selectedToneDrill, setSelectedToneDrill] = React.useState("3");
   const [practiceBackView, setPracticeBackView] = React.useState<"" | "toneDrill">("");
@@ -305,11 +340,8 @@ export function LegacyApp({
       }
       setLocalAssessmentProfiles(asArray<AssessmentProfile>(stored.assessmentProfiles, assessmentProfiles));
       if (typeof stored.selectedSyllableId === "string") setSelectedSyllableId(stored.selectedSyllableId);
-      if (typeof stored.selectedStudentId === "string") setSelectedStudentId(stored.selectedStudentId);
-      setLocalTeacherStudents(asArray<TeacherStudent>(stored.teacherStudents, teacherStudents));
       if (typeof stored.selectedToneDrill === "string") setSelectedToneDrill(stored.selectedToneDrill);
       if (stored.practiceBackView === "" || stored.practiceBackView === "toneDrill") setPracticeBackView(stored.practiceBackView);
-      setPublishedTasks(asArray<StudentTaskPackage>(stored.publishedTasks, []));
       setTaskSubmissions(asArray<TaskSubmission>(stored.taskSubmissions, []));
       if (stored.taskStepProgress && typeof stored.taskStepProgress === "object") {
         setTaskStepProgress(stored.taskStepProgress);
@@ -343,11 +375,8 @@ export function LegacyApp({
           assessmentSession,
           assessmentProfiles: localAssessmentProfiles,
           selectedSyllableId,
-          selectedStudentId,
-          teacherStudents: localTeacherStudents,
           selectedToneDrill,
           practiceBackView,
-          publishedTasks,
           taskSubmissions,
           taskStepProgress,
           selectedTaskId,
@@ -367,12 +396,9 @@ export function LegacyApp({
     assessmentSession,
     localAssessmentProfiles,
     localAccount,
-    localTeacherStudents,
     practiceBackView,
-    publishedTasks,
     role,
     selectedReviewId,
-    selectedStudentId,
     selectedSyllableId,
     selectedTaskId,
     selectedToneDrill,
@@ -411,14 +437,17 @@ export function LegacyApp({
       setLocalChatThreads([]);
       setChatUsers([]);
       setChatError("");
+      setPublishedTasks([]);
+      setLocalTeacherStudents([]);
+      setSelectedStudentId("");
       return;
     }
 
     let cancelled = false;
     setChatBusy(true);
     setChatError("");
-    Promise.all([fetchChatThreads(), fetchUsers()])
-      .then(async ([threadPayload, userPayload]) => {
+    Promise.all([fetchChatThreads(), fetchUsers(), fetchTasks(), fetchUsers("student")])
+      .then(async ([threadPayload, userPayload, taskPayload, learnerPayload]) => {
         const threadsWithMessages = await Promise.all(
           threadPayload.threads.map(async (thread) => {
             const messagePayload = await fetchChatMessages(thread.id);
@@ -426,14 +455,27 @@ export function LegacyApp({
           }),
         );
         if (cancelled) return;
+        const learnerAccounts = learnerPayload.users.map(learnerAccountToTeacherStudent);
         setLocalChatThreads(threadsWithMessages);
         setChatUsers(userPayload.users);
+        setLocalTeacherStudents(learnerAccounts);
+        setSelectedStudentId((current) =>
+          learnerAccounts.some((student) => student.id === current) ? current : learnerAccounts[0]?.id || "",
+        );
+        setTaskEditorStudentId((current) =>
+          learnerAccounts.some((student) => student.id === current) ? current : "",
+        );
+        setPublishedTasks(taskPayload.tasks.map(apiTaskToPackage));
       })
       .catch((error) => {
         if (cancelled) return;
         setLocalChatThreads([]);
         setChatUsers([]);
-        setChatError(error instanceof Error ? error.message : "Chat could not be loaded.");
+        setLocalTeacherStudents([]);
+        setPublishedTasks([]);
+        setSelectedStudentId("");
+        setTaskEditorStudentId("");
+        setChatError(error instanceof Error ? error.message : "Account data could not be loaded.");
       })
       .finally(() => {
         if (!cancelled) setChatBusy(false);
@@ -506,7 +548,7 @@ export function LegacyApp({
         const authenticatedUser = await onRegister(input.username, input.password, input.role);
         loginLocalAccount(authenticatedUser.role, authenticatedUser.username, "");
       } else {
-        const authenticatedUser = await onLogin(input.username, input.password);
+        const authenticatedUser = await onLogin(input.username, input.password, input.role);
         loginLocalAccount(authenticatedUser.role, authenticatedUser.username, "");
       }
     } catch (error) {
@@ -712,7 +754,10 @@ export function LegacyApp({
 
   function completeEntryAssessment() {
     const student = localTeacherStudents.find((item) => item.id === selectedStudentId) || localTeacherStudents[0];
-    if (!student) return;
+    if (!student) {
+      showToast("No learner account is selected for this assessment.");
+      return;
+    }
     const nextProfile = buildAssessmentProfileFromSession(student, assessmentSession, localAssessmentProfiles.length);
     setLocalAssessmentProfiles((current) => [...current, nextProfile].slice(-40));
     setAssessmentSession((current) => ({ ...current, active: false, completed: true }));
@@ -869,14 +914,36 @@ export function LegacyApp({
     showToast("Teacher feedback saved. The learner can see it.");
   }
 
-  function publishTask(task: StudentTaskPackage | null) {
+  async function publishTask(task: StudentTaskPackage | null) {
     if (!task) return;
-    setPublishedTasks((current) => [
-      ...current.filter((item) => item.targetStudentId !== task.targetStudentId),
-      task,
-    ]);
-    setTeacherView("tasks");
-    showToast("Teacher-reviewed practice task published to learner.");
+    if (!task.targetStudentId) {
+      showToast("Choose a learner account before publishing.");
+      return;
+    }
+    try {
+      const payload = await createTask({
+        studentId: task.targetStudentId,
+        title: task.title,
+        goal: task.goal,
+        targetText: task.practiceText,
+        suggestedDue: task.suggestedDue,
+        requiredSubmissions: task.requiredSubmissions,
+        practiceText: task.practiceText,
+        focusTag: task.focusTag,
+        teacherNote: task.teacherNote,
+        reviewTags: task.reviewTags || [],
+        exerciseSet: task.exerciseSet,
+      });
+      const savedTask = apiTaskToPackage(payload.task);
+      setPublishedTasks((current) => [
+        ...current.filter((item) => item.targetStudentId !== savedTask.targetStudentId),
+        savedTask,
+      ]);
+      setTeacherView("tasks");
+      showToast("Practice task published to the learner account.");
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Task could not be published.");
+    }
   }
 
   function confirmAssessmentProfile(profileId: string) {
@@ -978,12 +1045,14 @@ export function LegacyApp({
         <TeacherScreen
           view={teacherView}
           selectedStudentId={selectedStudentId}
+          taskEditorStudentId={taskEditorStudentId}
           studentFilter={teacherStudentFilter}
           students={localTeacherStudents}
           editingStudentSummaryId={editingStudentSummaryId}
           publishedTasks={publishedTasks}
           taskSubmissions={taskSubmissions}
           onSelectStudent={setSelectedStudentId}
+          onTaskEditorStudent={setTaskEditorStudentId}
           onStudentFilter={setTeacherStudentFilter}
           onTeacherView={navigateTeacher}
           onOpenReview={openTeacherReview}
@@ -2327,6 +2396,7 @@ function StudentTaskFeedback({ submission }: { submission?: TaskSubmission }) {
 function TeacherScreen({
   view,
   selectedStudentId,
+  taskEditorStudentId,
   studentFilter,
   students,
   editingStudentSummaryId,
@@ -2334,6 +2404,7 @@ function TeacherScreen({
   publishedTasks,
   taskSubmissions,
   onSelectStudent,
+  onTaskEditorStudent,
   onStudentFilter,
   onTeacherView,
   onOpenReview,
@@ -2344,6 +2415,7 @@ function TeacherScreen({
 }: {
   view: TeacherView;
   selectedStudentId: string;
+  taskEditorStudentId: string;
   studentFilter: TeacherStudentFilter;
   students: TeacherStudent[];
   editingStudentSummaryId: string;
@@ -2351,6 +2423,7 @@ function TeacherScreen({
   publishedTasks: StudentTaskPackage[];
   taskSubmissions: TaskSubmission[];
   onSelectStudent: (studentId: string) => void;
+  onTaskEditorStudent: (studentId: string) => void;
   onStudentFilter: (filter: TeacherStudentFilter) => void;
   onTeacherView: (view: TeacherView, filter?: TeacherStudentFilter) => void;
   onOpenReview: (submissionId: string) => void;
@@ -2360,6 +2433,7 @@ function TeacherScreen({
   onSaveStudentSummary: (studentId: string, summary: string) => void;
 }) {
   const selectedStudent = students.find((student) => student.id === selectedStudentId) || students[0];
+  const editorStudent = students.find((student) => student.id === taskEditorStudentId) || selectedStudent;
   let body: React.ReactNode;
 
   // Each branch maps a nav tab to the matching teacher content panel.
@@ -2382,9 +2456,9 @@ function TeacherScreen({
       </>
     );
   } else if (view === "tasks") {
-    body = <TeacherTasks student={selectedStudent} students={students} assessmentProfiles={assessmentProfiles} onTeacherView={onTeacherView} />;
+    body = <TeacherTasks student={selectedStudent} students={students} assessmentProfiles={assessmentProfiles} onSelectStudent={onSelectStudent} onTaskEditorStudent={onTaskEditorStudent} onTeacherView={onTeacherView} />;
   } else if (view === "taskPackageEditor") {
-    body = <TaskPackageEditorScreen student={selectedStudent} publishedTasks={publishedTasks} onBack={() => onTeacherView("tasks")} onPublishTask={onPublishTask} />;
+    body = <TaskPackageEditorScreen student={editorStudent} publishedTasks={publishedTasks} onBack={() => onTeacherView("tasks")} onPublishTask={onPublishTask} />;
   } else if (view === "assessmentEditor") {
     body = (
       <AssessmentTemplateEditorScreen
@@ -2642,15 +2716,31 @@ function TeacherTasks({
   student,
   students,
   assessmentProfiles,
+  onSelectStudent,
+  onTaskEditorStudent,
   onTeacherView,
 }: {
   student?: TeacherStudent;
   students: TeacherStudent[];
   assessmentProfiles: AssessmentProfile[];
+  onSelectStudent: (studentId: string) => void;
+  onTaskEditorStudent: (studentId: string) => void;
   onTeacherView: (view: TeacherView) => void;
 }) {
   const task = studentTaskPackages[0];
   const assessmentProfile = assessmentProfileForStudent(assessmentProfiles, student);
+  const [draftStudentId, setDraftStudentId] = React.useState(student?.id || "");
+
+  React.useEffect(() => {
+    setDraftStudentId(student?.id || students[0]?.id || "");
+  }, [student?.id, students]);
+
+  function openTaskEditor() {
+    if (!draftStudentId) return;
+    onSelectStudent(draftStudentId);
+    onTaskEditorStudent(draftStudentId);
+    onTeacherView("taskPackageEditor");
+  }
 
   return (
     <>
@@ -2660,7 +2750,8 @@ function TeacherTasks({
         <p className="m-0 text-xs leading-[1.6] text-[var(--muted)]">Choose a learner, then edit a template using the question bank or custom steps.</p>
         <label className={templateFieldClass}>
           <span>Choose Learner</span>
-          <select className={templateInputClass} defaultValue={student?.id}>
+          <select className={templateInputClass} value={draftStudentId} onChange={(event) => setDraftStudentId(event.target.value)} disabled={!students.length}>
+            {!students.length ? <option value="">No learner accounts yet</option> : null}
             {students.map((item) => (
               <option value={item.id} key={item.id}>
                 {item.name}
@@ -2668,7 +2759,7 @@ function TeacherTasks({
             ))}
           </select>
         </label>
-        <button className={primaryTeacherButtonClass} type="button" onClick={() => onTeacherView("taskPackageEditor")}>
+        <button className={primaryTeacherButtonClass} type="button" onClick={openTaskEditor} disabled={!draftStudentId}>
           Create Practice Task
         </button>
       </section>
