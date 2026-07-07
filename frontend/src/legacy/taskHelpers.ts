@@ -1,7 +1,6 @@
 import type { ScoreSet } from "../types";
 import {
   questionBankPackages,
-  studentTaskPackages,
   teacherStudents,
   type AssessmentProfile,
   type StudentTaskPackage,
@@ -41,16 +40,59 @@ export function commonTeacherFocusTags(students: TeacherStudent[]) {
 
 export function recommendedTaskForStudent(student?: TeacherStudent): StudentTaskPackage | null {
   if (!student) return null;
-  const baseTask = studentTaskPackages[0];
-  if (!baseTask) return null;
+  const bankPackage = questionBankPackages[0];
+  const practiceItems = bankPackage?.items?.length ? bankPackage.items : ["我要吃饭"];
+  const targetText = bankPackage?.targetText || practiceItems[0] || "我要吃饭";
+  const focusTag = student.focusTags[0] || bankPackage?.focusTags?.[0] || "Teacher assigned practice";
   return {
-    ...baseTask,
-    id: `task-${student.id}-${baseTask.id}`,
-    title: `${student.name} · ${baseTask.title}`,
+    id: `draft-task-${student.id}`,
+    title: `${student.name} · Practice Pack`,
+    goal: `Practice ${focusTag}.`,
+    status: "Draft",
+    suggestedDue: "Due this week",
+    requiredSubmissions: 1,
+    practiceText: targetText,
     targetStudentId: student.id,
-    focusTag: student.focusTags[0] || baseTask.reviewTags?.[0] || "Pronunciation Focus",
-    status: "Published",
-    reviewTags: student.focusTags.length ? student.focusTags.slice(0, 3) : baseTask.reviewTags,
+    focusTag,
+    teacherNote: "Complete each step slowly, then submit the final recording to your teacher.",
+    reviewTags: student.focusTags.length ? student.focusTags.slice(0, 3) : [focusTag],
+    exerciseSet: [
+      {
+        id: "draft-listen",
+        type: "Demo",
+        title: "Listen to Standard Pronunciation",
+        instruction: "Listen to the model pronunciation and notice the focus sound before recording.",
+        targetText,
+        requiredCount: 1,
+        requiresSubmission: false,
+        practiceItems,
+        sourceMode: bankPackage ? "bank" : "custom",
+        bankPackageId: bankPackage?.id,
+      },
+      {
+        id: "draft-repeat",
+        type: "Repeat",
+        title: "Repeat the Focus Items",
+        instruction: "Repeat each item slowly and keep the movement clear.",
+        targetText,
+        requiredCount: 3,
+        requiresSubmission: false,
+        practiceItems,
+        sourceMode: bankPackage ? "bank" : "custom",
+        bankPackageId: bankPackage?.id,
+      },
+      {
+        id: "draft-submit",
+        type: "Submit",
+        title: "Final Recording Submission",
+        instruction: "Record the final item and submit it for teacher review.",
+        targetText,
+        requiredCount: 1,
+        requiresSubmission: true,
+        practiceItems: [targetText],
+        sourceMode: "custom",
+      },
+    ],
   };
 }
 

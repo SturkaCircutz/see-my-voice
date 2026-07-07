@@ -23,7 +23,6 @@ import {
   entryAssessmentItems,
   pinyinByText,
   questionBankPackages,
-  studentTaskPackages,
   assessmentProfiles,
   studentQuickReplies,
   teacherQuickReplies,
@@ -2456,7 +2455,7 @@ function TeacherScreen({
       </>
     );
   } else if (view === "tasks") {
-    body = <TeacherTasks student={selectedStudent} students={students} assessmentProfiles={assessmentProfiles} onSelectStudent={onSelectStudent} onTaskEditorStudent={onTaskEditorStudent} onTeacherView={onTeacherView} />;
+    body = <TeacherTasks student={selectedStudent} students={students} publishedTasks={publishedTasks} assessmentProfiles={assessmentProfiles} onSelectStudent={onSelectStudent} onTaskEditorStudent={onTaskEditorStudent} onTeacherView={onTeacherView} />;
   } else if (view === "taskPackageEditor") {
     body = <TaskPackageEditorScreen student={editorStudent} publishedTasks={publishedTasks} onBack={() => onTeacherView("tasks")} onPublishTask={onPublishTask} />;
   } else if (view === "assessmentEditor") {
@@ -2715,6 +2714,7 @@ function TeacherProfile({
 function TeacherTasks({
   student,
   students,
+  publishedTasks,
   assessmentProfiles,
   onSelectStudent,
   onTaskEditorStudent,
@@ -2722,14 +2722,16 @@ function TeacherTasks({
 }: {
   student?: TeacherStudent;
   students: TeacherStudent[];
+  publishedTasks: StudentTaskPackage[];
   assessmentProfiles: AssessmentProfile[];
   onSelectStudent: (studentId: string) => void;
   onTaskEditorStudent: (studentId: string) => void;
   onTeacherView: (view: TeacherView) => void;
 }) {
-  const task = studentTaskPackages[0];
   const assessmentProfile = assessmentProfileForStudent(assessmentProfiles, student);
   const [draftStudentId, setDraftStudentId] = React.useState(student?.id || "");
+  const draftStudent = students.find((item) => item.id === draftStudentId) || student;
+  const learnerTasks = publishedTasks.filter((task) => task.targetStudentId === draftStudent?.id);
 
   React.useEffect(() => {
     setDraftStudentId(student?.id || students[0]?.id || "");
@@ -2766,25 +2768,31 @@ function TeacherTasks({
 
       <section className={cn(panelClass, "grid gap-2.5")} aria-label="AI Assisted Tasks">
         <span className={modelKickerClass}>Task Center</span>
-        <strong className="text-[15px]">{student?.name || "Learner"} · {task.title}</strong>
-        <div className={teacherTaskMetaClass}>
-          <span className={teacherTaskMetaItemClass}>{task.status}</span>
-          <span className={teacherTaskMetaItemClass}>{task.exerciseSet.length} task steps</span>
-          <span className={teacherTaskMetaItemClass}>{task.suggestedDue}</span>
-        </div>
-        <ol className="grid gap-[7px] [counter-reset:task-step] m-0 list-none p-0">
-          {task.exerciseSet.map((step) => (
-            <li
-              className="grid grid-cols-[24px_1fr] items-center gap-2 text-xs leading-[1.45] text-[var(--ink)] before:grid before:size-6 before:place-items-center before:rounded-full before:bg-[var(--navy)] before:text-[10px] before:font-extrabold before:text-white before:[content:counter(task-step)] [counter-increment:task-step]"
-              key={step.id}
-            >
-              {step.instruction}
-            </li>
-          ))}
-        </ol>
-        <button className={primaryTeacherButtonClass} type="button" onClick={() => onTeacherView("taskPackageEditor")}>
-          Review and Edit Practice Pack
-        </button>
+        <strong className="text-[15px]">{draftStudent ? `${draftStudent.name}'s Published Practice Packs` : "No learner selected"}</strong>
+        {learnerTasks.length ? (
+          <div className="grid gap-2.5">
+            {learnerTasks.map((task) => (
+              <article className="grid gap-2 rounded-[14px] border border-[var(--line)] bg-[#fbfaf7] p-3.5" key={task.id}>
+                <div className={teacherReviewHeadingClass}>
+                  <div>
+                    <strong className="block text-[var(--ink)]">{task.title}</strong>
+                    <span className="mt-[3px] block text-[11px] text-[var(--muted)]">{task.goal}</span>
+                  </div>
+                  <span className={statusPillClass}>{task.status}</span>
+                </div>
+                <div className={teacherTaskMetaClass}>
+                  <span className={teacherTaskMetaItemClass}>{task.exerciseSet.length} task steps</span>
+                  <span className={teacherTaskMetaItemClass}>{task.suggestedDue}</span>
+                  <span className={teacherTaskMetaItemClass}>Submit {task.requiredSubmissions} recording(s)</span>
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <p className="m-0 rounded-[14px] border border-[var(--line)] bg-[#fbfaf7] p-3.5 text-xs leading-[1.6] text-[var(--muted)]">
+            No task has been published for this learner yet.
+          </p>
+        )}
       </section>
 
       <section className={cn(panelClass, "grid gap-2.5")} aria-labelledby="teacher-assessment-title">
