@@ -155,7 +155,6 @@ import {
   teacherViewLabel,
   threadTypeLabel,
   tonePoints,
-  toneScore,
   unreadCount,
 } from "./utils";
 
@@ -1773,10 +1772,10 @@ function ProgressScreen({
               <button className="block w-full py-2.5 text-left" type="button" key={item.tone} onClick={() => onOpenToneDrill(item.tone)}>
                 <div className="flex items-center justify-between gap-3">
                   <span className="text-xs text-[var(--red)]">{item.label}</span>
-                  <span className="text-[11px] text-[var(--muted)]">{toneScore(item.tone)}</span>
+                  <span className="text-[11px] text-[var(--muted)]">No practice data yet</span>
                 </div>
                 <div className="mt-2 block h-[7px] overflow-hidden rounded-full bg-[#eceae6]" aria-hidden="true">
-                  <div className={cn("block h-full rounded-[inherit]", progressWidthClass(toneScore(item.tone)), toneFillClass(item.tone))}></div>
+                  <div className={cn("block h-full rounded-[inherit]", progressWidthClass(0), toneFillClass(item.tone))}></div>
                 </div>
               </button>
             ))}

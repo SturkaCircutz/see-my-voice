@@ -68,16 +68,6 @@ export function threadTypeLabel(thread: ChatThread) {
   return thread.type === "class" ? "Class Group" : "Teacher Chat";
 }
 
-export function toneScore(tone: string) {
-  const scores: Record<string, number> = {
-    "1": 80,
-    "2": 74,
-    "3": 67,
-    "4": 54,
-  };
-  return scores[tone] || 67;
-}
-
 // Header time is computed at render time for the responsive app shell.
 export function statusTime() {
   return new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });

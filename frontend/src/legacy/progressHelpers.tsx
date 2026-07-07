@@ -47,8 +47,7 @@ export function progressChartScores(attempts: PracticeAttempt[]) {
     .slice(0, 7)
     .map((attempt) => Math.round(attemptScore(attempt)))
     .reverse();
-  const fallbackScores = [60, 64, 67, 70, 72, 74, 76];
-  return attemptScores.length ? [...Array(Math.max(0, 7 - attemptScores.length)).fill(0), ...attemptScores] : fallbackScores;
+  return attemptScores.length ? [...Array(Math.max(0, 7 - attemptScores.length)).fill(0), ...attemptScores] : [];
 }
 
 export function progressChartLabels(attempts: PracticeAttempt[], count: number) {
@@ -92,6 +91,7 @@ export function ProgressTrendChart({
   const padding = { top: 15, right: 13, bottom: 25, left: 13 };
   const innerWidth = width - padding.left - padding.right;
   const innerHeight = height - padding.top - padding.bottom;
+  const hasScores = scores.some((score) => score > 0);
   const normalized = scores.map((score) => (score > 0 ? 100 - ((score - min) / (max - min)) * 100 : 100));
   const points = normalized.map((value, index) => {
     const x = padding.left + (innerWidth * index) / Math.max(normalized.length - 1, 1);
@@ -106,10 +106,18 @@ export function ProgressTrendChart({
         const y = padding.top + (innerHeight * row) / 2;
         return <line x1={padding.left} x2={width - padding.right} y1={y} y2={y} stroke="#ece8e0" strokeWidth="1" key={row} />;
       })}
-      <polyline points={polyline} fill="none" stroke="#cf4b31" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-      {points.map((point, index) => (
-        <circle cx={point.x} cy={point.y} r={index === points.length - 1 ? 4 : 3} fill="#cf4b31" key={`${point.x}-${point.y}`} />
-      ))}
+      {hasScores ? (
+        <>
+          <polyline points={polyline} fill="none" stroke="#cf4b31" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+          {points.map((point, index) => (
+            <circle cx={point.x} cy={point.y} r={index === points.length - 1 ? 4 : 3} fill="#cf4b31" key={`${point.x}-${point.y}`} />
+          ))}
+        </>
+      ) : (
+        <text x={width / 2} y={padding.top + innerHeight / 2} fill="#aaa6ad" fontSize="13" fontWeight="700" textAnchor="middle">
+          No practice data yet
+        </text>
+      )}
       {labels.map((label, index) => {
         const x = padding.left + (innerWidth * index) / Math.max(labels.length - 1, 1);
         return (
