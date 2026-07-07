@@ -1,5 +1,6 @@
 import type { LegacySyllable } from "./types";
 
+// Units here match the folder names under public articulation assets.
 const articulationUnits = new Set([
   "a",
   "ai",
@@ -66,6 +67,7 @@ const initials = ["zh", "ch", "sh", "b", "p", "m", "f", "d", "t", "n", "l", "g",
 const imageExtensions = ["png", "jpeg", "jpg", "webp"];
 const splitArticulationUnits = new Set(["b", "m", "p"]);
 
+// Only units in this set are advertised as precise image references.
 const articulationImageUnits = new Set([
   "a",
   "ai",
@@ -134,6 +136,7 @@ export interface ArticulationUnit {
 }
 
 export function mouthShapeClass(syllable: LegacySyllable) {
+  // Approximate mouth shape from the final for generated fallback art.
   const final = syllable.pinyin?.replace(/[a-z]*?([aeiouv].*)\d?$/i, "$1") || "";
   if (/u|o|ong|ou/.test(final)) return "shape-round";
   if (/a|ai|ao|ang/.test(final)) return "shape-open";
@@ -142,6 +145,7 @@ export function mouthShapeClass(syllable: LegacySyllable) {
 }
 
 export function tonguePositionClass(syllable: LegacySyllable) {
+  // Approximate tongue placement from the initial for generated fallback art.
   const initial = normalizedInitial(syllable) || (syllable.pinyin || "").replace(/\d/g, "").match(/^(zh|ch|sh|[bpmfdtnlgkhjqxrzcsyw])/)?.[0] || "";
   if (["d", "t", "n", "l", "z", "c", "s"].includes(initial)) return "tongue-front";
   if (["j", "q", "x", "y"].includes(initial)) return "tongue-palate";
@@ -151,6 +155,7 @@ export function tonguePositionClass(syllable: LegacySyllable) {
 }
 
 export function preciseArticulationUnits(syllable: LegacySyllable) {
+  // Return only units that have local reference images.
   return resolvedArticulationUnits(syllable).filter((item) => articulationImageUnits.has(item.unit));
 }
 
@@ -159,6 +164,7 @@ export function missingArticulationImageUnits(syllable: LegacySyllable) {
 }
 
 export function articulationImageSources(unit: string, imageType: "mouth" | "tongue") {
+  // Try common image extensions because the asset set is mixed.
   return imageExtensions.map((extension) => `/assets/articulation/${unit}/${imageType}.${extension}`);
 }
 
@@ -168,6 +174,7 @@ export function splitArticulationImageSources(unit: string, imageType: "mouth" |
 }
 
 function normalizePinyinUnit(value?: string) {
+  // Normalize ü spellings to match asset filenames.
   return String(value || "").toLowerCase().replace(/ü/g, "v").replace(/u:/g, "v");
 }
 
@@ -176,6 +183,7 @@ function pinyinBodyFor(syllable: LegacySyllable) {
 }
 
 function splitZeroInitialSpelling(pinyinBody: string) {
+  // y/w pinyin spellings often encode a final without an initial.
   if (!pinyinBody) return null;
   if (pinyinBody === "yi") return { initial: "", final: "i" };
   if (pinyinBody === "wu") return { initial: "", final: "u" };
@@ -222,6 +230,7 @@ function resolveArticulationUnit(value: string) {
 }
 
 function resolvedArticulationUnits(syllable: LegacySyllable): ArticulationUnit[] {
+  // Resolve both initial and final units so the panel can show both references.
   const units: ArticulationUnit[] = [];
   const initial = resolveArticulationUnit(normalizedInitial(syllable));
   const final = resolveArticulationUnit(normalizedFinal(syllable));

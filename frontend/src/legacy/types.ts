@@ -101,6 +101,7 @@ export interface StudentTaskPackage {
 }
 
 export interface TaskSubmission {
+  // Local submissions power the review UI before full backend review sync.
   id: string;
   taskId: string;
   studentId: string;
@@ -158,6 +159,7 @@ export interface QuestionBankPackage {
 }
 
 export interface AssessmentProfile {
+  // Assessment profiles are teacher-editable summaries from the entry flow.
   id: string;
   studentId?: string;
   studentName: string;

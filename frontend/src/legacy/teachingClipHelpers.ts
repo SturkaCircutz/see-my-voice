@@ -4,6 +4,7 @@ import type { TeachingClipPlan } from "./legacyAppTypes";
 import { clipSourceForUnit, getFocusSyllable, levelFromScore, pinyinPartsFor, playableClipTargetFor } from "./utils";
 
 export function diagnosisIssueSummary(issue: PinyinDiagnosisIssue, syllables: LegacySyllable[]) {
+  // Convert a raw diagnosis issue into compact UI labels.
   const syllable = syllables.find((item, index) => Number(issue.index) === index);
   const character = syllable?.character || issue.practice?.[0] || "this sound";
   const toneText = issue.type === "tone" && syllable?.tone ? `Tone ${syllable.tone.replace("T", "")}` : "";
@@ -23,6 +24,7 @@ export function diagnosisIssueSummary(issue: PinyinDiagnosisIssue, syllables: Le
 }
 
 export function diagnosisDetailLines(issue: PinyinDiagnosisIssue) {
+  // Detail cards show only the diagnosis text that exists.
   return [
     issue.summary,
     issue.detail,
@@ -30,12 +32,14 @@ export function diagnosisDetailLines(issue: PinyinDiagnosisIssue) {
 }
 
 function issuePriority(issue?: PinyinDiagnosisIssue) {
+  // Segmental problems are more useful for video clips than tone-only issues.
   if (["initial", "final", "syllable", "missing"].includes(issue?.type || "")) return 0;
   if (issue?.type === "tone") return 1;
   return 2;
 }
 
 function teachingIssuesFor(analysis: PronunciationAnalysis) {
+  // Remove extra-sound issues and sort by syllable order.
   return [...(analysis.pinyinDiagnosis?.issues || [])]
     .filter((issue) => issue.type !== "extra")
     .sort((left, right) => {
@@ -47,6 +51,7 @@ function teachingIssuesFor(analysis: PronunciationAnalysis) {
 }
 
 function clipTargetFor(issue: PinyinDiagnosisIssue | undefined, syllable: LegacySyllable) {
+  // Use the diagnosis type to pick initial or final clips when possible.
   const parts = pinyinPartsFor(syllable);
   if (issue?.type === "initial" && parts.initial) return { type: "initial" as const, unit: parts.initial };
   if (issue?.type === "final" && parts.final) return { type: "final" as const, unit: parts.final };
@@ -99,6 +104,7 @@ export function buildTeachingClipPlan(analysis: PronunciationAnalysis, syllables
 }
 
 export function scoreFillClass(score: number) {
+  // Progress bars reuse the same score color rules as syllable pills.
   const level = levelFromScore(score);
   if (level === "focus") return "bg-[var(--red)]";
   if (level === "warn") return "bg-[var(--amber)]";
@@ -106,6 +112,7 @@ export function scoreFillClass(score: number) {
 }
 
 export function toneFillClass(tone: string) {
+  // Tone drills use fixed colors so each tone stays recognizable.
   const colors: Record<string, string> = {
     "1": "bg-[var(--green)]",
     "2": "bg-[#f39b54]",

@@ -24,6 +24,7 @@ export function latestCompleteAnalysis(attempts: PracticeAttempt[]): Pronunciati
 }
 
 export function isUsableAnalysis(analysis: PronunciationAnalysis): boolean {
+  // Ignore empty no-speech responses unless they still include usable score data.
   const raw = analysis.raw;
   const speechRegion = raw && typeof raw === "object"
     ? (raw as { tone_timing?: { speech_region?: { reason?: string } } }).tone_timing?.speech_region
@@ -61,6 +62,7 @@ export function statusFromScore(score: number) {
 }
 
 export function unreadCount(thread: ChatThread, participantId: string) {
+  // Unread counts ignore messages sent by the current participant.
   return thread.messages.filter((message) => message.senderId !== participantId && !message.readBy.includes(participantId)).length;
 }
 
@@ -84,6 +86,7 @@ export function initials(name: string) {
 }
 
 function normalizePinyinUnit(value?: string) {
+  // Clip filenames use v for ü and lowercase ASCII pinyin.
   return String(value || "").toLowerCase().replace(/ü/g, "v").replace(/u:/g, "v");
 }
 
@@ -108,6 +111,7 @@ const hevcOnlyFinalClipUnits = new Set([
 ]);
 
 function splitZeroInitialSpelling(pinyinBody: string) {
+  // Mandarin y/w spellings often represent finals without a true initial.
   if (!pinyinBody) return null;
   if (pinyinBody === "yi") return { initial: "", final: "i" };
   if (pinyinBody === "wu") return { initial: "", final: "u" };
@@ -134,6 +138,7 @@ function splitZeroInitialSpelling(pinyinBody: string) {
 }
 
 export function pinyinPartsFor(syllable: LegacySyllable) {
+  // Split pinyin into initial/final units that match bundled clip names.
   const initials = ["zh", "ch", "sh", "b", "p", "m", "f", "d", "t", "n", "l", "g", "k", "h", "j", "q", "x", "r", "z", "c", "s"];
   const pinyinBody = normalizePinyinUnit(syllable.pinyin).replace(/\d/g, "");
   const zeroInitial = splitZeroInitialSpelling(pinyinBody);
@@ -151,6 +156,7 @@ export function clipSourceForUnit(type: "initial" | "final", unit: string) {
 }
 
 export function playableClipTargetFor(syllable: LegacySyllable, preferredType: "initial" | "final" = "final") {
+  // Some generated final clips use codecs Chrome cannot play, so fall back to initials.
   const parts = pinyinPartsFor(syllable);
   if (preferredType === "initial" && parts.initial) return { type: "initial" as const, unit: parts.initial };
   if (parts.final && !hevcOnlyFinalClipUnits.has(parts.final)) return { type: "final" as const, unit: parts.final };

@@ -5,6 +5,7 @@ import { panelClass } from "./styles";
 export const STORAGE_KEY = "see-my-voice-practice-state";
 
 export const fallbackAnalysis: PronunciationAnalysis = {
+  // Fallback analysis keeps the UI populated before the first recording.
   heardText: "Waiting for recording analysis",
   summary:
     "Enter a Chinese sentence to practice. After recording, the system will give tone, clarity, and rhythm feedback based on your pronunciation.",

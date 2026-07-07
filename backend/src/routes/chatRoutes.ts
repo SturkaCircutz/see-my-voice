@@ -47,6 +47,7 @@ function toMessageResponse(message: {
 chatRoutes.use(requireAuth);
 
 chatRoutes.get("/threads", async (request: AuthenticatedRequest, response) => {
+  // Only return conversations where the signed-in user is a member.
   const threads = await chatThreadsCollection()
     .find({ memberIds: request.user!._id })
     .sort({ updatedAt: -1 })
@@ -57,6 +58,7 @@ chatRoutes.get("/threads", async (request: AuthenticatedRequest, response) => {
 });
 
 chatRoutes.post("/threads", async (request: AuthenticatedRequest, response) => {
+  // Create direct or class threads with unique member ids.
   const title = String(request.body.title || "Conversation").trim();
   const type = request.body.type === "class" ? "class" : "direct";
   const memberIds = Array.isArray(request.body.memberIds)
@@ -80,6 +82,7 @@ chatRoutes.post("/threads", async (request: AuthenticatedRequest, response) => {
   }
 
   if (type === "direct") {
+    // Reuse an existing direct chat when the same members already have one.
     const existing = await chatThreadsCollection().findOne({
       type: "direct",
       memberIds: { $all: uniqueMemberIds },
@@ -107,6 +110,7 @@ chatRoutes.post("/threads", async (request: AuthenticatedRequest, response) => {
 });
 
 chatRoutes.get("/threads/:threadId/messages", async (request: AuthenticatedRequest, response) => {
+  // Message reads require thread membership.
   if (!ObjectId.isValid(request.params.threadId)) {
     response.status(404).json({ error: "Thread not found." });
     return;
@@ -128,6 +132,7 @@ chatRoutes.get("/threads/:threadId/messages", async (request: AuthenticatedReque
     .limit(200)
     .toArray();
   const senderIds = [...new Set(messages.map((message) => message.senderId.toHexString()))].map((id) => new ObjectId(id));
+  // Resolve sender display names in one query instead of per message.
   const senders = senderIds.length
     ? await usersCollection()
         .find({ _id: { $in: senderIds } })
@@ -142,6 +147,7 @@ chatRoutes.get("/threads/:threadId/messages", async (request: AuthenticatedReque
 });
 
 chatRoutes.post("/threads/:threadId/messages", async (request: AuthenticatedRequest, response) => {
+  // New messages update both the message collection and the thread preview.
   if (!ObjectId.isValid(request.params.threadId)) {
     response.status(404).json({ error: "Thread not found." });
     return;

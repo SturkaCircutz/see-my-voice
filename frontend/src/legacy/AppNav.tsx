@@ -30,6 +30,7 @@ export function AppNav({
     }`;
 
   const activeTeacherView =
+    // Editor sub-pages should keep their parent nav tab active.
     teacherView === "assessmentEditor" || teacherView === "taskPackageEditor"
       ? "tasks"
       : teacherView === "reviewEditor"
@@ -60,6 +61,7 @@ export function AppNav({
   }
 
   const activeStudentView = ["detail", "entryAssessment", "toneDrill", "teachingClip"].includes(studentView)
+    // Detail and drill screens are part of the learner practice area.
     ? "practice"
     : studentView === "taskDetail"
       ? "tasks"

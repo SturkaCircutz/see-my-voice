@@ -47,6 +47,7 @@ function toTaskResponse(task: {
 taskRoutes.use(requireAuth);
 
 taskRoutes.get("/", async (request: AuthenticatedRequest, response) => {
+  // Teachers see tasks they created; learners see tasks assigned to them.
   const userId = request.user!._id;
   const tasks = await tasksCollection()
     .find({
@@ -63,6 +64,7 @@ taskRoutes.get("/", async (request: AuthenticatedRequest, response) => {
 });
 
 taskRoutes.post("/", async (request: AuthenticatedRequest, response) => {
+  // Only teacher accounts can publish practice packs.
   if (request.user!.role !== "teacher") {
     response.status(403).json({ error: "Only teacher accounts can publish tasks." });
     return;
@@ -80,6 +82,7 @@ taskRoutes.post("/", async (request: AuthenticatedRequest, response) => {
     ? request.body.reviewTags.map((item: unknown) => String(item).trim()).filter(Boolean).slice(0, 12)
     : [];
   const exerciseSet = Array.isArray(request.body.exerciseSet)
+    // Sanitize each client-edited step before storing it.
     ? request.body.exerciseSet.map((step: Record<string, unknown>, index: number) => ({
         id: String(step.id || `step-${index + 1}`).trim(),
         type: String(step.type || "Practice").trim(),
@@ -103,6 +106,7 @@ taskRoutes.post("/", async (request: AuthenticatedRequest, response) => {
   }
 
   const studentObjectId = new ObjectId(studentId);
+  // Refuse tasks for missing or non-learner accounts.
   const student = await usersCollection().findOne({ _id: studentObjectId, role: "student" });
   if (!student) {
     response.status(400).json({ error: "Choose a real learner account before publishing a task." });

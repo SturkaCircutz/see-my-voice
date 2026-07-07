@@ -1,9 +1,11 @@
 type ClassValue = string | false | null | undefined;
 
 export function cn(...classes: ClassValue[]) {
+  // Small class combiner avoids pulling a dependency for conditional strings.
   return classes.filter(Boolean).join(" ");
 }
 
+// Shared layout classes keep the legacy screens visually consistent.
 export const screenClass = "min-h-full bg-[var(--paper)]";
 export const contentBaseClass =
   "grid px-4 pt-4 pb-6 max-[370px]:px-3 lg:mx-auto lg:w-full lg:max-w-[980px] lg:px-8 lg:pt-6 lg:pb-8 xl:max-w-[1040px] xl:px-10";
@@ -39,6 +41,7 @@ export const toastClass =
 export const toastVisibleClass = "translate-y-0 opacity-100";
 
 export function syllableStatusPillClass(level: string) {
+  // Status colors follow the same good/warn/focus levels as scores.
   if (level === "focus") return focusStatusPillClass;
   if (level === "warn") return warnStatusPillClass;
   return statusPillClass;

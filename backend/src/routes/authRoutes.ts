@@ -16,6 +16,7 @@ import {
 export const authRoutes = Router();
 
 function cleanUsername(value: unknown): string {
+  // Usernames are stored lowercase so login is case-insensitive.
   return String(value || "").trim().toLowerCase();
 }
 
@@ -24,6 +25,7 @@ function cleanName(value: unknown): string {
 }
 
 function cleanRole(value: unknown): "student" | "teacher" {
+  // Unknown roles fall back to learner accounts.
   return value === "teacher" ? "teacher" : "student";
 }
 
@@ -34,6 +36,7 @@ function roleLoginMessage(role: "student" | "teacher"): string {
 }
 
 function readClientMeta(request: AuthenticatedRequest) {
+  // Store lightweight request metadata for account history.
   return {
     ip: request.ip,
     userAgent: request.header("User-Agent") || "",
@@ -41,6 +44,7 @@ function readClientMeta(request: AuthenticatedRequest) {
 }
 
 authRoutes.post("/register", async (request, response) => {
+  // Registration creates the user and immediately returns a signed session.
   const username = cleanUsername(request.body.username);
   const name = cleanName(request.body.name) || username;
   const role = cleanRole(request.body.role);
@@ -93,6 +97,7 @@ authRoutes.post("/register", async (request, response) => {
 });
 
 authRoutes.post("/login", async (request, response) => {
+  // Login verifies credentials and prevents role-specific screens from crossing.
   const username = cleanUsername(request.body.username);
   const password = String(request.body.password || "");
   const requestedRole = cleanRole(request.body.role);
@@ -138,5 +143,6 @@ authRoutes.post("/login", async (request, response) => {
 });
 
 authRoutes.get("/me", requireAuth, (request: AuthenticatedRequest, response) => {
+  // The frontend uses /me to restore a session from local storage.
   response.json({ user: toPublicUser(request.user!) });
 });

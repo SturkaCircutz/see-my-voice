@@ -15,6 +15,7 @@ import type {
 } from "./data";
 
 export interface TeachingClipSegment {
+  // One segment maps a weak syllable to one pronunciation demo clip.
   title: string;
   guidanceText: string;
   syllable: LegacySyllable;
@@ -27,6 +28,7 @@ export interface TeachingClipSegment {
 }
 
 export interface TeachingClipPlan {
+  // A plan groups the clip segments shown after analysis.
   title: string;
   targetText: string;
   focusIssue?: PinyinDiagnosisIssue;
@@ -35,6 +37,7 @@ export interface TeachingClipPlan {
 }
 
 export interface TaskStepProgress {
+  // Progress is stored per task step so users can leave and return.
   completed: boolean;
   completedAt: string;
   exerciseId: string;
@@ -57,6 +60,7 @@ export interface TaskStepProgress {
 export type TaskProgressState = Record<string, Record<string, TaskStepProgress>>;
 
 export interface LocalAccountState {
+  // Local account fields preserve legacy avatar and entry-assessment state.
   isLoggedIn: boolean;
   isRegistered?: boolean;
   username: string;

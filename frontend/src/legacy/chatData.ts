@@ -51,6 +51,7 @@ export const chatThreads: ChatThread[] = [
 ];
 
 export const studentQuickReplies = [
+  // Quick replies reduce typing on mobile chat screens.
   "Got it",
   "I finished the recording",
   "Please review it again",
@@ -58,6 +59,7 @@ export const studentQuickReplies = [
 ];
 
 export const teacherQuickReplies = [
+  // Teacher quick replies focus on short feedback and pacing.
   "Improving. Keep going.",
   "This is steadier than last time.",
   "Read a little slower first.",

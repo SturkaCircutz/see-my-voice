@@ -8,6 +8,7 @@ const audioRoot = process.env.VERCEL
   : join(process.cwd(), ".uploads", "attempt-audio");
 
 function extensionFromFilename(filename: string): string {
+  // Keep the original extension when it looks safe, otherwise default to webm.
   const extension = extname(basename(filename)).toLowerCase();
   if (!extension || extension.length > 12) return ".webm";
   return extension;
@@ -19,6 +20,7 @@ export async function saveAttemptAudio(input: {
   audio: Blob;
   filename?: string;
 }): Promise<string> {
+  // Store uploaded practice audio beside the app or in tmp for serverless runs.
   await mkdir(audioRoot, { recursive: true });
   const extension = extensionFromFilename(input.filename || "practice.webm");
   // Use Mongo ids in the storage key so database attempts can be joined back to local audio files.

@@ -27,11 +27,13 @@ const progressWidthClasses = [
 ];
 
 export function progressWidthClass(value: number) {
+  // Tailwind needs static class names, so scores map into predefined buckets.
   const bucket = Math.min(progressWidthClasses.length - 1, Math.max(0, Math.round(value / 5)));
   return progressWidthClasses[bucket];
 }
 
 export function isRole(value: unknown): value is Role {
+  // Runtime guards protect restored browser state.
   return value === "guest" || value === "student" || value === "teacher";
 }
 
@@ -66,10 +68,12 @@ export function isTeacherView(value: unknown): value is TeacherView {
 }
 
 export function todayDateKey() {
+  // Date keys drive progress calendar grouping.
   return new Date().toISOString().slice(0, 10);
 }
 
 export function asArray<T>(value: unknown, fallback: T[]) {
+  // Use stored arrays only when localStorage data has the expected shape.
   return Array.isArray(value) ? (value as T[]) : fallback;
 }
 

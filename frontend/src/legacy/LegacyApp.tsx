@@ -163,12 +163,14 @@ declare global {
 }
 
 function chatMessageTime(value: string) {
+  // Backend timestamps become compact chat bubble times.
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return statusTime();
   return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
 function apiMessageToLegacy(message: ChatApiMessage): ChatThread["messages"][number] {
+  // Convert backend chat messages into the legacy thread message shape.
   return {
     id: message.id,
     sender: message.sender || "User",
@@ -180,6 +182,7 @@ function apiMessageToLegacy(message: ChatApiMessage): ChatThread["messages"][num
 }
 
 function apiThreadToLegacy(thread: ChatApiThread, messages: ChatApiMessage[] = []): ChatThread {
+  // Threads carry their messages so the legacy chat window can render offline.
   const legacyMessages = messages.map(apiMessageToLegacy);
   const lastMessage = legacyMessages.at(-1)?.body || thread.lastMessage || "";
   return {
@@ -194,6 +197,7 @@ function apiThreadToLegacy(thread: ChatApiThread, messages: ChatApiMessage[] = [
 }
 
 function apiTaskToPackage(task: TaskApiItem): StudentTaskPackage {
+  // Backend tasks are normalized to the local practice-pack shape.
   return {
     id: task.id,
     title: task.title,
@@ -211,6 +215,7 @@ function apiTaskToPackage(task: TaskApiItem): StudentTaskPackage {
 }
 
 function learnerAccountToTeacherStudent(account: AuthUser, index: number): TeacherStudent {
+  // Registered learner accounts fill the teacher dashboard list.
   return {
     id: account.id,
     name: account.name || account.username,
@@ -311,6 +316,7 @@ export function LegacyApp({
   const [storageReady, setStorageReady] = React.useState(false);
 
   React.useEffect(() => {
+    // Restore browser-saved UI state after hydration.
     const stored = loadStoredLegacyState();
     if (stored) {
       const storedRole: Exclude<Role, "guest"> | null = isRole(stored.role) && stored.role !== "guest"
@@ -358,6 +364,7 @@ export function LegacyApp({
   React.useEffect(() => {
     if (!storageReady) return;
     try {
+      // Persist lightweight UI state so refreshes keep the current workspace.
       const account = { ...localAccount, avatarDataUrl: accountAvatar };
       window.localStorage.setItem(
         STORAGE_KEY,
@@ -441,6 +448,7 @@ export function LegacyApp({
     }
 
     let cancelled = false;
+    // Load account-scoped chat, task, and learner lists from the backend.
     setChatBusy(true);
     setChatError("");
     Promise.all([fetchChatThreads(), fetchUsers(), fetchTasks(), fetchUsers("student")])
@@ -491,6 +499,7 @@ export function LegacyApp({
   }
 
   function loginLocalAccount(nextRole: Exclude<Role, "guest">, username: string, password: string) {
+    // Mirror backend auth into local legacy account fields for existing screens.
     const dateKey = todayDateKey();
     const accountUsername = username.trim();
     const displayName = accountUsername || localAccount.displayName || "User";
@@ -520,6 +529,7 @@ export function LegacyApp({
   }
 
   function logoutLocalAccount() {
+    // Reset visible role and local session state on logout.
     setLocalAccount((current) => ({ ...current, isLoggedIn: false, password: "" }));
     setRole("student");
     setStudentView("practice");
@@ -534,6 +544,7 @@ export function LegacyApp({
     username: string;
     password: string;
   }) {
+    // The login gate handles both register and login modes.
     setAuthMessage("");
     if (!input.username || !input.password) {
       setAuthMessage("Enter an account and password.");
@@ -713,12 +724,14 @@ export function LegacyApp({
   }
 
   function replayRecording() {
+    // Replay uses the last object URL created from MediaRecorder output.
     if (!lastRecordingUrl) return;
     const audio = new Audio(lastRecordingUrl);
     audio.play().catch(() => setMessage("This browser could not replay the last recording."));
   }
 
   function openTeachingClip() {
+    // Generate a clip plan from the latest analysis when one is not already stored.
     const plan = teachingClipPlan || buildTeachingClipPlan(activeAnalysis, syllables, targetText);
     if (!plan) {
       showToast("This analysis did not find an item that needs a clip.");
@@ -731,6 +744,7 @@ export function LegacyApp({
   }
 
   function startEntryAssessment() {
+    // Entry assessment takes over the target text prompt one item at a time.
     const nextSession = defaultAssessmentSession();
     setAssessmentSession({ ...nextSession, active: true });
     setTargetText(entryAssessmentItems[0]?.prompt || targetText);
@@ -742,6 +756,7 @@ export function LegacyApp({
   }
 
   function completeAssessmentItem(result: EntryAssessmentResult | null) {
+    // Save the current item result and prepare the next assessment prompt.
     if (!result) return;
     const nextSession = nextAssessmentSession(assessmentSession, result);
     const nextItem = entryAssessmentItems[nextSession.currentIndex];
@@ -750,6 +765,7 @@ export function LegacyApp({
   }
 
   function completeEntryAssessment() {
+    // Turn completed assessment items into a teacher-facing profile.
     const student = localTeacherStudents.find((item) => item.id === selectedStudentId) || localTeacherStudents[0];
     if (!student) {
       showToast("No learner account is selected for this assessment.");
@@ -777,6 +793,7 @@ export function LegacyApp({
   }
 
   function openStudentTask(taskId: string) {
+    // Opening a task starts at the task overview.
     setSelectedTaskId(taskId);
     setActiveTaskExerciseId("");
     setActiveTaskItemIndex(0);
@@ -784,6 +801,7 @@ export function LegacyApp({
   }
 
   function openTaskStep(taskId: string, exerciseId: string) {
+    // Opening a step starts at the first practice item.
     setSelectedTaskId(taskId);
     setActiveTaskExerciseId(exerciseId);
     setActiveTaskItemIndex(0);
@@ -797,11 +815,13 @@ export function LegacyApp({
   }
 
   function openTeacherReview(submissionId: string) {
+    // Teacher review editor is keyed by the selected submission id.
     setSelectedReviewId(submissionId);
     setTeacherView("reviewEditor");
   }
 
   function completeTaskRecording(analysisResult: PronunciationAnalysis, recordingUrl: string) {
+    // Save analysis and recording data into the active task step.
     const context = activeTaskRecordingRef.current;
     if (!context) return;
     const task = publishedTasks.find((item) => item.id === context.taskId);
@@ -848,6 +868,7 @@ export function LegacyApp({
   }
 
   function recordTaskStep(taskId: string, exerciseId: string, itemIndex: number) {
+    // Task recording reuses the same microphone flow as free practice.
     if (recording) {
       stopRecording();
       return;
@@ -870,6 +891,7 @@ export function LegacyApp({
   }
 
   function replayTaskRecording(taskId: string, exerciseId: string, itemIndex: number) {
+    // Prefer the item recording, then step recording, then latest recording.
     const step = taskStepProgress[taskId]?.[exerciseId];
     const recordingUrl = step?.items?.[itemIndex]?.recordingUrl || step?.recordingUrl || lastRecordingUrl;
     if (!recordingUrl) return;
@@ -878,6 +900,7 @@ export function LegacyApp({
   }
 
   function submitTaskToTeacher(taskId: string) {
+    // Build a submission only after every task step has progress.
     const task = publishedTasks.find((item) => item.id === taskId);
     if (!task) return;
     const submission = buildTaskSubmission(task, taskStepProgress[task.id] || {}, scores, taskSubmissions.length);
@@ -894,6 +917,7 @@ export function LegacyApp({
   }
 
   function saveTeacherReview(submissionId: string, teacherScore: number, feedback: string) {
+    // Store teacher feedback locally so the learner screen can show it.
     setTaskSubmissions((current) =>
       current.map((submission) =>
         submission.id === submissionId
@@ -912,6 +936,7 @@ export function LegacyApp({
   }
 
   async function publishTask(task: StudentTaskPackage | null) {
+    // Publishing sends the edited practice pack to the backend.
     if (!task) return;
     if (!task.targetStudentId) {
       showToast("Choose a learner account before publishing.");
@@ -944,6 +969,7 @@ export function LegacyApp({
   }
 
   function confirmAssessmentProfile(profileId: string) {
+    // Confirmation prevents the same assessment profile from being republished.
     setLocalAssessmentProfiles((current) =>
       current.map((profile) => profile.id === profileId ? { ...profile, status: "Teacher Confirmed" } : profile),
     );
@@ -965,11 +991,13 @@ export function LegacyApp({
   }
 
   function navigateTeacher(view: TeacherView, filter?: TeacherStudentFilter) {
+    // Teacher navigation can also set the learner list filter.
     setTeacherView(view);
     if (filter) setTeacherStudentFilter(filter);
   }
 
   function navigateStudent(view: StudentView) {
+    // Leaving practice clears the special back target unless practice is selected.
     if (view === "practice") setPracticeBackView("");
     setStudentView(view);
   }
@@ -2452,6 +2480,7 @@ function StudentTaskContent({
 }
 
 function StudentTaskFeedback({ submission }: { submission?: TaskSubmission }) {
+  // Feedback card switches from waiting state to teacher review state.
   const feedbackTitle = submission?.teacherFeedback
     ? `${submission.teacherScore ?? "--"} · Teacher Feedback`
     : "Teacher is reviewing";
@@ -2983,6 +3012,7 @@ function TaskPackageEditorScreen({
   onBack: () => void;
   onPublishTask: (task: StudentTaskPackage | null) => void;
 }) {
+  // Local draft state lets teachers edit before publishing to the backend.
   const task = recommendedTaskForStudent(student);
   const alreadyPublished = Boolean(student && publishedTasks.some((item) => item.targetStudentId === student.id));
   const [exerciseSet, setExerciseSet] = React.useState<StudentTaskStep[]>(() => task?.exerciseSet || []);
@@ -2991,6 +3021,7 @@ function TaskPackageEditorScreen({
   const [teacherNote, setTeacherNote] = React.useState(task?.teacherNote || "Complete each step slowly, then submit the final recording to your teacher.");
 
   React.useEffect(() => {
+    // Reset editor fields when the selected learner changes.
     setExerciseSet(task?.exerciseSet || []);
     setTaskTitle(task?.title || "");
     setTaskGoal(task?.goal || "");
@@ -2998,6 +3029,7 @@ function TaskPackageEditorScreen({
   }, [task?.id]);
 
   function publishEditedTask() {
+    // Convert the edited step list into a publishable task payload.
     if (!task) return;
     onPublishTask(taskDraftFromSteps(task, {
       title: taskTitle,
@@ -3008,6 +3040,7 @@ function TaskPackageEditorScreen({
   }
 
   function addStep() {
+    // Add a blank custom step at the end of the editor.
     setExerciseSet((current) => [...current, customTeacherStep(current.length)]);
   }
 
@@ -3128,6 +3161,7 @@ function AssessmentTemplateEditorScreen({
   onPublishTask: (task: StudentTaskPackage | null) => void;
   onConfirmAssessment: (profileId: string) => void;
 }) {
+  // This editor turns assessment results into the learner's first assigned pack.
   const profile = assessmentProfile;
   const bankPackage = questionBankPackages[0];
   const repeatCount = (profile?.overallScore || student?.latestScore || 0) < 70 ? 5 : 3;
@@ -3176,6 +3210,7 @@ function AssessmentTemplateEditorScreen({
   const [assessmentTeacherNote, setAssessmentTeacherNote] = React.useState("Your teacher adjusted this practice pack based on your entry assessment. Today, do not rush. Slow down the target sound, say it completely, and your teacher will listen again after you record.");
 
   React.useEffect(() => {
+    // Reset the assessment editor whenever a different profile is opened.
     setAssessmentExerciseSet(initialAssessmentExerciseSet);
     setProfileSummary(profile?.profileSummary || "");
     setAssessmentRecommendation(profile?.recommendation || "");
@@ -3184,6 +3219,7 @@ function AssessmentTemplateEditorScreen({
   }, [profile?.id]);
 
   function publishAssessmentTask() {
+    // Publish also marks the assessment profile as teacher-confirmed.
     const task = assessmentTaskForStudent(student, profile);
     if (!task) {
       onPublishTask(null);
@@ -3340,6 +3376,7 @@ function TeacherStepEditor({
   onBankPackage: (packageId: string) => void;
   onChange: (update: Partial<StudentTaskStep>) => void;
 }) {
+  // Each step editor can use a question-bank pack or fully custom text.
   const mode = exercise.sourceMode === "custom" ? "custom" : "bank";
   const selectedBank = questionBankPackages.find((pack) => pack.id === exercise.bankPackageId) || questionBankPackages[0];
   const practiceItems = exercise.practiceItems.length ? exercise.practiceItems : selectedBank.items;
@@ -3428,6 +3465,7 @@ function TeacherReviewEditorScreen({
   onBack: () => void;
   onSaveReview: (submissionId: string, teacherScore: number, feedback: string) => void;
 }) {
+  // Review editor starts from the AI score but allows teacher correction.
   const [teacherScore, setTeacherScore] = React.useState(submission?.teacherScore ?? submission?.aiScores.overall ?? 0);
   const [feedback, setFeedback] = React.useState(submission?.teacherFeedback || "This is closer to the target than last time. Keep slowing down the focus sound. Your teacher can see your progress.");
 
@@ -3523,6 +3561,7 @@ function ChatScreen({
   avatarDataUrl: string;
   streak?: number;
 }) {
+  // Chat derives visible threads from the signed-in participant id.
   const role = teacher ? "teacher" : "student";
   const participantId = user.id;
   const availableTeachers = chatUsers.filter((item) => item.role === "teacher" && item.id !== user.id);
@@ -3535,6 +3574,7 @@ function ChatScreen({
   const selectedThread = threads.find((thread) => thread.id === selectedThreadId) || threads[0] || null;
 
   function openThread(threadId: string) {
+    // Opening a thread marks visible unread messages as read locally.
     setSelectedThreadId(threadId);
     setChatMode("thread");
     onThreadsChange((current) =>
@@ -3554,6 +3594,7 @@ function ChatScreen({
   }
 
   async function sendMessage(body: string) {
+    // Send through the backend, then append the saved message to local state.
     const text = body.trim();
     if (!text || !selectedThread) return;
     try {
@@ -3578,6 +3619,7 @@ function ChatScreen({
   }
 
   function deleteThread(threadId: string) {
+    // Deleting is local-only for now so it asks for confirmation first.
     const thread = allThreads.find((item) => item.id === threadId);
     if (!thread) return;
     const confirmed = window.confirm(`Delete "${thread.title}" ${thread.type === "class" ? "Group" : "Conversation"}? Chat history will be removed from the local demo data.`);
@@ -3591,6 +3633,7 @@ function ChatScreen({
   }
 
   async function createClassChat(title: string, memberIds: string[]) {
+    // Teachers can create group chats with selected learners.
     if (!memberIds.length) return;
     try {
       const payload = await createChatThread({
@@ -3608,6 +3651,7 @@ function ChatScreen({
   }
 
   async function createDirectChat(studentId: string) {
+    // Reuse an existing direct chat instead of creating duplicates.
     const student = availableStudents.find((item) => item.id === studentId) || availableStudents[0];
     if (!student) return;
     const existing = allThreads.find((thread) => thread.type === "direct" && thread.memberIds.includes(student.id));
@@ -3631,6 +3675,7 @@ function ChatScreen({
   }
 
   async function createStudentDirectChat(teacherId: string) {
+    // Learners start direct conversations by choosing a teacher account.
     const teacherUser = availableTeachers.find((item) => item.id === teacherId) || availableTeachers[0];
     if (!teacherUser) return;
     const existing = allThreads.find((thread) => thread.type === "direct" && thread.memberIds.includes(teacherUser.id));
@@ -3701,6 +3746,7 @@ function ChatThreadGroup({
   onOpenThread: (threadId: string) => void;
   onDeleteThread: (threadId: string) => void;
 }) {
+  // Group renders either direct conversations or class conversations.
   if (!threads.length) return null;
   return (
     <div className="grid gap-[7px]">
@@ -3739,6 +3785,7 @@ function ChatThreadGroup({
 }
 
 function chatThreadDisplayTitle(thread: ChatThread, role: "student" | "teacher") {
+  // Thread title fallback depends on who is reading the conversation.
   if (thread.type === "class") return thread.title || "Class Group";
   return thread.title || (role === "student" ? "Teacher Chat" : "Student Chat");
 }
@@ -3760,12 +3807,14 @@ function ChatThreadWindow({
   onDeleteThread: (threadId: string) => void;
   avatarDataUrl: string;
 }) {
+  // Chat window owns only the draft text; messages live in parent state.
   const quickReplies = role === "teacher" ? teacherQuickReplies : studentQuickReplies;
   const displayTitle = chatThreadDisplayTitle(thread, role);
   const unread = unreadCount(thread, participantId);
   const [draft, setDraft] = React.useState("");
 
   function sendDraft() {
+    // Clear the input after handing the draft to the backend send handler.
     onSendMessage(draft);
     setDraft("");
   }
@@ -3848,16 +3897,19 @@ function TeacherChatTools({
   onCreateClassChat: (title: string, memberIds: string[]) => void;
   onCreateDirectChat: (studentId: string) => void;
 }) {
+  // Teacher tools create either class-wide or one-on-one conversations.
   const [classTitle, setClassTitle] = React.useState("Qiyin Class 1 Group");
   const [selectedStudentIds, setSelectedStudentIds] = React.useState<string[]>([]);
   const [directStudentId, setDirectStudentId] = React.useState("");
 
   React.useEffect(() => {
+    // Keep selected ids valid when registered learner accounts change.
     setSelectedStudentIds((current) => current.filter((id) => students.some((student) => student.id === id)));
     setDirectStudentId((current) => current || students[0]?.id || "");
   }, [students]);
 
   function toggleClassStudent(studentId: string, checked: boolean) {
+    // Checkbox state is stored as a unique list of learner ids.
     setSelectedStudentIds((current) =>
       checked ? [...new Set([...current, studentId])] : current.filter((id) => id !== studentId),
     );
@@ -3910,9 +3962,11 @@ function StudentChatTools({
   teachers: AuthUser[];
   onCreateStudentDirectChat: (teacherId: string) => void;
 }) {
+  // Learner tools create a direct conversation with one teacher.
   const [teacherId, setTeacherId] = React.useState("");
 
   React.useEffect(() => {
+    // Default to the first available teacher account.
     setTeacherId((current) => current || teachers[0]?.id || "");
   }, [teachers]);
 

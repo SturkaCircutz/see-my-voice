@@ -1,5 +1,6 @@
 export type AuthMode = "login" | "register";
 
+// Public user data mirrors the backend auth response.
 export interface AuthUser {
   id: string;
   username: string;
@@ -11,11 +12,13 @@ export interface AuthUser {
 }
 
 export interface AuthResponse {
+  // Login and registration both return a token plus user profile.
   token: string;
   user: AuthUser;
 }
 
 export interface ChatApiThread {
+  // Chat thread fields are serialized from Mongo ids to strings.
   id: string;
   memberIds: string[];
   type: "direct" | "class";
@@ -35,6 +38,7 @@ export interface ChatApiMessage {
 }
 
 export interface TaskApiStep {
+  // Each practice pack step can come from the question bank or custom text.
   id: string;
   type: string;
   title: string;
@@ -102,6 +106,7 @@ export interface PinyinDiagnosis {
 }
 
 export interface PronunciationAnalysis {
+  // The UI uses this normalized result regardless of the analysis backend.
   heardText: string;
   summary: string;
   scores: ScoreSet;
@@ -111,6 +116,7 @@ export interface PronunciationAnalysis {
 }
 
 export interface PracticeAttempt {
+  // Attempts track one recording workflow for one target sentence.
   id: string;
   targetText: string;
   text?: string;

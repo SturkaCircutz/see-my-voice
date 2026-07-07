@@ -5,6 +5,7 @@ import { usersCollection } from "../db.js";
 export const userRoutes = Router();
 
 userRoutes.get("/", requireAuth, async (request, response) => {
+  // Optional role filtering supports teacher chat and task assignment pickers.
   const role = request.query.role === "student" || request.query.role === "teacher"
     ? request.query.role
     : "";

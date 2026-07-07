@@ -1,6 +1,7 @@
 import { config } from "./config.js";
 
 export interface ScoreSet {
+  // The frontend expects four headline scores in a consistent range.
   overall: number;
   tone: number;
   clarity: number;
@@ -36,6 +37,7 @@ export interface PinyinDiagnosis {
 }
 
 export interface PronunciationAnalysis {
+  // This is the stable analysis shape returned by the backend API.
   heardText: string;
   summary: string;
   scores: ScoreSet;
@@ -59,6 +61,7 @@ function score(value: unknown): number {
 }
 
 function rhythmScoreFromResult(result: Record<string, any>): number {
+  // Convert boundary confidence labels into a simple rhythm score.
   const confidence = result?.tone_timing?.boundary_confidence;
   if (confidence === "low") return 62;
   if (confidence === "medium") return 78;
@@ -67,6 +70,7 @@ function rhythmScoreFromResult(result: Record<string, any>): number {
 }
 
 function normalizeSyllables(result: Record<string, any>): SyllableFeedback[] {
+  // Each detected syllable becomes one row in the pronunciation detail UI.
   const rows = Array.isArray(result?.tone_timing?.syllables)
     ? result.tone_timing.syllables
     : [];
@@ -82,10 +86,12 @@ function normalizeSyllables(result: Record<string, any>): SyllableFeedback[] {
 }
 
 function stringList(value: unknown): string[] {
+  // Normalize optional arrays from the Python service.
   return Array.isArray(value) ? value.map((item) => String(item)).filter(Boolean) : [];
 }
 
 function normalizePinyinDiagnosis(result: Record<string, any>): PinyinDiagnosis | null {
+  // Pinyin diagnosis is optional because some analysis paths only return scores.
   const diagnosis = result?.pinyin_diagnosis;
   if (!diagnosis || typeof diagnosis !== "object") return null;
   const source = diagnosis as Record<string, any>;
@@ -134,6 +140,7 @@ export function normalizePronunciationAnalysis(payload: unknown): PronunciationA
 }
 
 export async function analyzeWithPronunciationService(input: AnalysisInput): Promise<PronunciationAnalysis> {
+  // Backend routes call through this function instead of talking to Python directly.
   if (!config.pronunciationApiUrl) {
     throw new Error("Pronunciation API is not configured yet. Set PRONUNCIATION_API_URL when it is available.");
   }

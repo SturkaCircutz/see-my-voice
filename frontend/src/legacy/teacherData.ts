@@ -84,6 +84,7 @@ export const questionBankPackages: QuestionBankPackage[] = [
 ];
 
 export const assessmentProfiles: AssessmentProfile[] = [
+  // Sample assessment profile drives the teacher confirmation flow.
   {
     id: "assessment-sample",
     studentName: "Learner B",

@@ -13,6 +13,7 @@ import { statusTime } from "./utils";
 type LoginMode = "login" | "register";
 
 export function ResponsiveShell({ children }: { children: React.ReactNode }) {
+  // The shell provides the centered desktop frame and full-screen mobile frame.
   return (
     <div className="min-h-screen bg-[#ece8df] lg:grid lg:place-items-center lg:px-6 lg:py-6 max-lg:p-0">
       <div className="relative h-[100dvh] min-h-[620px] w-full overflow-hidden bg-[var(--paper)] shadow-none lg:h-[min(900px,calc(100vh-48px))] lg:min-h-[720px] lg:w-[min(1180px,calc(100vw-48px))] lg:rounded-[28px] lg:border lg:border-[var(--line-strong)] lg:shadow-[var(--shadow)]">
@@ -40,6 +41,7 @@ export function LoginScreen({
     password: string;
   }) => Promise<void> | void;
 }) {
+  // Login state stays local until the form submits to the page auth handler.
   const [mode, setMode] = React.useState<LoginMode>("login");
   const [username, setUsername] = React.useState("");
   const [password, setPassword] = React.useState("");
@@ -51,6 +53,7 @@ export function LoginScreen({
     }`;
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
+    // Prevent the browser reload and hand sanitized credentials to the app.
     event.preventDefault();
     await onSubmit({
       role,
@@ -180,6 +183,7 @@ export function LoginScreen({
 }
 
 export function LoadingShell() {
+  // Minimal loading shell keeps layout stable while auth state initializes.
   return (
     <ResponsiveShell>
       <main id="app" className="h-full overflow-x-hidden overflow-y-auto overscroll-contain pb-[92px] lg:pb-0">
@@ -192,6 +196,7 @@ export function LoadingShell() {
 }
 
 export function HomeScreen({ onSelectRole }: { onSelectRole: (role: Exclude<Role, "guest">) => void }) {
+  // The first screen sends users into learner or teacher authentication.
   return (
     <section
       className={cn(
@@ -240,6 +245,7 @@ export function HomeScreen({ onSelectRole }: { onSelectRole: (role: Exclude<Role
 }
 
 function ProductOverview() {
+  // Product cards describe user-facing capabilities without exposing storage internals.
   const productSections = [
     {
       section: "Accounts",

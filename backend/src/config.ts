@@ -1,11 +1,13 @@
 import "dotenv/config";
 
 function required(name: string, fallback = ""): string {
+  // Use local defaults in development but still fail when a required value is blank.
   const value = process.env[name] || fallback;
   if (!value) throw new Error(`${name} is required.`);
   return value;
 }
 
+// Centralized config keeps routes from reading process.env directly.
 export const config = {
   port: Number(process.env.PORT || 8080),
   mongoUri: required("MONGODB_URI", "mongodb://127.0.0.1:27017"),

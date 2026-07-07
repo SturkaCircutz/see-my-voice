@@ -14,6 +14,7 @@ import { seedConfiguredUser } from "./seed.js";
 
 const app = express();
 
+// Allow the configured frontend origins plus Vercel preview domains.
 app.use(
   cors({
     origin(origin, callback) {
@@ -33,6 +34,7 @@ app.use(
 );
 app.use(express.json({ limit: "1mb" }));
 
+// Root and health endpoints support quick deployment checks.
 app.get("/", (_request, response) => {
   response.json({ ok: true, service: "see-my-voice-backend" });
 });
@@ -41,6 +43,7 @@ app.get("/api/health", (_request, response) => {
   response.json({ ok: true, service: "see-my-voice-backend" });
 });
 
+// Auth routes also seed the configured demo account before login/register work.
 app.use("/api/auth", async (_request, _response, next) => {
   try {
     await connectToMongo();
@@ -78,6 +81,7 @@ app.use("/api/submissions", submissionRoutes);
 app.use("/api/reviews", reviewRoutes);
 app.use("/api/chat", chatRoutes);
 
+// Pronunciation calls need the database for auth and attempt ownership.
 app.use("/api/pronunciation", async (_request, _response, next) => {
   try {
     await connectToMongo();
@@ -88,6 +92,7 @@ app.use("/api/pronunciation", async (_request, _response, next) => {
 });
 app.use("/api/pronunciation", pronunciationRoutes);
 
+// Return one consistent error shape for uncaught route failures.
 const errorHandler: ErrorRequestHandler = (error, _request, response, _next) => {
   console.error(error);
   response.status(500).json({ error: "Internal server error." });
@@ -95,6 +100,7 @@ const errorHandler: ErrorRequestHandler = (error, _request, response, _next) => 
 
 app.use(errorHandler);
 
+// Local development starts a listener; Vercel imports the app instead.
 if (!process.env.VERCEL) {
   await connectToMongo();
   await seedConfiguredUser();

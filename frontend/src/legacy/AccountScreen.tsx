@@ -42,6 +42,7 @@ export function AccountScreen({
   onLogout: () => void;
   onAvatarChange: (avatarDataUrl: string) => void;
 }) {
+  // Account metrics combine backend user data with local legacy UI state.
   const signedIn = Boolean(user);
   const displayName = user?.name || localAccount.displayName || (role === "teacher" ? "Coach" : "Learner");
   const accountName = user?.username || localAccount.username || "Signed-in user";
@@ -52,6 +53,7 @@ export function AccountScreen({
   const hasTodayTask = publishedTasks.some((task) => task.status === "Published");
 
   function updateAvatar(event: React.ChangeEvent<HTMLInputElement>) {
+    // Avatars stay browser-local as a data URL.
     const file = event.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();

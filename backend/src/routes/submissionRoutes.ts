@@ -29,6 +29,7 @@ function toSubmissionResponse(submission: {
 submissionRoutes.use(requireAuth);
 
 submissionRoutes.get("/", async (request: AuthenticatedRequest, response) => {
+  // Learners can list their own submitted task work.
   const submissions = await taskSubmissionsCollection()
     .find({ studentId: request.user!._id })
     .sort({ createdAt: -1 })
@@ -39,6 +40,7 @@ submissionRoutes.get("/", async (request: AuthenticatedRequest, response) => {
 });
 
 submissionRoutes.post("/", async (request: AuthenticatedRequest, response) => {
+  // A submission points at a task and may also point at an analyzed attempt.
   const taskId = String(request.body.taskId || "").trim();
   const attemptId = String(request.body.attemptId || "").trim();
 

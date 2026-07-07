@@ -6,6 +6,7 @@ import { config } from "../config.js";
 export const pronunciationRoutes = Router();
 
 async function readAnalyzeForm(request: AuthenticatedRequest) {
+  // Parse multipart uploads without adding a separate Express upload middleware.
   const webRequest = new Request("http://local.invalid", {
     method: "POST",
     headers: {
@@ -29,6 +30,7 @@ async function readAnalyzeForm(request: AuthenticatedRequest) {
 }
 
 pronunciationRoutes.post("/analyze", requireAuth, async (request, response) => {
+  // This endpoint is disabled until a Python pronunciation service URL is configured.
   if (!config.pronunciationApiUrl) {
     response.status(501).json({
       error:

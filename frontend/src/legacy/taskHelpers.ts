@@ -12,6 +12,7 @@ import type { TaskStepProgress } from "./legacyAppTypes";
 import { statusTime } from "./utils";
 
 export function teacherStudentAttentionReasons(student: TeacherStudent) {
+  // Teacher alerts combine overdue work, low scores, and pending reviews.
   const reasons = [];
   if (Number(student.overdueTasks || 0) > 0) reasons.push("Task incomplete");
   if (student.latestScore < 70) reasons.push("Recent score is low");
@@ -25,6 +26,7 @@ export function teacherDashboardNeedsAttention(student: TeacherStudent) {
 }
 
 export function commonTeacherFocusTags(students: TeacherStudent[]) {
+  // Aggregate focus tags for the dashboard overview chips.
   const counts = students
     .flatMap((student) => student.focusTags)
     .reduce<Record<string, number>>((items, tag) => {
@@ -39,6 +41,7 @@ export function commonTeacherFocusTags(students: TeacherStudent[]) {
 }
 
 export function recommendedTaskForStudent(student?: TeacherStudent): StudentTaskPackage | null {
+  // Draft a simple practice pack from the selected learner profile.
   if (!student) return null;
   const bankPackage = questionBankPackages[0];
   const practiceItems = bankPackage?.items?.length ? bankPackage.items : ["我要吃饭"];
@@ -97,6 +100,7 @@ export function recommendedTaskForStudent(student?: TeacherStudent): StudentTask
 }
 
 export function assessmentTaskForStudent(student?: TeacherStudent, profile?: AssessmentProfile | null): StudentTaskPackage | null {
+  // Entry assessment profiles become initial published practice packs.
   if (!student) return null;
   const bankPackage = questionBankPackages[0];
   return {
@@ -153,11 +157,13 @@ export function assessmentTaskForStudent(student?: TeacherStudent, profile?: Ass
 }
 
 export function assessmentProfileForStudent(profiles: AssessmentProfile[], student?: TeacherStudent) {
+  // Prefer a profile tied to the selected learner, otherwise show the latest one.
   if (!profiles.length) return null;
   return [...profiles].reverse().find((profile) => profile.studentId === student?.id) || profiles[profiles.length - 1] || null;
 }
 
 export function taskPracticeItemsForExercise(exercise: StudentTaskStep, task: StudentTaskPackage) {
+  // Steps can define their own item list or inherit the task practice text.
   if (exercise.practiceItems.length) return exercise.practiceItems;
   return [exercise.targetText || task.practiceText].filter(Boolean);
 }
@@ -188,6 +194,7 @@ export function buildTaskSubmission(task: StudentTaskPackage, progress: Record<s
 }
 
 export function stepFromQuestionBank(step: StudentTaskStep, packageId: string): StudentTaskStep {
+  // Selecting a bank package fills the editor step with standard content.
   const bank = questionBankPackages.find((pack) => pack.id === packageId) || questionBankPackages[0];
   return {
     ...step,

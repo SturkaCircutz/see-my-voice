@@ -2,6 +2,7 @@ import type { PracticeAttempt } from "../types";
 import { attemptScore } from "./utils";
 
 export function practiceStreakDays(attempts: PracticeAttempt[], now = new Date()) {
+  // Count consecutive calendar days that contain at least one practice attempt.
   const practicedDates = new Set(
     attempts
       .map((attempt) => new Date(attempt.createdAt))
@@ -20,6 +21,7 @@ export function practiceStreakDays(attempts: PracticeAttempt[], now = new Date()
 }
 
 export function progressCalendarDays(attempts: PracticeAttempt[], count = 14) {
+  // Build a fixed-width calendar strip ending today.
   const practiced = new Set(
     attempts
       .map((attempt) => new Date(attempt.createdAt))
@@ -43,6 +45,7 @@ export function progressCalendarDays(attempts: PracticeAttempt[], count = 14) {
 }
 
 export function progressChartScores(attempts: PracticeAttempt[]) {
+  // Show at most seven recent scores in chronological order.
   const attemptScores = attempts
     .slice(0, 7)
     .map((attempt) => Math.round(attemptScore(attempt)))
@@ -51,6 +54,7 @@ export function progressChartScores(attempts: PracticeAttempt[]) {
 }
 
 export function progressChartLabels(attempts: PracticeAttempt[], count: number) {
+  // Labels follow real attempts when available, otherwise recent dates.
   const attemptLabels = attempts
     .slice(0, count)
     .map((attempt) => progressDateLabel(attempt.createdAt))
@@ -86,6 +90,7 @@ function clamp(value: number, min: number, max: number) {
 }
 
 function roundedDomain(scores: number[]) {
+  // Use an adaptive axis so low scores are not clipped at the card bottom.
   if (!scores.length) return { min: 0, mid: 50, max: 100 };
   const low = Math.min(...scores);
   const high = Math.max(...scores);
@@ -105,6 +110,7 @@ function roundedDomain(scores: number[]) {
 }
 
 function smoothTrendPath(points: TrendPoint[]) {
+  // Curved SVG paths give the chart a softer product feel.
   if (!points.length) return "";
   if (points.length === 1) {
     const point = points[0];
@@ -129,6 +135,7 @@ export function ProgressTrendChart({
   labels: string[];
   latestScore: number;
 }) {
+  // The chart is pure SVG so it renders consistently without a chart library.
   const width = 360;
   const height = 184;
   const padding = { top: 30, right: 22, bottom: 42, left: 40 };

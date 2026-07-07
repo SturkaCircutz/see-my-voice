@@ -29,6 +29,7 @@ function toReviewResponse(review: {
 reviewRoutes.use(requireAuth);
 
 reviewRoutes.get("/", async (_request: AuthenticatedRequest, response) => {
+  // Review center reads recent teacher feedback records.
   const reviews = await reviewsCollection()
     .find({})
     .sort({ createdAt: -1 })
@@ -39,6 +40,7 @@ reviewRoutes.get("/", async (_request: AuthenticatedRequest, response) => {
 });
 
 reviewRoutes.post("/", async (request: AuthenticatedRequest, response) => {
+  // Saving a review also marks the related submission as reviewed.
   const submissionId = String(request.body.submissionId || "").trim();
   const feedback = String(request.body.feedback || "").trim();
   const score = request.body.score === undefined ? undefined : Number(request.body.score);

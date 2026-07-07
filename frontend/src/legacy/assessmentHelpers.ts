@@ -10,6 +10,7 @@ import {
 } from "./data";
 
 export function defaultAssessmentSession(): EntryAssessmentSession {
+  // Entry assessment starts inactive until the learner opens it.
   return {
     active: false,
     currentIndex: 0,
@@ -23,15 +24,18 @@ function todayKey() {
 }
 
 export function cleanEditorText(value: string, fallback: string) {
+  // Empty editor fields keep the original task text.
   return value.trim() || fallback;
 }
 
 export function countFromEditor(value: string | number, fallback = 1) {
+  // Counts from text inputs are clamped to positive numbers.
   const count = Number(value);
   return Number.isFinite(count) && count > 0 ? count : fallback;
 }
 
 export function practiceItemsFromEditor(value: string) {
+  // Teacher-entered item lists use one line per practice item.
   return value
     .split(/\n+/)
     .map((item) => item.trim())
@@ -42,6 +46,7 @@ export function taskDraftFromSteps(
   task: StudentTaskPackage,
   edits: Pick<StudentTaskPackage, "title" | "goal" | "teacherNote" | "exerciseSet">,
 ): StudentTaskPackage {
+  // Merge teacher edits back into the task package preview.
   const editedItems = edits.exerciseSet.flatMap((exercise) => exercise.practiceItems).filter(Boolean);
   const firstPracticeText = editedItems[0] || edits.exerciseSet.find((exercise) => exercise.targetText)?.targetText || task.practiceText;
   return {
@@ -59,6 +64,7 @@ export function assessmentResultFromAnalysis(
   session: EntryAssessmentSession,
   analysisResult: PronunciationAnalysis,
 ): EntryAssessmentResult | null {
+  // Save the current assessment item with the latest AI score.
   const item = entryAssessmentItems[session.currentIndex] || entryAssessmentItems[0];
   if (!item) return null;
   return {
@@ -69,6 +75,7 @@ export function assessmentResultFromAnalysis(
 }
 
 export function fallbackAssessmentResult(session: EntryAssessmentSession): EntryAssessmentResult | null {
+  // Fallback results keep the assessment moving when analysis is unavailable.
   const item = entryAssessmentItems[session.currentIndex] || entryAssessmentItems[0];
   if (!item) return null;
   const existingCount = session.results.length;
@@ -83,6 +90,7 @@ export function nextAssessmentSession(
   session: EntryAssessmentSession,
   result: EntryAssessmentResult,
 ): EntryAssessmentSession {
+  // Advance to the next item until every assessment prompt has a result.
   const existingResults = session.results.filter((row) => row.id !== result.id);
   const results = [...existingResults, result];
   const completed = results.length >= entryAssessmentItems.length;
@@ -130,6 +138,7 @@ export function buildAssessmentProfileFromSession(
 }
 
 export function customTeacherStep(index: number): StudentTaskStep {
+  // New custom steps start blank so teachers can write their own prompt.
   return {
     id: `custom-${Date.now()}-${index + 1}`,
     type: "Practice",

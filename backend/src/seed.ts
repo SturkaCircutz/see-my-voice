@@ -4,6 +4,7 @@ import { config } from "./config.js";
 import { usersCollection, type UserDocument } from "./db.js";
 
 export async function seedConfiguredUser(): Promise<void> {
+  // Optional seed user supports demos and first deploy smoke tests.
   const username = config.seedUsername.trim().toLowerCase();
   const password = config.seedPassword;
   if (!username || !password) return;

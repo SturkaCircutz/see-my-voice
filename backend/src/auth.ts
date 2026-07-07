@@ -15,6 +15,7 @@ export interface PublicUser {
 }
 
 export interface AuthenticatedRequest extends Request {
+  // Routes attach the loaded user after validating the bearer token.
   user?: UserDocument;
 }
 
@@ -36,6 +37,7 @@ export function toPublicUser(user: UserDocument): PublicUser {
 }
 
 export function signToken(user: UserDocument): string {
+  // JWT payload only needs the user id; the database remains the source of truth.
   return jwt.sign({ sub: user._id.toHexString() }, config.jwtSecret, {
     expiresIn: "7d",
   });

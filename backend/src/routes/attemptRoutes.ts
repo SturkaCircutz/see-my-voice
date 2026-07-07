@@ -59,6 +59,7 @@ async function readAnalyzeForm(request: AuthenticatedRequest) {
 attemptRoutes.use(requireAuth);
 
 attemptRoutes.get("/", async (request: AuthenticatedRequest, response) => {
+  // Return recent attempts for the current user only.
   const attempts = await practiceAttemptsCollection()
     .find({ userId: request.user!._id })
     .sort({ createdAt: -1 })
@@ -69,6 +70,7 @@ attemptRoutes.get("/", async (request: AuthenticatedRequest, response) => {
 });
 
 attemptRoutes.post("/", async (request: AuthenticatedRequest, response) => {
+  // Create the attempt before audio upload so later analysis can attach to it.
   const targetText = String(request.body.targetText || "").trim();
 
   if (!targetText) {
@@ -91,6 +93,7 @@ attemptRoutes.post("/", async (request: AuthenticatedRequest, response) => {
 });
 
 attemptRoutes.get("/:attemptId", async (request: AuthenticatedRequest, response) => {
+  // Fetch one owned attempt by id.
   const filter = attemptFilter(request, request.params.attemptId);
   if (!filter) {
     response.status(404).json({ error: "Attempt not found." });
@@ -107,6 +110,7 @@ attemptRoutes.get("/:attemptId", async (request: AuthenticatedRequest, response)
 });
 
 attemptRoutes.post("/:attemptId/analyze", async (request: AuthenticatedRequest, response) => {
+  // Save audio first, then send it to the pronunciation analysis service.
   const filter = attemptFilter(request, request.params.attemptId);
   if (!filter) {
     response.status(404).json({ error: "Attempt not found." });

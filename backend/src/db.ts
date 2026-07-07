@@ -1,6 +1,7 @@
 import { MongoClient, type Collection, type Db, ObjectId } from "mongodb";
 import { config } from "./config.js";
 
+// User records hold auth identity and lightweight login stats.
 export interface UserDocument {
   _id: ObjectId;
   username: string;
@@ -13,6 +14,7 @@ export interface UserDocument {
   loginCount: number;
 }
 
+// Login events provide a simple account activity trail.
 export interface LoginEventDocument {
   _id?: ObjectId;
   userId: ObjectId;
@@ -25,6 +27,7 @@ export interface LoginEventDocument {
 
 export type PracticeAttemptStatus = "created" | "analyzing" | "complete" | "failed";
 
+// Practice attempts link a user, target sentence, audio file, and analysis result.
 export interface PracticeAttemptDocument {
   _id: ObjectId;
   userId: ObjectId;
@@ -41,6 +44,7 @@ export interface PracticeAttemptDocument {
   error?: string;
 }
 
+// Tasks are teacher-published practice packs for one learner.
 export interface TaskDocument {
   _id: ObjectId;
   teacherId: ObjectId;
@@ -71,6 +75,7 @@ export interface TaskDocument {
   updatedAt: Date;
 }
 
+// Submissions connect a completed task back to the learner's attempt.
 export interface TaskSubmissionDocument {
   _id: ObjectId;
   taskId: ObjectId;
@@ -81,6 +86,7 @@ export interface TaskSubmissionDocument {
   updatedAt: Date;
 }
 
+// Reviews store teacher feedback for submitted recordings.
 export interface ReviewDocument {
   _id: ObjectId;
   submissionId: ObjectId;
@@ -91,6 +97,7 @@ export interface ReviewDocument {
   updatedAt: Date;
 }
 
+// Chat threads are shared containers for direct or class conversations.
 export interface ChatThreadDocument {
   _id: ObjectId;
   memberIds: ObjectId[];
@@ -101,6 +108,7 @@ export interface ChatThreadDocument {
   updatedAt: Date;
 }
 
+// Chat messages keep the actual text inside a thread.
 export interface ChatMessageDocument {
   _id: ObjectId;
   threadId: ObjectId;
@@ -114,6 +122,7 @@ let database: Db | null = null;
 let connectionPromise: Promise<Db> | null = null;
 
 export async function connectToMongo(): Promise<Db> {
+  // Reuse the existing connection once the app has connected.
   if (database) return database;
   if (connectionPromise) return connectionPromise;
 
@@ -149,6 +158,7 @@ export async function connectToMongo(): Promise<Db> {
 }
 
 export function usersCollection(): Collection<UserDocument> {
+  // Collection helpers keep type names near the Mongo collection names.
   if (!database) throw new Error("MongoDB is not connected.");
   return database.collection<UserDocument>("users");
 }

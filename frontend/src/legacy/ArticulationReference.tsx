@@ -21,6 +21,7 @@ function ReferenceImage({
   className: string;
   sources: string[];
 }) {
+  // Try alternate image formats if the first asset path is missing.
   const [sourceIndex, setSourceIndex] = React.useState(0);
 
   if (!sources[sourceIndex]) return null;
@@ -44,6 +45,7 @@ function ArticulationPhotoCard({
   item: ArticulationUnit;
   syllable: LegacySyllable;
 }) {
+  // Photo cards show mouth or tongue references for a pinyin unit.
   const title = imageType === "mouth" ? "Mouth Shape" : "Tongue Position";
   const fallbackSources = articulationImageSources(item.unit, imageType);
   const splitSources = splitArticulationImageSources(item.unit, imageType);
@@ -76,6 +78,7 @@ function ArticulationPhotoCard({
 }
 
 function GeneratedMouthDiagram({ syllable }: { syllable: LegacySyllable }) {
+  // Fallback mouth diagram keeps the detail screen useful without an asset.
   const shapeClass = mouthShapeClass(syllable);
   const roundClass = shapeClass === "shape-round" ? "w-[38px]" : "";
   const openHoleClass = shapeClass === "shape-open" ? "h-[34px] w-12" : "";
@@ -100,6 +103,7 @@ function GeneratedMouthDiagram({ syllable }: { syllable: LegacySyllable }) {
 }
 
 function GeneratedTongueDiagram({ syllable }: { syllable: LegacySyllable }) {
+  // Fallback tongue diagram highlights the approximate articulation position.
   const positionClass = tonguePositionClass(syllable);
   const tongueClass = {
     "tongue-front": "-rotate-[10deg] translate-y-[-8px]",
@@ -128,6 +132,7 @@ function GeneratedTongueDiagram({ syllable }: { syllable: LegacySyllable }) {
 }
 
 function MouthReference({ syllable, units }: { syllable: LegacySyllable; units: ArticulationUnit[] }) {
+  // Use precise images when available, otherwise draw a generated diagram.
   if (!units.length) return <GeneratedMouthDiagram syllable={syllable} />;
 
   return (
@@ -152,6 +157,7 @@ function TongueReference({ syllable, units }: { syllable: LegacySyllable; units:
 }
 
 export function ArticulationReference({ syllable }: { syllable: LegacySyllable }) {
+  // The detail panel combines visual references with text pronunciation cues.
   const units = preciseArticulationUnits(syllable);
   const missingUnits = missingArticulationImageUnits(syllable);
   const hasReference = units.length > 0;
