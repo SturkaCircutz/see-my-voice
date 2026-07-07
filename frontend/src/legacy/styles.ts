@@ -7,19 +7,19 @@ export function cn(...classes: ClassValue[]) {
 export const screenClass = "min-h-full bg-[var(--paper)]";
 export const contentBaseClass =
   "grid px-4 pt-4 pb-6 max-[370px]:px-3 lg:mx-auto lg:w-full lg:max-w-[980px] lg:px-8 lg:pt-6 lg:pb-8 xl:max-w-[1040px] xl:px-10";
-export const contentClass = cn(contentBaseClass, "gap-3.5");
+export const contentClass = cn(contentBaseClass, "gap-4 lg:gap-5");
 
 export const appHeaderBaseClass =
-  "relative bg-[var(--navy)] px-[22px] pt-[38px] pb-[22px] text-white before:absolute before:top-[15px] before:left-1/2 before:h-2 before:w-[92px] before:-translate-x-1/2 before:rounded-full before:bg-[#090a12] before:content-[''] lg:px-8 lg:pt-8 lg:pb-8 lg:before:hidden xl:px-10";
-export const appHeaderClass = cn(appHeaderBaseClass, "min-h-[152px] lg:min-h-[172px]");
-export const statusRowClass = "mb-[21px] flex items-center justify-between text-xs font-bold tracking-[0.04em] text-[rgba(255,255,255,0.76)] lg:mb-6";
+  "relative bg-[linear-gradient(135deg,var(--navy)_0%,#20213a_58%,#151628_100%)] px-[22px] pt-8 pb-5 text-white shadow-[0_22px_54px_rgba(25,26,47,0.16)] before:absolute before:top-[15px] before:left-1/2 before:h-2 before:w-[92px] before:-translate-x-1/2 before:rounded-full before:bg-[#090a12] before:content-[''] lg:px-8 lg:pt-7 lg:pb-7 lg:before:hidden xl:px-10";
+export const appHeaderClass = cn(appHeaderBaseClass, "min-h-[144px] lg:min-h-[160px]");
+export const statusRowClass = "mb-4 flex items-center justify-between text-xs font-bold tracking-[0.025em] text-[rgba(255,255,255,0.78)] lg:mb-5";
 export const brandRowClass = "flex items-center justify-between";
-export const brandClass = "m-0 text-2xl font-semibold tracking-normal lg:text-[32px]";
+export const brandClass = "m-0 text-2xl font-semibold tracking-normal text-white lg:text-[32px]";
 export const brandAccentClass = "font-(family-name:--serif) text-[var(--red)]";
 
-export const sectionLabelClass = "m-0 mb-[7px] text-xs font-semibold tracking-[0.08em] text-[var(--muted)]";
-export const panelClass = "rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-3.5 lg:p-5";
-export const panelFrameClass = "rounded-2xl border border-[var(--line)] bg-[var(--surface)] lg:p-1";
+export const sectionLabelClass = "m-0 mb-2 text-xs font-extrabold tracking-[0.055em] text-[var(--muted)]";
+export const panelClass = "rounded-[16px] border border-[rgba(53,84,110,0.1)] bg-[var(--surface)] p-4 shadow-[0_14px_40px_rgba(25,26,47,0.06)] lg:p-5";
+export const panelFrameClass = "rounded-[16px] border border-[rgba(53,84,110,0.1)] bg-[var(--surface)] shadow-[0_14px_40px_rgba(25,26,47,0.06)] lg:p-1";
 export const modelKickerClass = "text-[10px] font-extrabold uppercase tracking-[0.08em] text-[var(--green)]";
 export const statusPillClass = "self-start rounded-full bg-[var(--green-soft)] px-[9px] py-[5px] text-[10px] font-bold text-[var(--green)]";
 export const warnStatusPillClass = "self-start rounded-full bg-[var(--amber-soft)] px-[9px] py-[5px] text-[10px] font-bold text-[#a96600]";

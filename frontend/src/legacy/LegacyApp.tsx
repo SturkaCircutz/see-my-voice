@@ -105,8 +105,6 @@ import {
   buildTeachingClipPlan,
   diagnosisDetailLines,
   diagnosisIssueSummary,
-  scoreFillClass,
-  toneFillClass,
 } from "./teachingClipHelpers";
 import {
   progressCalendarDays,
@@ -1255,21 +1253,21 @@ function BrandHeader({
   onProgress?: () => void;
 }) {
   return (
-    <header className={cn(appHeaderBaseClass, progress ? "min-h-[148px]" : "min-h-[152px]")}>
-      <div className="mb-[21px] flex items-center justify-between text-xs font-bold tracking-[0.04em] text-[rgba(255,255,255,0.76)]">
+    <header className={cn(appHeaderBaseClass, progress ? "min-h-[132px] lg:min-h-[144px]" : "min-h-[144px] lg:min-h-[152px]")}>
+      <div className="mb-4 flex items-center justify-between gap-4 text-xs font-bold tracking-[0.025em] text-[rgba(255,255,255,0.78)]">
         <span>{statusTime()}</span>
-        <span>Mandarin pronunciation practice</span>
+        <span className="text-right">Mandarin pronunciation practice</span>
       </div>
-      <div className="flex items-center justify-between">
-        <h1 className="m-0 text-2xl font-semibold tracking-normal">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="m-0 text-[26px] leading-tight font-semibold tracking-normal lg:text-[34px]">
           <span className="font-(family-name:--serif) text-[var(--red)]">VoiceSight</span> · {progress ? "My Progress" : "See My Voice"}
         </h1>
         {progress ? (
-          <button className="min-h-9 rounded-full border border-[rgba(255,255,255,0.2)] px-[11px] py-[7px] text-xs text-[rgba(255,255,255,0.72)]" type="button">
+          <button className="min-h-10 rounded-full border border-[rgba(255,255,255,0.2)] px-4 py-2 text-xs font-bold text-[rgba(255,255,255,0.78)] shadow-[0_8px_18px_rgba(0,0,0,0.12)] transition-[transform,background-color,border-color,box-shadow] duration-[180ms] hover:-translate-y-0.5 hover:border-[rgba(255,255,255,0.32)] hover:bg-[rgba(255,255,255,0.05)] hover:shadow-[0_12px_24px_rgba(0,0,0,0.16)] active:translate-y-px" type="button">
             Recent Practice
           </button>
         ) : (
-          <button className="min-h-9 py-[5px] pr-0 pl-3 text-xs text-[rgba(255,255,255,0.72)]" type="button" onClick={onProgress}>
+          <button className="min-h-10 rounded-full px-4 py-2 text-xs font-bold text-[rgba(255,255,255,0.78)] transition-[transform,background-color,color] duration-[180ms] hover:-translate-y-0.5 hover:bg-[rgba(255,255,255,0.05)] active:translate-y-px" type="button" onClick={onProgress}>
             Streak {streak} days · Progress
           </button>
         )}
@@ -1700,7 +1698,7 @@ function ProgressScreen({
           <p className={sectionLabelClass} id="trend-title">
             Overall Score Trend
           </p>
-          <div className={cn(panelClass, "pt-1.5")}>
+          <div className={cn(panelClass, "smv-fade-in p-4 pt-3 transition-[transform,box-shadow] duration-[180ms] hover:-translate-y-0.5 hover:shadow-[0_18px_52px_rgba(25,26,47,0.08)] lg:p-6 lg:pt-5")}>
             <ProgressTrendChart scores={chartScores} labels={chartLabels} latestScore={latestScore} />
           </div>
         </section>
@@ -1709,25 +1707,28 @@ function ProgressScreen({
           <p className={sectionLabelClass} id="calendar-title">
             Practice Calendar
           </p>
-          <div className={cn(panelClass, "grid grid-cols-7 gap-1.5 lg:gap-2")}>
-            {days.map((day) => (
-              <button
-                className={`grid min-h-[56px] content-center gap-0.5 rounded-xl border p-1 text-center lg:min-h-[72px] ${
-                  day.selected
-                    ? "border-[var(--green)] bg-[var(--green-soft)] shadow-[inset_0_0_0_2px_rgba(32,154,120,0.28)]"
-                    : day.today
-                      ? "border-[var(--line)] bg-[#fbfaf7] shadow-[inset_0_0_0_2px_rgba(207,75,49,0.22)]"
-                    : day.practiced
-                      ? "border-[rgba(32,154,120,0.3)] bg-[var(--green-soft)]"
-                      : "border-[rgba(222,216,205,0.72)] bg-[#fbfaf7]"
-                }`}
-                type="button"
-                key={day.date}
-              >
-                <strong className="text-[10px] text-[var(--ink)]">{day.label}</strong>
-                <span className="text-[9px] leading-[1.15] text-[var(--muted)]">{day.practiced ? "Practiced" : "No Practice"}</span>
-              </button>
-            ))}
+          <div className={cn(panelClass, "smv-fade-in grid grid-cols-7 gap-2 p-3 lg:gap-2 lg:p-4")}>
+            {days.map((day) => {
+              const stateLabel = day.today ? "Today" : day.practiced ? "Practiced" : "No Practice";
+              return (
+                <button
+                  className={`grid min-h-[64px] content-center gap-1 rounded-[14px] border px-1.5 py-2 text-center transition-[transform,box-shadow,border-color,background-color] duration-[180ms] hover:-translate-y-0.5 hover:shadow-[0_10px_24px_rgba(25,26,47,0.08)] active:translate-y-px lg:min-h-[76px] ${
+                    day.today
+                      ? "border-[rgba(207,75,49,0.42)] bg-[var(--red-soft)] shadow-[inset_0_0_0_2px_rgba(207,75,49,0.14)]"
+                      : day.practiced
+                        ? "border-[rgba(32,154,120,0.24)] bg-[var(--green-soft)]"
+                        : "border-[rgba(222,216,205,0.54)] bg-[#fbfaf7]"
+                  }`}
+                  type="button"
+                  key={day.date}
+                  aria-pressed={day.today}
+                >
+                  <strong className="text-[10px] leading-none text-[var(--ink)]">{day.label}</strong>
+                  <span className={`text-[9px] leading-[1.15] ${day.today ? "font-extrabold text-[var(--red)]" : "text-[var(--muted)]"}`}>{stateLabel}</span>
+                  {day.today ? <span className="mx-auto mt-0.5 block size-1.5 rounded-full bg-[var(--red)]" aria-hidden="true"></span> : null}
+                </button>
+              );
+            })}
           </div>
         </section>
 
@@ -1740,10 +1741,10 @@ function ProgressScreen({
               attempts.slice(0, 6).map((attempt) => {
                 const score = attemptScore(attempt);
                 return (
-                  <button className="w-full rounded-[14px] border border-[var(--line)] bg-[var(--surface)] px-3.5 py-3 text-left" type="button" key={attempt.id}>
+                  <button className="smv-fade-in w-full rounded-[16px] border border-[rgba(53,84,110,0.1)] bg-[var(--surface)] px-4 py-3.5 text-left shadow-[0_10px_28px_rgba(25,26,47,0.045)] transition-[transform,box-shadow,border-color] duration-[180ms] hover:-translate-y-0.5 hover:border-[rgba(207,75,49,0.18)] hover:shadow-[0_16px_38px_rgba(25,26,47,0.08)] active:translate-y-px" type="button" key={attempt.id}>
                     <span className="flex items-center justify-between gap-3">
-                      <strong className="font-(family-name:--serif) text-[23px]">{attempt.targetText || attempt.text}</strong>
-                      <span className="text-[10px] text-[var(--muted)]">
+                      <strong className="font-(family-name:--serif) text-[24px] leading-none text-[var(--ink)]">{attempt.targetText || attempt.text}</strong>
+                      <span className="text-[10px] font-bold text-[var(--muted)]">
                         {attempt.status === "complete"
                           ? `${Math.round(score)} · ${statusFromScore(score)}`
                           : attempt.status === "failed"
@@ -1751,14 +1752,14 @@ function ProgressScreen({
                             : "Analysis Pending"}
                       </span>
                     </span>
-                    <span className="mt-2 block h-[7px] overflow-hidden rounded-full bg-[#eceae6]" aria-hidden="true">
-                      <span className={cn("block h-full rounded-[inherit]", progressWidthClass(score), scoreFillClass(score))}></span>
+                    <span className="mt-3 block h-2 overflow-hidden rounded-full bg-[#ebe5dc]" aria-hidden="true">
+                      <span className={cn("block h-full rounded-[inherit] bg-[linear-gradient(90deg,#e99656,#cf4b31)] shadow-[0_0_12px_rgba(207,75,49,0.2)] transition-[width] duration-200", progressWidthClass(score))}></span>
                     </span>
                   </button>
                 );
               })
             ) : (
-              <p className={cn(panelClass, "m-0 text-xs leading-[1.6] text-[var(--muted)]")}>No custom practice record for this day.</p>
+              <p className={cn(panelClass, "smv-fade-in m-0 text-xs leading-[1.65] text-[var(--muted)]")}>No custom practice record for this day.</p>
             )}
           </div>
         </section>
@@ -1767,22 +1768,22 @@ function ProgressScreen({
           <p className={sectionLabelClass} id="tones-title">
             Tone Drills
           </p>
-          <div className={cn(panelClass, "grid gap-2")}>
+          <div className={cn(panelClass, "smv-fade-in grid gap-2")}>
             {Object.values(toneDrills).map((item) => (
-              <button className="block w-full py-2.5 text-left" type="button" key={item.tone} onClick={() => onOpenToneDrill(item.tone)}>
+              <button className="block w-full rounded-[14px] px-2 py-3 text-left transition-[transform,background-color] duration-[180ms] hover:-translate-y-0.5 hover:bg-[rgba(207,75,49,0.045)] active:translate-y-px" type="button" key={item.tone} onClick={() => onOpenToneDrill(item.tone)}>
                 <div className="flex items-center justify-between gap-3">
-                  <span className="text-xs text-[var(--red)]">{item.label}</span>
-                  <span className="text-[11px] text-[var(--muted)]">No practice data yet</span>
+                  <span className="text-xs font-extrabold text-[var(--red)]">{item.label}</span>
+                  <span className="text-[11px] font-bold text-[var(--muted)]">No practice data yet</span>
                 </div>
-                <div className="mt-2 block h-[7px] overflow-hidden rounded-full bg-[#eceae6]" aria-hidden="true">
-                  <div className={cn("block h-full rounded-[inherit]", progressWidthClass(0), toneFillClass(item.tone))}></div>
+                <div className="mt-2.5 block h-2 overflow-hidden rounded-full bg-[#ebe5dc]" aria-hidden="true">
+                  <div className={cn("block h-full rounded-[inherit] bg-[linear-gradient(90deg,#e99656,#cf4b31)] transition-[width] duration-200", progressWidthClass(0))}></div>
                 </div>
               </button>
             ))}
           </div>
         </section>
 
-        <button className="w-full rounded-[13px] bg-[var(--navy)] font-bold text-white lg:col-span-2 lg:max-w-[320px] lg:justify-self-end" type="button" onClick={onBack}>
+        <button className="w-full rounded-[15px] bg-[var(--navy)] px-5 py-3 font-bold text-white shadow-[0_12px_28px_rgba(25,26,47,0.16)] transition-[transform,box-shadow,background-color] duration-[180ms] hover:-translate-y-0.5 hover:bg-[var(--navy-soft)] hover:shadow-[0_16px_34px_rgba(25,26,47,0.2)] active:translate-y-px lg:col-span-2 lg:max-w-[320px] lg:justify-self-end" type="button" onClick={onBack}>
           Back to Practice Today
         </button>
       </div>

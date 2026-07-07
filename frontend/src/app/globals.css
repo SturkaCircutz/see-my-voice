@@ -13,7 +13,7 @@
   --amber: #d27a00;
   --amber-soft: #fff3d9;
   --ink: #29283b;
-  --muted: #8b8991;
+  --muted: #766f78;
   --line: #ded9d0;
   --line-strong: #cfc8bd;
   --shadow: 0 22px 64px rgba(26, 24, 43, 0.2);
@@ -63,6 +63,39 @@
   textarea:focus-visible {
     @apply outline-[3px] outline-offset-[3px] outline-[rgba(32,154,120,0.4)];
   }
+}
+
+@keyframes smv-chart-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes smv-soft-rise {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.smv-chart-line {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: smv-chart-draw 720ms ease-out forwards;
+}
+
+.smv-chart-area,
+.smv-fade-in {
+  animation: smv-soft-rise 220ms ease-out both;
 }
 
 @media (prefers-reduced-motion: reduce) {
