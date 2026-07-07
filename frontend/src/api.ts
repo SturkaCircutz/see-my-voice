@@ -1,4 +1,4 @@
-import type { AuthResponse, AuthUser, PracticeAttempt, PronunciationAnalysis } from "./types";
+import type { AuthResponse, AuthUser, ChatApiMessage, ChatApiThread, PracticeAttempt, PronunciationAnalysis } from "./types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "";
 const TOKEN_KEY = "see-my-voice-token";
@@ -42,6 +42,7 @@ export function registerUser(input: {
   name: string;
   username: string;
   password: string;
+  role: "student" | "teacher";
 }): Promise<AuthResponse> {
   return request<AuthResponse>("/api/auth/register", {
     method: "POST",
@@ -65,6 +66,32 @@ export function fetchCurrentUser(): Promise<{ user: AuthUser }> {
 
 export function fetchUsers(): Promise<{ users: AuthUser[] }> {
   return request<{ users: AuthUser[] }>("/api/users");
+}
+
+export function fetchChatThreads(): Promise<{ threads: ChatApiThread[] }> {
+  return request<{ threads: ChatApiThread[] }>("/api/chat/threads");
+}
+
+export function createChatThread(input: {
+  title: string;
+  type?: "direct" | "class";
+  memberIds: string[];
+}): Promise<{ thread: ChatApiThread }> {
+  return request<{ thread: ChatApiThread }>("/api/chat/threads", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function fetchChatMessages(threadId: string): Promise<{ messages: ChatApiMessage[] }> {
+  return request<{ messages: ChatApiMessage[] }>(`/api/chat/threads/${threadId}/messages`);
+}
+
+export function createChatMessage(threadId: string, body: string): Promise<{ message: ChatApiMessage }> {
+  return request<{ message: ChatApiMessage }>(`/api/chat/threads/${threadId}/messages`, {
+    method: "POST",
+    body: JSON.stringify({ body }),
+  });
 }
 
 export function fetchPracticeAttempts(): Promise<{ attempts: PracticeAttempt[] }> {

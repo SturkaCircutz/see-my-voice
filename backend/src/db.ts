@@ -5,6 +5,7 @@ export interface UserDocument {
   _id: ObjectId;
   username: string;
   name: string;
+  role: "student" | "teacher";
   passwordHash: string;
   createdAt: Date;
   updatedAt: Date;
@@ -74,7 +75,9 @@ export interface ReviewDocument {
 export interface ChatThreadDocument {
   _id: ObjectId;
   memberIds: ObjectId[];
+  type: "direct" | "class";
   title: string;
+  lastMessage?: string;
   createdAt: Date;
   updatedAt: Date;
 }

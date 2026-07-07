@@ -1,14 +1,16 @@
 import { Router } from "express";
 import { ObjectId } from "mongodb";
 import { requireAuth, type AuthenticatedRequest } from "../auth.js";
-import { chatMessagesCollection, chatThreadsCollection } from "../db.js";
+import { chatMessagesCollection, chatThreadsCollection, usersCollection, type ChatThreadDocument } from "../db.js";
 
 export const chatRoutes = Router();
 
 function toThreadResponse(thread: {
   _id: ObjectId;
   memberIds: ObjectId[];
+  type?: "direct" | "class";
   title: string;
+  lastMessage?: string;
   createdAt: Date;
   updatedAt: Date;
 }) {
@@ -16,7 +18,9 @@ function toThreadResponse(thread: {
   return {
     id: thread._id.toHexString(),
     memberIds: thread.memberIds.map((id) => id.toHexString()),
+    type: thread.type || "direct",
     title: thread.title,
+    lastMessage: thread.lastMessage || "",
     createdAt: thread.createdAt.toISOString(),
     updatedAt: thread.updatedAt.toISOString(),
   };
@@ -28,12 +32,13 @@ function toMessageResponse(message: {
   senderId: ObjectId;
   body: string;
   createdAt: Date;
-}) {
+}, senderName = "") {
   // Keep chat messages JSON-safe while preserving ownership and thread links.
   return {
     id: message._id.toHexString(),
     threadId: message.threadId.toHexString(),
     senderId: message.senderId.toHexString(),
+    sender: senderName,
     body: message.body,
     createdAt: message.createdAt.toISOString(),
   };
@@ -53,6 +58,7 @@ chatRoutes.get("/threads", async (request: AuthenticatedRequest, response) => {
 
 chatRoutes.post("/threads", async (request: AuthenticatedRequest, response) => {
   const title = String(request.body.title || "Conversation").trim();
+  const type = request.body.type === "class" ? "class" : "direct";
   const memberIds = Array.isArray(request.body.memberIds)
     ? request.body.memberIds.map((id: unknown) => String(id)).filter(ObjectId.isValid)
     : [];
@@ -64,11 +70,34 @@ chatRoutes.post("/threads", async (request: AuthenticatedRequest, response) => {
     return;
   }
 
+  const foundUsers = await usersCollection()
+    .find({ _id: { $in: uniqueMemberIds } })
+    .project({ _id: 1 })
+    .toArray();
+  if (foundUsers.length !== uniqueMemberIds.length) {
+    response.status(400).json({ error: "Every chat member must be a registered user." });
+    return;
+  }
+
+  if (type === "direct") {
+    const existing = await chatThreadsCollection().findOne({
+      type: "direct",
+      memberIds: { $all: uniqueMemberIds },
+      $expr: { $eq: [{ $size: "$memberIds" }, uniqueMemberIds.length] },
+    });
+    if (existing) {
+      response.json({ thread: toThreadResponse(existing) });
+      return;
+    }
+  }
+
   const now = new Date();
-  const thread = {
+  const thread: ChatThreadDocument = {
     _id: new ObjectId(),
     memberIds: uniqueMemberIds,
+    type,
     title: title || "Conversation",
+    lastMessage: "",
     createdAt: now,
     updatedAt: now,
   };
@@ -98,8 +127,18 @@ chatRoutes.get("/threads/:threadId/messages", async (request: AuthenticatedReque
     .sort({ createdAt: 1 })
     .limit(200)
     .toArray();
+  const senderIds = [...new Set(messages.map((message) => message.senderId.toHexString()))].map((id) => new ObjectId(id));
+  const senders = senderIds.length
+    ? await usersCollection()
+        .find({ _id: { $in: senderIds } })
+        .project({ _id: 1, name: 1, username: 1 })
+        .toArray()
+    : [];
+  const senderNames = new Map(senders.map((sender) => [sender._id.toHexString(), sender.name || sender.username]));
 
-  response.json({ messages: messages.map(toMessageResponse) });
+  response.json({
+    messages: messages.map((message) => toMessageResponse(message, senderNames.get(message.senderId.toHexString()) || "")),
+  });
 });
 
 chatRoutes.post("/threads/:threadId/messages", async (request: AuthenticatedRequest, response) => {
@@ -134,6 +173,6 @@ chatRoutes.post("/threads/:threadId/messages", async (request: AuthenticatedRequ
   };
 
   await chatMessagesCollection().insertOne(message);
-  await chatThreadsCollection().updateOne({ _id: threadId }, { $set: { updatedAt: now } });
-  response.status(201).json({ message: toMessageResponse(message) });
+  await chatThreadsCollection().updateOne({ _id: threadId }, { $set: { lastMessage: body, updatedAt: now } });
+  response.status(201).json({ message: toMessageResponse(message, request.user!.name || request.user!.username) });
 });

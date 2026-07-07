@@ -52,7 +52,7 @@ export interface TeacherStudent {
   trend?: string;
 }
 
-// Chat data is local until the real backend chat source exists.
+// Chat data is normalized into this UI shape after loading from the backend.
 export interface ChatThread {
   id: string;
   title: string;

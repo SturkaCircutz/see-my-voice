@@ -22,6 +22,13 @@ export function AppNav({
   // Guests stay on the role picker and do not need tab navigation.
   if (role === "guest") return <nav className="hidden" aria-label="Main pages" hidden />;
 
+  const navClass =
+    "absolute inset-x-0 bottom-0 z-[5] grid border-t border-[rgba(207,200,189,0.92)] bg-[rgba(255,254,250,0.94)] px-2.5 pt-[7px] pb-[calc(7px+env(safe-area-inset-bottom))] backdrop-blur-[16px] lg:inset-y-0 lg:inset-x-auto lg:left-0 lg:w-[176px] lg:auto-rows-min lg:grid-cols-1 lg:gap-2 lg:border-t-0 lg:border-r lg:bg-[rgba(255,254,250,0.98)] lg:px-4 lg:py-5";
+  const navButtonClass = (active: boolean) =>
+    `grid min-h-[51px] place-items-center content-center gap-px rounded-xl text-[11px] lg:min-h-[54px] lg:grid-cols-[28px_1fr] lg:justify-items-start lg:gap-2.5 lg:px-3 lg:text-left lg:text-[13px] ${
+      active ? "bg-[var(--red-soft)] font-extrabold text-[var(--red)]" : "text-[var(--muted)]"
+    }`;
+
   const activeTeacherView =
     teacherView === "assessmentEditor" || teacherView === "taskPackageEditor"
       ? "tasks"
@@ -32,16 +39,12 @@ export function AppNav({
   if (role === "teacher") {
     return (
       <nav
-        className="absolute inset-x-0 bottom-0 z-[5] grid grid-cols-6 border-t border-[rgba(207,200,189,0.92)] bg-[rgba(255,254,250,0.94)] px-2.5 pt-[7px] pb-[calc(7px+env(safe-area-inset-bottom))] backdrop-blur-[16px]"
+        className={`${navClass} grid-cols-6`}
         aria-label="Main pages"
       >
         {teacherNavItems.map((item) => (
           <button
-            className={`grid min-h-[51px] place-items-center content-center gap-px rounded-xl text-[11px] ${
-              item.view === activeTeacherView
-                ? "bg-[var(--red-soft)] font-extrabold text-[var(--red)]"
-                : "text-[var(--muted)]"
-            }`}
+            className={navButtonClass(item.view === activeTeacherView)}
             type="button"
             key={item.view}
             data-teacher-view={item.view}
@@ -63,16 +66,12 @@ export function AppNav({
     : studentView;
   return (
     <nav
-      className="absolute inset-x-0 bottom-0 z-[5] grid grid-cols-5 border-t border-[rgba(207,200,189,0.92)] bg-[rgba(255,254,250,0.94)] px-2.5 pt-[7px] pb-[calc(7px+env(safe-area-inset-bottom))] backdrop-blur-[16px]"
+      className={`${navClass} grid-cols-5`}
       aria-label="Main pages"
     >
       {studentNavItems.map((item) => (
         <button
-          className={`grid min-h-[51px] place-items-center content-center gap-px rounded-xl text-[11px] ${
-            item.view === activeStudentView
-              ? "bg-[var(--red-soft)] font-extrabold text-[var(--red)]"
-              : "text-[var(--muted)]"
-          }`}
+          className={navButtonClass(item.view === activeStudentView)}
           type="button"
           key={item.view}
           data-view={item.view}

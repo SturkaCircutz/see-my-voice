@@ -8,6 +8,7 @@ export interface PublicUser {
   id: string;
   username: string;
   name: string;
+  role: "student" | "teacher";
   createdAt: string;
   lastLoginAt?: string;
   loginCount: number;
@@ -27,6 +28,7 @@ export function toPublicUser(user: UserDocument): PublicUser {
     id: user._id.toHexString(),
     username: user.username,
     name: user.name,
+    role: user.role || "student",
     createdAt: user.createdAt.toISOString(),
     lastLoginAt: user.lastLoginAt?.toISOString(),
     loginCount: user.loginCount,

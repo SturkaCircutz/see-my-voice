@@ -3,9 +3,7 @@
 import React from "react";
 import {
   clearToken,
-  fetchCurrentUser,
   fetchPracticeAttempts,
-  getToken,
   loginUser,
   registerUser,
   setToken,
@@ -17,13 +15,12 @@ function App() {
   // Keep backend-owned session and practice data at the page boundary.
   const [user, setUser] = React.useState<AuthUser | null>(null);
   const [attempts, setAttempts] = React.useState<PracticeAttempt[]>([]);
+  const [authReady, setAuthReady] = React.useState(false);
 
-  // Restore a saved login token in the background so the legacy-style shell can paint immediately.
+  // Each new site visit starts at the login gate instead of silently restoring an old token.
   React.useEffect(() => {
-    if (!getToken()) return;
-    fetchCurrentUser()
-      .then(({ user: currentUser }) => setUser(currentUser))
-      .catch(() => clearToken());
+    clearToken();
+    setAuthReady(true);
   }, []);
 
   // Load dashboard data only after the backend confirms the current user.
@@ -38,27 +35,19 @@ function App() {
   const handleAuthed = React.useCallback((payload: { token: string; user: AuthUser }) => {
     setToken(payload.token);
     setUser(payload.user);
+    return payload.user;
   }, []);
 
   const authenticateAccount = React.useCallback(
     async (username: string, password: string) => {
-      try {
-        handleAuthed(await loginUser({ username, password }));
-        return;
-      } catch (loginError) {
-        const message = loginError instanceof Error ? loginError.message : "";
-        if (!message.toLowerCase().includes("incorrect")) throw loginError;
-      }
+      return handleAuthed(await loginUser({ username, password }));
+    },
+    [handleAuthed],
+  );
 
-      try {
-        handleAuthed(await registerUser({ username, password, name: username }));
-      } catch (registerError) {
-        const message = registerError instanceof Error ? registerError.message : "";
-        if (message.toLowerCase().includes("already registered")) {
-          throw new Error("That account already exists. Check the password and try again.");
-        }
-        throw registerError;
-      }
+  const registerAccount = React.useCallback(
+    async (username: string, password: string, role: "student" | "teacher") => {
+      return handleAuthed(await registerUser({ username, password, name: username, role }));
     },
     [handleAuthed],
   );
@@ -74,9 +63,11 @@ function App() {
   return (
     <LegacyApp
       user={user}
+      authReady={authReady}
       attempts={attempts}
       setAttempts={setAttempts}
       onLogin={authenticateAccount}
+      onRegister={registerAccount}
       onLogout={handleLogout}
     />
   );

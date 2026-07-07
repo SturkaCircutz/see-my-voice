@@ -4,6 +4,7 @@ export interface AuthUser {
   id: string;
   username: string;
   name: string;
+  role: "student" | "teacher";
   createdAt: string;
   lastLoginAt?: string;
   loginCount: number;
@@ -12,6 +13,25 @@ export interface AuthUser {
 export interface AuthResponse {
   token: string;
   user: AuthUser;
+}
+
+export interface ChatApiThread {
+  id: string;
+  memberIds: string[];
+  type: "direct" | "class";
+  title: string;
+  lastMessage: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ChatApiMessage {
+  id: string;
+  threadId: string;
+  senderId: string;
+  sender: string;
+  body: string;
+  createdAt: string;
 }
 
 export interface ScoreSet {

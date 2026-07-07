@@ -19,6 +19,7 @@ export async function seedConfiguredUser(): Promise<void> {
       {
         $set: {
           name: config.seedName || existing.name || username,
+          role: existing.role || "student",
           passwordHash,
           updatedAt: now,
         },
@@ -31,6 +32,7 @@ export async function seedConfiguredUser(): Promise<void> {
     _id: new ObjectId(),
     username,
     name: config.seedName || username,
+    role: "student",
     passwordHash,
     createdAt: now,
     updatedAt: now,

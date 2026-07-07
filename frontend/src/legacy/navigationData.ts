@@ -1,4 +1,4 @@
-// Bottom navigation is data-driven so labels and indexes match web/app.js.
+// Navigation is data-driven so mobile tabs and the desktop rail share labels.
 export const studentNavItems = [
   { view: "practice", label: "Practice", index: "01" },
   { view: "tasks", label: "Tasks", index: "02" },

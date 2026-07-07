@@ -23,6 +23,10 @@ function cleanName(value: unknown): string {
   return String(value || "").trim();
 }
 
+function cleanRole(value: unknown): "student" | "teacher" {
+  return value === "teacher" ? "teacher" : "student";
+}
+
 function readClientMeta(request: AuthenticatedRequest) {
   return {
     ip: request.ip,
@@ -33,6 +37,7 @@ function readClientMeta(request: AuthenticatedRequest) {
 authRoutes.post("/register", async (request, response) => {
   const username = cleanUsername(request.body.username);
   const name = cleanName(request.body.name) || username;
+  const role = cleanRole(request.body.role);
   const password = String(request.body.password || "");
 
   if (!username || username.length < 2) {
@@ -50,6 +55,7 @@ authRoutes.post("/register", async (request, response) => {
     _id: new ObjectId(),
     username,
     name,
+    role,
     passwordHash,
     createdAt: now,
     updatedAt: now,

@@ -5,13 +5,17 @@ import {
   analyzePracticeAttempt,
   createPracticeAttempt,
   fetchPracticeAttempts,
+  fetchUsers,
+  fetchChatThreads,
+  fetchChatMessages,
+  createChatThread,
+  createChatMessage,
 } from "../api";
 import { AppNav } from "./AppNav";
-import { HomeScreen, PhoneShell } from "./AppShell";
+import { LoadingShell, LoginScreen, ResponsiveShell } from "./AppShell";
 import { AccountScreen } from "./AccountScreen";
 import { ArticulationReference } from "./ArticulationReference";
 import {
-  chatThreads,
   defaultScores,
   defaultSyllables,
   entryAssessmentItems,
@@ -36,7 +40,7 @@ import {
   type TeacherStudent,
   type TeacherView,
 } from "./data";
-import type { AuthUser, PracticeAttempt, PronunciationAnalysis, ScoreSet } from "../types";
+import type { AuthUser, ChatApiMessage, ChatApiThread, PracticeAttempt, PronunciationAnalysis, ScoreSet } from "../types";
 import {
   assessmentResultFromAnalysis,
   buildAssessmentProfileFromSession,
@@ -160,24 +164,59 @@ declare global {
   }
 }
 
+function chatMessageTime(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return statusTime();
+  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+function apiMessageToLegacy(message: ChatApiMessage): ChatThread["messages"][number] {
+  return {
+    id: message.id,
+    sender: message.sender || "User",
+    senderId: message.senderId,
+    body: message.body,
+    time: chatMessageTime(message.createdAt),
+    readBy: [message.senderId],
+  };
+}
+
+function apiThreadToLegacy(thread: ChatApiThread, messages: ChatApiMessage[] = []): ChatThread {
+  const legacyMessages = messages.map(apiMessageToLegacy);
+  const lastMessage = legacyMessages.at(-1)?.body || thread.lastMessage || "";
+  return {
+    id: thread.id,
+    title: thread.title,
+    type: thread.type,
+    unread: 0,
+    lastMessage,
+    memberIds: thread.memberIds,
+    messages: legacyMessages,
+  };
+}
+
 // Props keep the legacy UI connected to auth and practice state owned by the app shell.
 interface LegacyAppProps {
   user: AuthUser | null;
+  authReady: boolean;
   attempts: PracticeAttempt[];
   setAttempts: React.Dispatch<React.SetStateAction<PracticeAttempt[]>>;
-  onLogin: (username: string, password: string) => Promise<void> | void;
+  onLogin: (username: string, password: string) => Promise<AuthUser> | AuthUser;
+  onRegister: (username: string, password: string, role: Exclude<Role, "guest">) => Promise<AuthUser> | AuthUser;
   onLogout: () => void;
 }
 
 export function LegacyApp({
   user,
+  authReady,
   attempts,
   setAttempts,
   onLogin,
+  onRegister,
   onLogout,
 }: LegacyAppProps) {
   // Navigation state controls which legacy screen is visible.
-  const [role, setRole] = React.useState<Role>(user ? "student" : "guest");
+  const [role, setRole] = React.useState<Exclude<Role, "guest">>("student");
   const [studentView, setStudentView] = React.useState<StudentView>("practice");
   const [teacherView, setTeacherView] = React.useState<TeacherView>("home");
   const [teacherStudentFilter, setTeacherStudentFilter] = React.useState<TeacherStudentFilter>("all");
@@ -207,7 +246,10 @@ export function LegacyApp({
   const [activeTaskItemIndex, setActiveTaskItemIndex] = React.useState(0);
   const [selectedReviewId, setSelectedReviewId] = React.useState("");
   const [accountAvatar, setAccountAvatar] = React.useState("");
-  const [localChatThreads, setLocalChatThreads] = React.useState<ChatThread[]>(chatThreads);
+  const [localChatThreads, setLocalChatThreads] = React.useState<ChatThread[]>([]);
+  const [chatUsers, setChatUsers] = React.useState<AuthUser[]>([]);
+  const [chatBusy, setChatBusy] = React.useState(false);
+  const [chatError, setChatError] = React.useState("");
   const [lastRecordingUrl, setLastRecordingUrl] = React.useState("");
   const [localAccount, setLocalAccount] = React.useState<LocalAccountState>({
     isLoggedIn: false,
@@ -222,6 +264,8 @@ export function LegacyApp({
   });
   const [teachingClipPlan, setTeachingClipPlan] = React.useState<TeachingClipPlan | null>(null);
   const [selectedClipSegmentIndex, setSelectedClipSegmentIndex] = React.useState(0);
+  const [authMessage, setAuthMessage] = React.useState("");
+  const [authBusy, setAuthBusy] = React.useState(false);
 
   // Recording and toast refs hold browser objects that should not trigger rerenders.
   const mediaRecorder = React.useRef<MediaRecorder | null>(null);
@@ -231,14 +275,17 @@ export function LegacyApp({
   const toastTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const recordingUrlRef = React.useRef("");
   const recordingContextRef = React.useRef<RecordingContext>("practice");
-  const accountSyncAttemptedRef = React.useRef(false);
   const activeTaskRecordingRef = React.useRef<{ taskId: string; exerciseId: string; itemIndex: number } | null>(null);
   const [storageReady, setStorageReady] = React.useState(false);
 
   React.useEffect(() => {
     const stored = loadStoredLegacyState();
     if (stored) {
-      const storedRole = isRole(stored.role) ? stored.role : isRole(stored.currentRole) ? stored.currentRole : null;
+      const storedRole: Exclude<Role, "guest"> | null = isRole(stored.role) && stored.role !== "guest"
+        ? stored.role
+        : isRole(stored.currentRole) && stored.currentRole !== "guest"
+          ? stored.currentRole
+          : null;
       const storedStudentView = isStudentView(stored.studentView)
         ? stored.studentView
         : isStudentView(stored.currentView)
@@ -275,7 +322,6 @@ export function LegacyApp({
         setLocalAccount((current) => ({ ...current, ...stored.account }));
         setAccountAvatar(stored.account.avatarDataUrl || "");
       }
-      setLocalChatThreads(asArray<ChatThread>(stored.chatThreads, chatThreads));
     }
     setStorageReady(true);
   }, []);
@@ -290,7 +336,7 @@ export function LegacyApp({
           role,
           currentRole: role,
           studentView,
-          currentView: role === "teacher" && teacherView !== "account" ? "teacher" : role === "teacher" ? "account" : role === "guest" ? "home" : studentView,
+          currentView: role === "teacher" && teacherView !== "account" ? "teacher" : role === "teacher" ? "account" : studentView,
           teacherView,
           teacherStudentFilter,
           targetText,
@@ -309,7 +355,6 @@ export function LegacyApp({
           activeTaskItemIndex,
           selectedReviewId,
           account,
-          chatThreads: localChatThreads,
         }),
       );
     } catch {
@@ -322,7 +367,6 @@ export function LegacyApp({
     assessmentSession,
     localAssessmentProfiles,
     localAccount,
-    localChatThreads,
     localTeacherStudents,
     practiceBackView,
     publishedTasks,
@@ -339,28 +383,6 @@ export function LegacyApp({
     taskSubmissions,
     teacherStudentFilter,
     teacherView,
-  ]);
-
-  React.useEffect(() => {
-    // A signed-in visitor should land in the student flow instead of the guest role picker.
-    if (user && role === "guest") setRole("student");
-  }, [role, user]);
-
-  React.useEffect(() => {
-    if (!storageReady || user || accountSyncAttemptedRef.current) return;
-    if (!localAccount.isLoggedIn || !localAccount.username || !localAccount.password) return;
-
-    accountSyncAttemptedRef.current = true;
-    Promise.resolve(onLogin(localAccount.username, localAccount.password))
-      .then(() => showToast("Account saved to MongoDB."))
-      .catch(() => showToast("Sign in again to save this account to MongoDB."));
-  }, [
-    storageReady,
-    user,
-    localAccount.isLoggedIn,
-    localAccount.username,
-    localAccount.password,
-    onLogin,
   ]);
 
   React.useEffect(() => {
@@ -382,6 +404,45 @@ export function LegacyApp({
     syllables.find((item) => item.id === selectedSyllableId) || syllables[0] || defaultSyllables[0];
   const pinyin = pinyinByText[targetText] || (analysis ? activeAnalysis.heardText : "Waiting for recording analysis");
   const streak = Math.max(1, Math.min(9, attempts.length || 1));
+  const accountDisplayName = user?.name || localAccount.displayName || localAccount.username || (role === "teacher" ? "Teacher" : "Learner");
+
+  React.useEffect(() => {
+    if (!user) {
+      setLocalChatThreads([]);
+      setChatUsers([]);
+      setChatError("");
+      return;
+    }
+
+    let cancelled = false;
+    setChatBusy(true);
+    setChatError("");
+    Promise.all([fetchChatThreads(), fetchUsers()])
+      .then(async ([threadPayload, userPayload]) => {
+        const threadsWithMessages = await Promise.all(
+          threadPayload.threads.map(async (thread) => {
+            const messagePayload = await fetchChatMessages(thread.id);
+            return apiThreadToLegacy(thread, messagePayload.messages);
+          }),
+        );
+        if (cancelled) return;
+        setLocalChatThreads(threadsWithMessages);
+        setChatUsers(userPayload.users);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        setLocalChatThreads([]);
+        setChatUsers([]);
+        setChatError(error instanceof Error ? error.message : "Chat could not be loaded.");
+      })
+      .finally(() => {
+        if (!cancelled) setChatBusy(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   // Toasts are intentionally short-lived so action feedback does not cover the UI.
   function showToast(messageText: string) {
@@ -390,33 +451,25 @@ export function LegacyApp({
     toastTimer.current = setTimeout(() => setToast(""), 1800);
   }
 
-  // Switching roles also resets that role to its default landing page.
-  function selectRole(nextRole: Exclude<Role, "guest">) {
-    setRole(nextRole);
-    setPracticeBackView("");
-    if (nextRole === "student") setStudentView("practice");
-    else setTeacherView("home");
-  }
-
-  function switchAccountRole(nextRole: Exclude<Role, "guest">) {
-    setRole(nextRole);
-    setPracticeBackView("");
-    if (nextRole === "student") setStudentView("account");
-    else setTeacherView("account");
-  }
-
   function loginLocalAccount(nextRole: Exclude<Role, "guest">, username: string, password: string) {
     const dateKey = todayDateKey();
+    const accountUsername = username.trim();
+    const displayName = accountUsername || localAccount.displayName || "User";
+    const isDifferentAccount = Boolean(localAccount.username && localAccount.username !== accountUsername);
+    const avatarDataUrl = isDifferentAccount ? "" : accountAvatar;
+    setAccountAvatar(avatarDataUrl);
     setLocalAccount({
       ...localAccount,
       isLoggedIn: true,
       isRegistered: true,
-      username,
-      displayName: username || localAccount.displayName || "User",
+      username: accountUsername,
+      displayName,
       password,
+      avatarDataUrl,
       lastLoginAt: dateKey,
-      registeredAt: localAccount.registeredAt || dateKey,
+      registeredAt: isDifferentAccount ? dateKey : localAccount.registeredAt || dateKey,
     });
+    setLocalChatThreads([]);
     setRole(nextRole);
     setPracticeBackView("");
     if (nextRole === "teacher") {
@@ -428,8 +481,39 @@ export function LegacyApp({
   }
 
   function logoutLocalAccount() {
-    setLocalAccount((current) => ({ ...current, isLoggedIn: false }));
+    setLocalAccount((current) => ({ ...current, isLoggedIn: false, password: "" }));
+    setRole("student");
+    setStudentView("practice");
+    setTeacherView("home");
+    onLogout();
     showToast("Logged out.");
+  }
+
+  async function submitLoginGate(input: {
+    role: Exclude<Role, "guest">;
+    mode: "login" | "register";
+    username: string;
+    password: string;
+  }) {
+    setAuthMessage("");
+    if (!input.username || !input.password) {
+      setAuthMessage("Enter an account and password.");
+      return;
+    }
+    setAuthBusy(true);
+    try {
+      if (input.mode === "register") {
+        const authenticatedUser = await onRegister(input.username, input.password, input.role);
+        loginLocalAccount(authenticatedUser.role, authenticatedUser.username, "");
+      } else {
+        const authenticatedUser = await onLogin(input.username, input.password);
+        loginLocalAccount(authenticatedUser.role, authenticatedUser.username, "");
+      }
+    } catch (error) {
+      setAuthMessage(error instanceof Error ? error.message : "Account could not be verified.");
+    } finally {
+      setAuthBusy(false);
+    }
   }
 
   // Start microphone capture, then submit the collected blob when recording stops.
@@ -826,11 +910,33 @@ export function LegacyApp({
     setStudentView(view);
   }
 
+  if (!authReady) {
+    return <LoadingShell />;
+  }
+
+  if (!user) {
+    return (
+      <ResponsiveShell>
+        <main
+          id="app"
+          className="h-full overflow-x-hidden overflow-y-auto overscroll-contain [scrollbar-color:#c7c1b8_transparent] [scrollbar-width:thin]"
+          tabIndex={-1}
+        >
+          <LoginScreen
+            role={role === "teacher" ? "teacher" : "student"}
+            busy={authBusy}
+            message={authMessage}
+            onRoleChange={setRole}
+            onSubmit={submitLoginGate}
+          />
+        </main>
+      </ResponsiveShell>
+    );
+  }
+
   // Route the legacy single-page experience based on role and current tab.
   let screen: React.ReactNode;
-  if (role === "guest") {
-    screen = <HomeScreen onSelectRole={selectRole} />;
-  } else if (role === "teacher") {
+  if (role === "teacher") {
     if (teacherView === "account") {
       screen = (
         <AccountScreen
@@ -841,15 +947,24 @@ export function LegacyApp({
           chatThreads={localChatThreads}
           avatarDataUrl={accountAvatar}
           localAccount={localAccount}
-          onRoleChange={switchAccountRole}
-          onLogin={onLogin}
-          onLocalLogin={loginLocalAccount}
-          onLogout={user ? onLogout : logoutLocalAccount}
+          onLogout={logoutLocalAccount}
           onAvatarChange={setAccountAvatar}
         />
       );
     } else if (teacherView === "chat") {
-      screen = <ChatScreen teacher threads={localChatThreads} onThreadsChange={setLocalChatThreads} avatarDataUrl={accountAvatar} />;
+      screen = (
+        <ChatScreen
+          teacher
+          user={user}
+          chatUsers={chatUsers}
+          chatBusy={chatBusy}
+          chatError={chatError}
+          accountDisplayName={accountDisplayName}
+          threads={localChatThreads}
+          onThreadsChange={setLocalChatThreads}
+          avatarDataUrl={accountAvatar}
+        />
+      );
     } else if (teacherView === "reviewEditor") {
       screen = (
         <TeacherReviewEditorScreen
@@ -890,10 +1005,7 @@ export function LegacyApp({
         chatThreads={localChatThreads}
         avatarDataUrl={accountAvatar}
         localAccount={localAccount}
-        onRoleChange={switchAccountRole}
-        onLogin={onLogin}
-        onLocalLogin={loginLocalAccount}
-        onLogout={user ? onLogout : logoutLocalAccount}
+        onLogout={logoutLocalAccount}
         onAvatarChange={setAccountAvatar}
       />
     );
@@ -949,7 +1061,19 @@ export function LegacyApp({
       />
     );
   } else if (studentView === "chat") {
-    screen = <ChatScreen teacher={false} threads={localChatThreads} onThreadsChange={setLocalChatThreads} avatarDataUrl={accountAvatar} />;
+    screen = (
+      <ChatScreen
+        teacher={false}
+        user={user}
+        chatUsers={chatUsers}
+        chatBusy={chatBusy}
+        chatError={chatError}
+        accountDisplayName={accountDisplayName}
+        threads={localChatThreads}
+        onThreadsChange={setLocalChatThreads}
+        avatarDataUrl={accountAvatar}
+      />
+    );
   } else if (studentView === "entryAssessment") {
     screen = (
       <EntryAssessmentScreen
@@ -1019,11 +1143,14 @@ export function LegacyApp({
   }
 
   return (
-    // The phone shell remains constant while the routed screen and nav change inside it.
-    <PhoneShell>
+    // The responsive shell remains constant while the routed screen and nav change inside it.
+    <ResponsiveShell>
       <main
         id="app"
-        className="h-full overflow-x-hidden overflow-y-auto overscroll-contain pb-[92px] [scrollbar-color:#c7c1b8_transparent] [scrollbar-width:thin]"
+        className={cn(
+          "h-full overflow-x-hidden overflow-y-auto overscroll-contain pb-[92px] [scrollbar-color:#c7c1b8_transparent] [scrollbar-width:thin] lg:pb-0",
+          "lg:ml-[176px]",
+        )}
         tabIndex={-1}
       >
         {screen}
@@ -1038,7 +1165,7 @@ export function LegacyApp({
       <div id="toast" className={cn(toastClass, toast && toastVisibleClass)} role="status" aria-live="polite">
         {toast}
       </div>
-    </PhoneShell>
+    </ResponsiveShell>
   );
 }
 
@@ -1148,9 +1275,9 @@ function PracticeScreen({
   return (
     <section className={screenClass} data-screen="practice">
       <BrandHeader streak={streak} onProgress={onOpenProgress} />
-      <div className={contentClass}>
+      <div className={cn(contentClass, "lg:grid-cols-[minmax(330px,0.95fr)_minmax(360px,1.05fr)] lg:items-start")}>
         {showEntryAssessment && (
-          <section className={cn(panelClass, "grid gap-[11px] border-[rgba(239,190,98,0.42)] bg-[#fffaf0]")} aria-labelledby="assessment-entry-title">
+          <section className={cn(panelClass, "grid gap-[11px] border-[rgba(239,190,98,0.42)] bg-[#fffaf0] lg:col-span-2 lg:grid-cols-[1fr_auto] lg:items-center")} aria-labelledby="assessment-entry-title">
             <div className="grid grid-cols-[1fr_auto] items-start gap-2.5">
               <div>
                 <span className={modelKickerClass}>Entry Assessment</span>
@@ -1166,17 +1293,17 @@ function PracticeScreen({
         )}
 
         {practiceBackView === "toneDrill" && (
-          <button className="justify-self-start rounded-full border border-[rgba(53,84,110,0.12)] bg-[var(--surface)] px-3 py-2 text-xs font-extrabold text-[var(--navy)]" type="button" onClick={onBackToToneBank}>
+          <button className="justify-self-start rounded-full border border-[rgba(53,84,110,0.12)] bg-[var(--surface)] px-3 py-2 text-xs font-extrabold text-[var(--navy)] lg:col-span-2" type="button" onClick={onBackToToneBank}>
             Back to Tone Bank
           </button>
         )}
 
-        <section className="rounded-[20px] bg-[var(--navy)] px-4 pt-5 pb-[18px] text-center text-white" aria-labelledby="sentence-title">
+        <section className="rounded-[20px] bg-[var(--navy)] px-4 pt-5 pb-[18px] text-center text-white lg:grid lg:min-h-[245px] lg:content-center lg:px-8 lg:py-8" aria-labelledby="sentence-title">
           <label className="mb-2.5 block text-xs text-[rgba(255,255,255,0.45)]" htmlFor="target-text">
             Custom Practice
           </label>
           <input
-            className="block w-full border-0 bg-transparent text-center font-(family-name:--serif) text-[37px] leading-[1.25] font-normal tracking-[0.08em] text-white placeholder:text-[rgba(255,255,255,0.34)] focus:outline-0"
+            className="block w-full border-0 bg-transparent text-center font-(family-name:--serif) text-[37px] leading-[1.25] font-normal tracking-[0.08em] text-white placeholder:text-[rgba(255,255,255,0.34)] focus:outline-0 lg:text-[56px]"
             id="target-text"
             value={targetText}
             onChange={(event) => onTextChange(event.target.value)}
@@ -1218,7 +1345,7 @@ function PracticeScreen({
           </button>
         </div>
 
-        <section aria-label="Pronunciation score">
+        <section className="lg:self-stretch" aria-label="Pronunciation score">
           <div className="mb-[7px] grid grid-cols-[1fr_auto] items-end gap-3">
             <div>
               <span className={modelKickerClass}>Current Score</span>
@@ -1226,7 +1353,7 @@ function PracticeScreen({
             </div>
           <span className="block text-[11px] font-bold text-[var(--muted)]">{hasAnalysis && focusSyllable ? `Focus: ${focusSyllable.character}` : "Tone · Clarity · Rhythm"}</span>
           </div>
-          <div className="grid grid-cols-4 overflow-hidden rounded-[15px] border border-[var(--line)] bg-[var(--surface)]">
+          <div className="grid grid-cols-4 overflow-hidden rounded-[15px] border border-[var(--line)] bg-[var(--surface)] lg:h-[112px]">
             <Score label="Overall" value={scores.overall} />
             <Score label="Tone" value={scores.tone} />
             <Score label="Clarity" value={scores.clarity} />
@@ -1247,7 +1374,7 @@ function PracticeScreen({
           <p className={sectionLabelClass} id="feedback-title">
             Syllable Feedback
           </p>
-          <div className="grid gap-2">
+          <div className="grid gap-2 lg:grid-cols-2">
             {syllables.map((item) => (
               <button
                 className={`grid w-full grid-cols-[1fr_auto] rounded-[14px] border bg-[var(--surface)] px-3.5 py-3 text-left transition-transform duration-150 active:translate-y-px active:scale-[0.99] ${
@@ -1274,7 +1401,7 @@ function PracticeScreen({
           </div>
         </section>
 
-        <button className="rounded-[14px] border border-[#efbe62] bg-[#fffaf0] p-3.5 text-xs leading-[1.6] text-[#8f6316]" type="button">
+        <button className="rounded-[14px] border border-[#efbe62] bg-[#fffaf0] p-3.5 text-xs leading-[1.6] text-[#8f6316] lg:col-span-2" type="button">
           Tap a syllable card to view mouth-shape guidance, tongue-position cues, tone curves, and detailed practice advice.
         </button>
       </div>
@@ -1491,8 +1618,8 @@ function ProgressScreen({
   return (
     <section className={screenClass} data-screen="progress">
       <BrandHeader progress streak={Math.max(1, attempts.length || 1)} />
-      <div className={contentClass}>
-        <section aria-labelledby="trend-title">
+      <div className={cn(contentClass, "lg:grid-cols-[minmax(420px,1.2fr)_minmax(320px,0.8fr)] lg:items-start")}>
+        <section className="lg:col-span-2" aria-labelledby="trend-title">
           <p className={sectionLabelClass} id="trend-title">
             Overall Score Trend
           </p>
@@ -1505,10 +1632,10 @@ function ProgressScreen({
           <p className={sectionLabelClass} id="calendar-title">
             Practice Calendar
           </p>
-          <div className={cn(panelClass, "grid grid-cols-7 gap-1.5")}>
+          <div className={cn(panelClass, "grid grid-cols-7 gap-1.5 lg:gap-2")}>
             {days.map((day) => (
               <button
-                className={`grid min-h-[56px] content-center gap-0.5 rounded-xl border p-1 text-center ${
+                className={`grid min-h-[56px] content-center gap-0.5 rounded-xl border p-1 text-center lg:min-h-[72px] ${
                   day.selected
                     ? "border-[var(--green)] bg-[var(--green-soft)] shadow-[inset_0_0_0_2px_rgba(32,154,120,0.28)]"
                     : day.today
@@ -1578,7 +1705,7 @@ function ProgressScreen({
           </div>
         </section>
 
-        <button className="w-full rounded-[13px] bg-[var(--navy)] font-bold text-white" type="button" onClick={onBack}>
+        <button className="w-full rounded-[13px] bg-[var(--navy)] font-bold text-white lg:col-span-2 lg:max-w-[320px] lg:justify-self-end" type="button" onClick={onBack}>
           Back to Practice Today
         </button>
       </div>
@@ -2277,7 +2404,7 @@ function TeacherScreen({
   return (
     <section className={screenClass} data-screen="teacher">
       <TeacherHeader title="Mandarin Practice Management" subtitle={teacherViewLabel(view)} />
-      <div className={cn(contentBaseClass, "gap-4")}>{body}</div>
+      <div className={cn(contentBaseClass, view === "students" ? "gap-4 lg:grid-cols-[minmax(320px,0.85fr)_minmax(360px,1.15fr)] lg:items-start" : "gap-4")}>{body}</div>
     </section>
   );
 }
@@ -2332,7 +2459,7 @@ function TeacherHome({
         <p className={sectionLabelClass} id="teacher-home-title">
           Today
         </p>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-2 gap-2 lg:grid-cols-3 lg:gap-3">
           <button className="grid min-h-[82px] content-center gap-[5px] rounded-[14px] border border-[var(--line)] bg-[var(--surface)] p-[13px] text-left" type="button" onClick={() => onTeacherView("reviews")}>
             <strong className="text-3xl leading-none text-[var(--amber)]">{pending}</strong>
             <span className="text-[11px] font-bold text-[var(--muted)]">Recordings to Review</span>
@@ -3183,20 +3310,32 @@ function TeacherReviewEditorScreen({
   );
 }
 
-// Chat screen reuses the same static threads for learner and teacher modes.
+// Chat screen renders Mongo-backed conversations for the signed-in account.
 function ChatScreen({
   teacher,
+  user,
+  chatUsers,
+  chatBusy,
+  chatError,
+  accountDisplayName,
   threads: allThreads,
   onThreadsChange,
   avatarDataUrl,
 }: {
   teacher: boolean;
+  user: AuthUser;
+  chatUsers: AuthUser[];
+  chatBusy: boolean;
+  chatError: string;
+  accountDisplayName: string;
   threads: ChatThread[];
   onThreadsChange: React.Dispatch<React.SetStateAction<ChatThread[]>>;
   avatarDataUrl: string;
 }) {
   const role = teacher ? "teacher" : "student";
-  const participantId = teacher ? "teacher-main" : "student-chen";
+  const participantId = user.id;
+  const availableTeachers = chatUsers.filter((item) => item.role === "teacher" && item.id !== user.id);
+  const availableStudents = chatUsers.filter((item) => item.role === "student" && item.id !== user.id);
   const threads = allThreads.filter((thread) => thread.memberIds.includes(participantId));
   const directThreads = threads.filter((thread) => thread.type !== "class");
   const classThreads = threads.filter((thread) => thread.type === "class");
@@ -3223,31 +3362,28 @@ function ChatScreen({
     );
   }
 
-  function sendMessage(body: string) {
+  async function sendMessage(body: string) {
     const text = body.trim();
     if (!text || !selectedThread) return;
-    const sender = role === "teacher" ? "Ms. Wang" : "Chen Xiaohe";
-    const message = {
-      id: `chat-${selectedThread.id}-${Date.now()}`,
-      sender,
-      senderId: participantId,
-      body: text,
-      time: statusTime(),
-      readBy: [participantId],
-    };
-    onThreadsChange((current) =>
-      current.map((thread) =>
-        thread.id === selectedThread.id
-          ? {
-              ...thread,
-              lastMessage: text,
-              messages: [...thread.messages, message].slice(-120),
-            }
-          : thread,
-      ),
-    );
-    setSelectedThreadId(selectedThread.id);
-    setChatMode("thread");
+    try {
+      const payload = await createChatMessage(selectedThread.id, text);
+      const message = apiMessageToLegacy(payload.message);
+      onThreadsChange((current) =>
+        current.map((thread) =>
+          thread.id === selectedThread.id
+            ? {
+                ...thread,
+                lastMessage: text,
+                messages: [...thread.messages, message].slice(-120),
+              }
+            : thread,
+        ),
+      );
+      setSelectedThreadId(selectedThread.id);
+      setChatMode("thread");
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : "Message could not be sent.");
+    }
   }
 
   function deleteThread(threadId: string) {
@@ -3263,74 +3399,67 @@ function ChatScreen({
     }
   }
 
-  function createClassChat(title: string, memberIds: string[]) {
+  async function createClassChat(title: string, memberIds: string[]) {
     if (!memberIds.length) return;
-    const id = `chat-class-${Date.now()}`;
-    const thread: ChatThread = {
-      id,
-      title: title.trim() || "New Class Group Chat",
-      type: "class",
-      unread: 0,
-      lastMessage: "Class group created.",
-      memberIds: ["teacher-main", ...memberIds],
-      messages: [],
-    };
-    onThreadsChange((current) => [...current, thread]);
-    setSelectedThreadId(id);
-    setChatMode("thread");
+    try {
+      const payload = await createChatThread({
+        title: title.trim() || "New Class Group Chat",
+        type: "class",
+        memberIds,
+      });
+      const thread = apiThreadToLegacy(payload.thread);
+      onThreadsChange((current) => [...current.filter((item) => item.id !== thread.id), thread]);
+      setSelectedThreadId(thread.id);
+      setChatMode("thread");
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : "Group chat could not be created.");
+    }
   }
 
-  function createDirectChat(studentId: string) {
-    const student = teacherStudents.find((item) => item.id === studentId) || teacherStudents[0];
+  async function createDirectChat(studentId: string) {
+    const student = availableStudents.find((item) => item.id === studentId) || availableStudents[0];
     if (!student) return;
     const existing = allThreads.find((thread) => thread.type === "direct" && thread.memberIds.includes(student.id));
     if (existing) {
       openThread(existing.id);
       return;
     }
-    const id = `chat-direct-${student.id}-${Date.now()}`;
-    const thread: ChatThread = {
-      id,
-      title: student.name,
-      type: "direct",
-      unread: 0,
-      lastMessage: "Learner chat created.",
-      memberIds: ["teacher-main", student.id],
-      messages: [],
-    };
-    onThreadsChange((current) => [...current, thread]);
-    setSelectedThreadId(id);
-    setChatMode("thread");
+    try {
+      const payload = await createChatThread({
+        title: student.name || student.username,
+        type: "direct",
+        memberIds: [student.id],
+      });
+      const thread = apiThreadToLegacy(payload.thread);
+      onThreadsChange((current) => [...current.filter((item) => item.id !== thread.id), thread]);
+      setSelectedThreadId(thread.id);
+      setChatMode("thread");
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : "Learner chat could not be created.");
+    }
   }
 
-  function createStudentDirectChat() {
-    const existing = allThreads.find((thread) => thread.type === "direct" && thread.memberIds.includes("student-chen"));
+  async function createStudentDirectChat(teacherId: string) {
+    const teacherUser = availableTeachers.find((item) => item.id === teacherId) || availableTeachers[0];
+    if (!teacherUser) return;
+    const existing = allThreads.find((thread) => thread.type === "direct" && thread.memberIds.includes(teacherUser.id));
     if (existing) {
       openThread(existing.id);
       return;
     }
-    const id = `chat-direct-student-chen-${Date.now()}`;
-    const thread: ChatThread = {
-      id,
-      title: "Ms. Wang",
-      type: "direct",
-      unread: 0,
-      lastMessage: "Teacher chat opened.",
-      memberIds: ["teacher-main", "student-chen"],
-      messages: [
-        {
-          id: `msg-${id}-hello`,
-          sender: "Chen Xiaohe",
-          senderId: "student-chen",
-          body: "Teacher, I want to ask about today's pronunciation practice.",
-          time: statusTime(),
-          readBy: ["student-chen"],
-        },
-      ],
-    };
-    onThreadsChange((current) => [...current, thread]);
-    setSelectedThreadId(id);
-    setChatMode("thread");
+    try {
+      const payload = await createChatThread({
+        title: teacherUser.name || teacherUser.username,
+        type: "direct",
+        memberIds: [teacherUser.id],
+      });
+      const thread = apiThreadToLegacy(payload.thread);
+      onThreadsChange((current) => [...current.filter((item) => item.id !== thread.id), thread]);
+      setSelectedThreadId(thread.id);
+      setChatMode("thread");
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : "Teacher chat could not be created.");
+    }
   }
 
   return (
@@ -3351,8 +3480,14 @@ function ChatScreen({
           <section className="grid gap-3.5 overflow-hidden rounded-[18px] border border-[var(--line)] bg-[var(--surface)] p-3.5">
             <ChatThreadGroup title="Teacher Chat" threads={directThreads} participantId={participantId} role={role} onOpenThread={openThread} onDeleteThread={deleteThread} />
             <ChatThreadGroup title="Class Group" threads={classThreads} participantId={participantId} role={role} onOpenThread={openThread} onDeleteThread={deleteThread} />
-            {!threads.length ? <p className="m-0 py-3 text-center text-xs font-bold leading-[1.6] text-[var(--muted)]">No conversations yet.</p> : null}
-            {teacher ? <TeacherChatTools onCreateClassChat={createClassChat} onCreateDirectChat={createDirectChat} /> : <StudentChatTools onCreateStudentDirectChat={createStudentDirectChat} />}
+            {chatBusy ? <p className="m-0 py-3 text-center text-xs font-bold leading-[1.6] text-[var(--muted)]">Loading conversations...</p> : null}
+            {chatError ? <p className="m-0 rounded-xl bg-[var(--red-soft)] px-3 py-2 text-xs font-bold leading-[1.5] text-[var(--red)]">{chatError}</p> : null}
+            {!chatBusy && !threads.length ? <p className="m-0 py-3 text-center text-xs font-bold leading-[1.6] text-[var(--muted)]">No conversations yet.</p> : null}
+            {teacher ? (
+              <TeacherChatTools students={availableStudents} onCreateClassChat={createClassChat} onCreateDirectChat={createDirectChat} />
+            ) : (
+              <StudentChatTools teachers={availableTeachers} onCreateStudentDirectChat={createStudentDirectChat} />
+            )}
           </section>
         )}
       </div>
@@ -3414,10 +3549,7 @@ function ChatThreadGroup({
 
 function chatThreadDisplayTitle(thread: ChatThread, role: "student" | "teacher") {
   if (thread.type === "class") return thread.title || "Class Group";
-  if (role === "student") return "Ms. Wang";
-  const studentId = thread.memberIds.find((id) => id !== "teacher-main");
-  const student = teacherStudents.find((item) => item.id === studentId);
-  return student?.name || thread.title || "Student Chat";
+  return thread.title || (role === "student" ? "Teacher Chat" : "Student Chat");
 }
 
 function ChatThreadWindow({
@@ -3517,15 +3649,22 @@ function ChatThreadWindow({
 }
 
 function TeacherChatTools({
+  students,
   onCreateClassChat,
   onCreateDirectChat,
 }: {
+  students: AuthUser[];
   onCreateClassChat: (title: string, memberIds: string[]) => void;
   onCreateDirectChat: (studentId: string) => void;
 }) {
   const [classTitle, setClassTitle] = React.useState("Qiyin Class 1 Group");
-  const [selectedStudentIds, setSelectedStudentIds] = React.useState(teacherStudents.map((student) => student.id));
-  const [directStudentId, setDirectStudentId] = React.useState(teacherStudents[0]?.id || "");
+  const [selectedStudentIds, setSelectedStudentIds] = React.useState<string[]>([]);
+  const [directStudentId, setDirectStudentId] = React.useState("");
+
+  React.useEffect(() => {
+    setSelectedStudentIds((current) => current.filter((id) => students.some((student) => student.id === id)));
+    setDirectStudentId((current) => current || students[0]?.id || "");
+  }, [students]);
 
   function toggleClassStudent(studentId: string, checked: boolean) {
     setSelectedStudentIds((current) =>
@@ -3542,7 +3681,7 @@ function TeacherChatTools({
           <input className="min-h-11 w-full rounded-xl border border-[var(--line)] bg-[#fbfaf7] px-3 text-[var(--ink)] font-extrabold" value={classTitle} onChange={(event) => setClassTitle(event.target.value)} placeholder="Example: Wednesday Tone Practice" />
         </label>
         <div className="flex flex-wrap gap-2" aria-label="Choose learners for the group">
-          {teacherStudents.map((student) => (
+          {students.map((student) => (
             <label className="inline-flex min-h-[34px] items-center gap-1.5 rounded-full border border-[rgba(32,154,120,0.18)] bg-[var(--green-soft)] px-2.5 py-[7px] text-[var(--green)]" key={student.id}>
               <input
                 className="accent-[var(--green)]"
@@ -3550,32 +3689,54 @@ function TeacherChatTools({
                 checked={selectedStudentIds.includes(student.id)}
                 onChange={(event) => toggleClassStudent(student.id, event.target.checked)}
               />
-              <span>{student.name}</span>
+              <span>{student.name || student.username}</span>
             </label>
           ))}
+          {!students.length ? <p className="m-0 text-xs font-bold leading-[1.6] text-[var(--muted)]">No student accounts are registered yet.</p> : null}
         </div>
-        <button className={primaryTeacherButtonClass} type="button" onClick={() => onCreateClassChat(classTitle, selectedStudentIds)}>Create Group</button>
+        <button className={primaryTeacherButtonClass} type="button" onClick={() => onCreateClassChat(classTitle, selectedStudentIds)} disabled={!selectedStudentIds.length}>Create Group</button>
       </div>
       <div className="grid gap-2.5 border-t border-[rgba(53,84,110,0.1)] pt-3">
         <span className={modelKickerClass}>Create Learner Chat</span>
         <label className="grid gap-1.5 text-xs font-extrabold text-[var(--muted)]">
           <span>Choose Learner</span>
           <select className="min-h-11 w-full rounded-xl border border-[var(--line)] bg-[#fbfaf7] px-3 text-[var(--ink)] font-extrabold" value={directStudentId} onChange={(event) => setDirectStudentId(event.target.value)}>
-            {teacherStudents.map((student) => (
-              <option value={student.id} key={student.id}>{student.name}</option>
+            {students.map((student) => (
+              <option value={student.id} key={student.id}>{student.name || student.username}</option>
             ))}
           </select>
         </label>
-        <button className={secondaryTeacherButtonClass} type="button" onClick={() => onCreateDirectChat(directStudentId)}>Start Chat</button>
+        <button className={secondaryTeacherButtonClass} type="button" onClick={() => onCreateDirectChat(directStudentId)} disabled={!directStudentId}>Start Chat</button>
       </div>
     </section>
   );
 }
 
-function StudentChatTools({ onCreateStudentDirectChat }: { onCreateStudentDirectChat: () => void }) {
+function StudentChatTools({
+  teachers,
+  onCreateStudentDirectChat,
+}: {
+  teachers: AuthUser[];
+  onCreateStudentDirectChat: (teacherId: string) => void;
+}) {
+  const [teacherId, setTeacherId] = React.useState("");
+
+  React.useEffect(() => {
+    setTeacherId((current) => current || teachers[0]?.id || "");
+  }, [teachers]);
+
   return (
     <section className="grid gap-3 rounded-2xl border border-[rgba(53,84,110,0.12)] bg-white p-3.5" aria-label="Contact Teacher">
-      <button className={secondaryTeacherButtonClass} type="button" onClick={onCreateStudentDirectChat}>Chat with Teacher</button>
+      <label className="grid gap-1.5 text-xs font-extrabold text-[var(--muted)]">
+        <span>Choose Teacher</span>
+        <select className="min-h-11 w-full rounded-xl border border-[var(--line)] bg-[#fbfaf7] px-3 text-[var(--ink)] font-extrabold" value={teacherId} onChange={(event) => setTeacherId(event.target.value)}>
+          {teachers.map((teacherUser) => (
+            <option value={teacherUser.id} key={teacherUser.id}>{teacherUser.name || teacherUser.username}</option>
+          ))}
+        </select>
+      </label>
+      {!teachers.length ? <p className="m-0 text-xs font-bold leading-[1.6] text-[var(--muted)]">No teacher accounts are registered yet.</p> : null}
+      <button className={secondaryTeacherButtonClass} type="button" onClick={() => onCreateStudentDirectChat(teacherId)} disabled={!teacherId}>Chat with Teacher</button>
     </section>
   );
 }

@@ -78,7 +78,7 @@ export function toneScore(tone: string) {
   return scores[tone] || 67;
 }
 
-// Status-bar time is computed at render time for the phone mockup.
+// Header time is computed at render time for the responsive app shell.
 export function statusTime() {
   return new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 }
