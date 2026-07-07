@@ -1,5 +1,6 @@
 @import "tailwindcss";
 
+/* Theme tokens keep the warm VoiceSight palette consistent across screens. */
 :root {
   color-scheme: light;
   --navy: #191a2f;
@@ -23,15 +24,18 @@
 }
 
 @layer base {
+  /* Normalize box sizing so composed Tailwind layouts measure predictably. */
   * {
     @apply box-border;
   }
 
+  /* The document shell owns the warm page background and minimum viewport width. */
   html {
     min-width: 320px;
     background: #ece8df;
   }
 
+  /* Body defaults define the typography, ink color, and subtle premium wash. */
   body {
     margin: 0;
     min-width: 320px;
@@ -45,10 +49,12 @@
     -webkit-font-smoothing: antialiased;
   }
 
+  /* Buttons inherit app typography while keeping a reliable touch target. */
   button {
     @apply min-h-11 cursor-pointer border-0 bg-transparent font-[inherit] text-[inherit];
   }
 
+  /* Disabled controls stay visible but communicate that work is in progress. */
   button:disabled {
     @apply cursor-wait opacity-[0.72];
   }
@@ -65,6 +71,7 @@
   }
 }
 
+/* The chart line draws itself when progress data enters the page. */
 @keyframes smv-chart-draw {
   from {
     stroke-dashoffset: 1;
@@ -75,6 +82,7 @@
   }
 }
 
+/* Soft rise is reused for lightweight data and chart reveals. */
 @keyframes smv-soft-rise {
   from {
     opacity: 0;
@@ -87,17 +95,20 @@
   }
 }
 
+/* SVG chart strokes use dash animation without changing measured layout. */
 .smv-chart-line {
   stroke-dasharray: 1;
   stroke-dashoffset: 1;
   animation: smv-chart-draw 720ms ease-out forwards;
 }
 
+/* Area fills and loaded content share the same quick entrance motion. */
 .smv-chart-area,
 .smv-fade-in {
   animation: smv-soft-rise 220ms ease-out both;
 }
 
+/* Respect users who prefer minimal motion while preserving the final state. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
