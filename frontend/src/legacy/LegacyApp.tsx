@@ -1563,6 +1563,80 @@ function PinyinDiagnosisCard({
   );
 }
 
+function PronunciationVideo({
+  src,
+  poster,
+  label,
+}: {
+  src: string;
+  poster: string;
+  label: string;
+}) {
+  const videoRef = React.useRef<HTMLVideoElement | null>(null);
+  const [playing, setPlaying] = React.useState(false);
+  const [failed, setFailed] = React.useState(false);
+
+  React.useEffect(() => {
+    setPlaying(false);
+    setFailed(false);
+  }, [src]);
+
+  async function togglePlayback() {
+    const video = videoRef.current;
+    if (!video || failed) return;
+    try {
+      if (video.paused) {
+        await video.play();
+      } else {
+        video.pause();
+      }
+    } catch {
+      setFailed(true);
+      setPlaying(false);
+    }
+  }
+
+  return (
+    <div className="relative w-full max-w-full overflow-hidden rounded-[14px] bg-[#111]">
+      <video
+        className="block aspect-video max-h-[min(62vh,520px)] w-full max-w-full bg-[#111] object-contain"
+        ref={videoRef}
+        controls
+        playsInline
+        preload="metadata"
+        poster={poster}
+        aria-label={label}
+        onPlay={() => setPlaying(true)}
+        onPause={() => setPlaying(false)}
+        onEnded={() => setPlaying(false)}
+        onError={() => {
+          setFailed(true);
+          setPlaying(false);
+        }}
+      >
+        <source src={src} type="video/mp4" />
+      </video>
+      {!playing && !failed ? (
+        <div className="pointer-events-none absolute inset-0 grid place-items-center">
+          <button
+            className="pointer-events-auto grid size-14 place-items-center rounded-full bg-[rgba(207,75,49,0.92)] shadow-[0_14px_34px_rgba(25,26,47,0.26)] transition-[transform,box-shadow,background-color] duration-[180ms] hover:scale-[1.04] hover:bg-[var(--red)] active:scale-[0.98]"
+            type="button"
+            onClick={togglePlayback}
+            aria-label={`Play ${label}`}
+          >
+            <span className="ml-1 block h-0 w-0 border-y-[10px] border-y-transparent border-l-[16px] border-l-white" aria-hidden="true"></span>
+          </button>
+        </div>
+      ) : null}
+      {failed ? (
+        <p className="absolute right-3 bottom-3 left-3 m-0 rounded-xl bg-[rgba(25,26,47,0.9)] px-3 py-2 text-xs leading-[1.5] text-white">
+          This browser could not play this pronunciation clip.
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 // Syllable detail screen combines reference media, visual tone curves, and coaching text.
 function DetailScreen({
   syllable,
@@ -1633,11 +1707,11 @@ function DetailScreen({
           <div className="grid gap-2.5">
             <div className="overflow-hidden rounded-[14px] border border-[var(--line)] bg-[#fffaf4]">
               <p className="m-0 px-3 py-[11px] text-[11px] font-semibold text-[var(--muted)]">Pronunciation Demo</p>
-              <div className="overflow-hidden rounded-[14px] bg-[#111]">
-                <video className="block aspect-video w-full bg-[#111]" controls playsInline preload="metadata" poster="/assets/mouth-reference.png">
-                  <source src={clipSourceFor(syllable)} type="video/mp4" />
-                </video>
-              </div>
+              <PronunciationVideo
+                src={clipSourceFor(syllable)}
+                poster="/assets/mouth-reference.png"
+                label={`${syllable.character} pronunciation demo`}
+              />
               <p className="m-0 text-xs leading-[1.55] text-[var(--muted)]">{syllable.tongueCue}</p>
             </div>
           </div>
@@ -2006,11 +2080,11 @@ function TeachingClipScreen({
             {segment.title}
           </h2>
           <p className="m-0 text-xs leading-[1.55] text-[var(--muted)]">{segment.guidanceText}</p>
-          <div className="overflow-hidden rounded-[14px] bg-[#111]">
-            <video className="block aspect-video w-full bg-[#111]" controls playsInline poster="/assets/mouth-reference.png">
-              <source src={segment.clipUrl || clipSourceFor(segment.syllable, segment.clipType)} type="video/mp4" />
-            </video>
-          </div>
+          <PronunciationVideo
+            src={segment.clipUrl || clipSourceFor(segment.syllable, segment.clipType)}
+            poster="/assets/mouth-reference.png"
+            label={segment.videoTitle}
+          />
           <p className="m-0 text-xs leading-[1.55] text-[var(--muted)]">{segment.videoTitle}</p>
           <div className="flex flex-wrap gap-1.5">
             {segment.practiceWords.map((word) => (

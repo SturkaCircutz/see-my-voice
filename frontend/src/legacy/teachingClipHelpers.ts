@@ -1,7 +1,7 @@
 import type { PinyinDiagnosisIssue, PronunciationAnalysis } from "../types";
 import type { LegacySyllable } from "./data";
 import type { TeachingClipPlan } from "./legacyAppTypes";
-import { clipSourceForUnit, getFocusSyllable, levelFromScore, pinyinPartsFor } from "./utils";
+import { clipSourceForUnit, getFocusSyllable, levelFromScore, pinyinPartsFor, playableClipTargetFor } from "./utils";
 
 export function diagnosisIssueSummary(issue: PinyinDiagnosisIssue, syllables: LegacySyllable[]) {
   const syllable = syllables.find((item, index) => Number(issue.index) === index);
@@ -69,7 +69,8 @@ export function buildTeachingClipPlan(analysis: PronunciationAnalysis, syllables
   const segments = rows
     .filter((row): row is { issue?: PinyinDiagnosisIssue; syllable: LegacySyllable } => Boolean(row.syllable))
     .map(({ issue, syllable }) => {
-      const target = clipTargetFor(issue, syllable);
+      const issueTarget = clipTargetFor(issue, syllable);
+      const target = playableClipTargetFor(syllable, issueTarget.type);
       const label = `${target.type === "initial" ? "Initial" : "Final"} ${target.unit}`;
       return {
         title: `${syllable.character} / ${syllable.pinyin}`,

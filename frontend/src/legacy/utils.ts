@@ -87,6 +87,26 @@ function normalizePinyinUnit(value?: string) {
   return String(value || "").toLowerCase().replace(/ü/g, "v").replace(/u:/g, "v");
 }
 
+const hevcOnlyFinalClipUnits = new Set([
+  "an",
+  "ang",
+  "eng",
+  "ian",
+  "iang",
+  "iao",
+  "ie",
+  "in",
+  "iu",
+  "ong",
+  "ou",
+  "ua",
+  "uai",
+  "ui",
+  "uo",
+  "van",
+  "ve",
+]);
+
 function splitZeroInitialSpelling(pinyinBody: string) {
   if (!pinyinBody) return null;
   if (pinyinBody === "yi") return { initial: "", final: "i" };
@@ -130,13 +150,19 @@ export function clipSourceForUnit(type: "initial" | "final", unit: string) {
   return normalized ? `/assets/pronunciation-clips/${type}-${normalized}.mp4` : "";
 }
 
+export function playableClipTargetFor(syllable: LegacySyllable, preferredType: "initial" | "final" = "final") {
+  const parts = pinyinPartsFor(syllable);
+  if (preferredType === "initial" && parts.initial) return { type: "initial" as const, unit: parts.initial };
+  if (parts.final && !hevcOnlyFinalClipUnits.has(parts.final)) return { type: "final" as const, unit: parts.final };
+  if (parts.initial) return { type: "initial" as const, unit: parts.initial };
+  if (parts.final) return { type: "final" as const, unit: parts.final };
+  return { type: "final" as const, unit: "a" };
+}
+
 // Map focus syllables to bundled pronunciation clips copied from the static prototype.
 export function clipSourceFor(syllable: LegacySyllable, preferredType: "initial" | "final" = "final") {
-  const parts = pinyinPartsFor(syllable);
-  if (preferredType === "initial" && parts.initial) return clipSourceForUnit("initial", parts.initial);
-  if (parts.final) return clipSourceForUnit("final", parts.final);
-  if (parts.initial) return clipSourceForUnit("initial", parts.initial);
-  return "/assets/pronunciation-clips/final-an.mp4";
+  const target = playableClipTargetFor(syllable, preferredType);
+  return clipSourceForUnit(target.type, target.unit);
 }
 
 // Convert tone sample values into an SVG polyline path.
