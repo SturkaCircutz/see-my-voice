@@ -5,10 +5,11 @@ import csv
 from pathlib import Path
 from typing import Any
 
-from stage3a_labels import build_inventory, labels_to_dict, text_to_stage3a_labels, write_json
+from stage3a_labels import build_inventory, text_to_stage3a_labels, write_json
+from training_manifest import validation_report
 
 
-DEFAULT_MANIFEST = Path("samples") / "evaluation_manifest.csv"
+DEFAULT_MANIFEST = Path("data") / "phoneme_manifest.csv"
 DEFAULT_OUTPUT_DIR = Path("stage3b_dataset")
 
 
@@ -61,6 +62,8 @@ def make_dataset_row(
         "audio_path": str(audio_path),
         "audio_exists": audio_path.exists(),
         "target_text": target_text,
+        "speaker_id": manifest_row.get("speaker_id", "").strip(),
+        "split": manifest_row.get("split", "").strip(),
         "pinyin": " ".join(labels.pinyin),
         "syllable_tokens": " ".join(labels.syllable_tokens),
         "phone_tokens": " ".join(labels.phone_tokens),
@@ -80,6 +83,8 @@ def write_csv(rows: list[dict[str, Any]], path: Path) -> None:
         "audio_path",
         "audio_exists",
         "target_text",
+        "speaker_id",
+        "split",
         "pinyin",
         "syllable_tokens",
         "phone_tokens",
@@ -103,6 +108,14 @@ def build_dataset(
     """Build the Stage 3B dataset files from a labeled manifest."""
     if not manifest_path.exists():
         print(f"Manifest not found: {manifest_path}")
+        print("Create one with: python3 src/run_stage3b_prepare_manifest.py")
+        return 1
+
+    manifest_report = validation_report(manifest_path)
+    if manifest_report.errors:
+        print(f"Manifest is invalid: {manifest_path}")
+        for error in manifest_report.errors:
+            print(f"- {error}")
         return 1
 
     manifest_rows = read_manifest(manifest_path)
@@ -138,6 +151,9 @@ def build_dataset(
             "manifest": str(manifest_path),
             "n_samples": len(dataset_rows),
             "n_unique_texts": len(unique_texts),
+            "n_speakers": manifest_report.n_speakers,
+            "split_counts": manifest_report.split_counts,
+            "label_counts": manifest_report.label_counts,
             "n_missing_audio": len(missing_audio),
             "missing_audio": [row["audio_path"] for row in missing_audio],
             "use_tone_sandhi": use_tone_sandhi,

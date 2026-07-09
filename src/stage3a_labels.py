@@ -173,6 +173,12 @@ def normalize_stage3a_final(initial: str, final: str) -> str:
         return "i_z"
     if initial in {"zh", "ch", "sh", "r"} and final == "i":
         return "i_zh"
+    if initial in {"j", "q", "x", "y"}:
+        return {
+            "ue": "ve",
+            "uan": "van",
+            "un": "vn",
+        }.get(final, final)
     return final
 
 

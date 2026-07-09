@@ -1,0 +1,20 @@
+{
+  "manifest": "data/phoneme_manifest.csv",
+  "n_samples": 500,
+  "n_speakers": 18,
+  "split_counts": {
+    "test": 2,
+    "train": 496,
+    "val": 2
+  },
+  "label_counts": {
+    "learner": 50,
+    "native": 450
+  },
+  "n_missing_audio": 0,
+  "missing_audio": [],
+  "errors": [],
+  "warnings": [],
+  "readiness": "prototype_ready",
+  "ok": true
+}

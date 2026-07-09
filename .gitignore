@@ -39,3 +39,4 @@ sample.m4a
 *.wav
 *.mp3
 web/.tts_cache/
+data/external/

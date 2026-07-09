@@ -1,0 +1,43 @@
+{
+  "n_slots": 500,
+  "n_speakers": 50,
+  "split_counts": {
+    "test": 50,
+    "train": 400,
+    "val": 50
+  },
+  "target_label_counts": {
+    "final_issue": 62,
+    "good": 189,
+    "initial_issue": 62,
+    "timing_issue": 62,
+    "tone_issue": 63,
+    "unclear": 62
+  },
+  "target_issue_counts": {
+    "final_issue": 62,
+    "initial_issue": 62,
+    "none": 189,
+    "timing_issue": 62,
+    "tone_issue": 63,
+    "unclear": 62
+  },
+  "n_unique_texts": 20,
+  "top_texts": {
+    "你好": 25,
+    "谢谢": 25,
+    "朋友": 25,
+    "我很好": 25,
+    "我要吃饭": 25,
+    "我要喝水": 25,
+    "我想吃饭": 25,
+    "请再说一遍": 25,
+    "今天很好": 25,
+    "明天见": 25
+  },
+  "notes": [
+    "This is a collection plan, not a training manifest.",
+    "Only import rows into data/phoneme_manifest.csv after their audio files exist.",
+    "Speakers are assigned to exactly one split to avoid speaker leakage."
+  ]
+}

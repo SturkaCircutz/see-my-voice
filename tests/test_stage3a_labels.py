@@ -17,6 +17,9 @@ class Stage3ALabelTest(unittest.TestCase):
             "是": ["I_sh", "F_i_zh", "T4"],
             "字": ["I_z", "F_i_z", "T4"],
             "儿": ["F_er", "T2"],
+            "学": ["I_x", "F_ve", "T2"],
+            "远": ["I_y", "F_van", "T3"],
+            "云": ["I_y", "F_vn", "T2"],
         }
 
         for text, expected_tokens in examples.items():
