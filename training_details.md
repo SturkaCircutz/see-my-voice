@@ -2,7 +2,7 @@
 
 ## What We Are Training
 
-We are training a Mandarin PHONE-token CTC model, the original model is hf-internal-testing/tiny-random-wav2vec2, it is a Very small model. Used for testing code, not high accuracy.
+We are training a Mandarin PHONE-token CTC model. The selected pretrained model is jonatasgrosman/wav2vec2-large-xlsr-53-chinese-zh-cn. The old hf-internal-testing/tiny-random-wav2vec2 model is only a very small model used for testing code, not high accuracy.
 
 The post trained model learns this mapping:
 
@@ -196,19 +196,29 @@ train on our Mandarin audio-label pairs
 save updated checkpoint
 ```
 
-The current test command uses:
+The selected pretrained model for real training is:
+
+```text
+jonatasgrosman/wav2vec2-large-xlsr-53-chinese-zh-cn
+```
+
+The old smoke test command used:
 
 ```text
 hf-internal-testing/tiny-random-wav2vec2
 ```
 
-That model is useful for proving the pipeline works, but it is not a serious pretrained Mandarin model. For a real pronunciation model, replace it with a real pretrained Mandarin/Chinese speech checkpoint.
+That tiny model is useful for proving the pipeline works, but it is not a serious pretrained Mandarin model.
 
-## Better Base Model To Use
+## Selected Pretrained Model
 
-The tiny random model is only for testing the code path.
+The tiny random model is only for testing the code path. The selected model for real training is:
 
-The best drop-in model for our current trainer is:
+```text
+jonatasgrosman/wav2vec2-large-xlsr-53-chinese-zh-cn
+```
+
+This is the best drop-in model for our current trainer:
 
 ```text
 jonatasgrosman/wav2vec2-large-xlsr-53-chinese-zh-cn
@@ -340,28 +350,7 @@ stage3b_dataset/dataset.csv
 
 ## Current Training Command
 
-Example fuller CPU run with the tiny random test model:
-
-```bash
-.venv/bin/python src/run_stage3d_train_phone_ctc.py \
-  --dataset stage3b_dataset/dataset.csv \
-  --base-model hf-internal-testing/tiny-random-wav2vec2 \
-  --output-dir models/mandarin_phone_ctc_fuller \
-  --max-train-samples 300 \
-  --max-eval-samples 50 \
-  --max-steps 1000 \
-  --batch-size 2 \
-  --learning-rate 0.0002 \
-  --max-audio-seconds 6.0 \
-  --max-phone-tokens 60 \
-  --eval-every 25 \
-  --early-stop-patience 6 \
-  --early-stop-min-delta 0.01
-```
-
-With `--max-phone-tokens 60`, the long NTU val/test rows are filtered out. Eval falls back to held-out short AISHELL rows. The NTU test rows should be evaluated separately as a final test set.
-
-Better real training command:
+Selected training command:
 
 ```bash
 .venv/bin/python src/run_stage3d_train_phone_ctc.py \
@@ -379,7 +368,81 @@ Better real training command:
   --early-stop-patience 6
 ```
 
+With `--max-phone-tokens 60`, the long NTU val/test rows are filtered out. Eval falls back to held-out short AISHELL rows. The NTU test rows should be evaluated separately as a final test set.
+
+These are the important selected parameters:
+
+```text
+base model:        jonatasgrosman/wav2vec2-large-xlsr-53-chinese-zh-cn
+output dir:        models/mandarin_phone_ctc_xlsr_chinese
+train samples:     300
+eval samples:      50
+training steps:    1000
+batch size:        1
+learning rate:     0.0001
+audio cap:         6.0 seconds
+max phone tokens:  60
+eval every:        25 steps
+early stop:        6 eval checks without improvement
+```
+
 Use `batch-size 1` for this model first because it is much larger than the tiny random model. After it works, increase batch size only if the machine has enough memory.
+
+## Files Used By The Selected Training Command
+
+Code files:
+
+```text
+src/run_stage3d_train_phone_ctc.py
+src/stage3a_labels.py
+src/stage1_pronunciation.py
+```
+
+Input dataset file:
+
+```text
+stage3b_dataset/dataset.csv
+```
+
+Important columns used from `dataset.csv`:
+
+```text
+audio_path
+audio_exists
+split
+phone_tokens
+n_phone_tokens
+sample_id
+```
+
+Audio files are loaded from the paths inside `dataset.csv`. With the selected parameters, the training run mainly uses AISHELL wav files like:
+
+```text
+data/external/aishell/wav/train/S0002/train/S0002/*.wav
+data/external/aishell/wav/train/S0003/train/S0003/*.wav
+```
+
+The base model is downloaded or loaded from the Hugging Face cache:
+
+```text
+jonatasgrosman/wav2vec2-large-xlsr-53-chinese-zh-cn
+~/.cache/huggingface/hub/
+```
+
+Output files:
+
+```text
+models/mandarin_phone_ctc_xlsr_chinese/model.safetensors
+models/mandarin_phone_ctc_xlsr_chinese/config.json
+models/mandarin_phone_ctc_xlsr_chinese/loss_curve.png
+models/mandarin_phone_ctc_xlsr_chinese/loss_history.csv
+models/mandarin_phone_ctc_xlsr_chinese/training_report.json
+models/mandarin_phone_ctc_xlsr_chinese/id_to_phone_token.json
+models/mandarin_phone_ctc_xlsr_chinese/phone_token_to_id.json
+models/mandarin_phone_ctc_xlsr_chinese/processor_config.json
+models/mandarin_phone_ctc_xlsr_chinese/tokenizer_config.json
+models/mandarin_phone_ctc_xlsr_chinese/vocab.json
+```
 
 ## Training Outputs
 
@@ -401,10 +464,12 @@ vocab.json
 These are saved under the chosen output directory, for example:
 
 ```text
-models/mandarin_phone_ctc_fuller/
+models/mandarin_phone_ctc_xlsr_chinese/
 ```
 
 ## Current Results From The Local Experiments
+
+These results are from the old tiny random pipeline test, not from the selected `jonatasgrosman/wav2vec2-large-xlsr-53-chinese-zh-cn` training run.
 
 The non-overfit local run used:
 
