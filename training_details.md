@@ -384,9 +384,10 @@ audio cap:         6.0 seconds
 max phone tokens:  60
 eval every:        25 steps
 early stop:        6 eval checks without improvement
+min delta:         0.01
 ```
 
-Use `batch-size 1` for this model first because it is much larger than the tiny random model. After it works, increase batch size only if the machine has enough memory.
+The Python trainer defaults now match these selected parameters. Use `batch-size 1` for this model first because it is much larger than the tiny random model. After it works, increase batch size only if the machine has enough memory.
 
 ## Files Used By The Selected Training Command
 

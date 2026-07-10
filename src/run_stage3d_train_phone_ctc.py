@@ -18,8 +18,8 @@ from stage3a_labels import FROZEN_PHONE_TOKENS
 
 
 DEFAULT_DATASET = Path("stage3b_dataset") / "dataset.csv"
-DEFAULT_OUTPUT_DIR = Path("models") / "mandarin_phone_ctc"
-DEFAULT_MODEL = "hf-internal-testing/tiny-random-wav2vec2"
+DEFAULT_OUTPUT_DIR = Path("models") / "mandarin_phone_ctc_xlsr_chinese"
+DEFAULT_MODEL = "jonatasgrosman/wav2vec2-large-xlsr-53-chinese-zh-cn"
 
 
 @dataclass
@@ -427,16 +427,16 @@ def main() -> int:
     parser.add_argument("--base-model", default=DEFAULT_MODEL)
     parser.add_argument("--device", default="auto")
     parser.add_argument("--seed", type=int, default=13)
-    parser.add_argument("--max-train-samples", type=int, default=8)
-    parser.add_argument("--max-eval-samples", type=int, default=2)
-    parser.add_argument("--max-steps", type=int, default=3)
+    parser.add_argument("--max-train-samples", type=int, default=300)
+    parser.add_argument("--max-eval-samples", type=int, default=50)
+    parser.add_argument("--max-steps", type=int, default=1000)
     parser.add_argument("--batch-size", type=int, default=1)
     parser.add_argument("--learning-rate", type=float, default=1e-4)
-    parser.add_argument("--max-audio-seconds", type=float, default=4.0)
-    parser.add_argument("--max-phone-tokens", type=int, default=32)
-    parser.add_argument("--eval-every", type=int, default=1)
-    parser.add_argument("--early-stop-patience", type=int, default=0)
-    parser.add_argument("--early-stop-min-delta", type=float, default=0.0)
+    parser.add_argument("--max-audio-seconds", type=float, default=6.0)
+    parser.add_argument("--max-phone-tokens", type=int, default=60)
+    parser.add_argument("--eval-every", type=int, default=25)
+    parser.add_argument("--early-stop-patience", type=int, default=6)
+    parser.add_argument("--early-stop-min-delta", type=float, default=0.01)
     parser.add_argument("--no-load-best-at-end", action="store_true")
     parser.add_argument("--max-grad-norm", type=float, default=1.0)
     parser.add_argument("--no-freeze-feature-encoder", action="store_true")
