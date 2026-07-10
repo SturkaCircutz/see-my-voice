@@ -204,6 +204,51 @@ hf-internal-testing/tiny-random-wav2vec2
 
 That model is useful for proving the pipeline works, but it is not a serious pretrained Mandarin model. For a real pronunciation model, replace it with a real pretrained Mandarin/Chinese speech checkpoint.
 
+## Better Base Model To Use
+
+The tiny random model is only for testing the code path.
+
+The best drop-in model for our current trainer is:
+
+```text
+jonatasgrosman/wav2vec2-large-xlsr-53-chinese-zh-cn
+```
+
+Why this is the best first real model:
+
+```text
+It works with AutoProcessor + AutoModelForCTC.
+It is already fine-tuned for Chinese ASR.
+It expects 16kHz audio, which matches our pipeline.
+We can replace its character CTC head with our 67 phone-token head.
+```
+
+So the idea is:
+
+```text
+Chinese ASR Wav2Vec2 model
+-> replace old CTC output head
+-> resize/reinitialize head to 67 phone-token outputs
+-> post-train on our audio -> phone_tokens labels
+```
+
+This is better than `hf-internal-testing/tiny-random-wav2vec2` because the encoder already knows useful speech features from a real Chinese ASR task.
+
+Second choice:
+
+```text
+TencentGameMate/chinese-wav2vec2-base
+```
+
+Why:
+
+```text
+Chinese Wav2Vec2 pretrained on 10k hours WenetSpeech.
+MIT license.
+Better as a pure Chinese audio encoder.
+But it is a pretraining checkpoint, not directly an ASR CTC checkpoint, so smoke-test loading before doing a long run.
+```
+
 ## CTC Training
 
 The model outputs frame-level logits:
@@ -295,7 +340,7 @@ stage3b_dataset/dataset.csv
 
 ## Current Training Command
 
-Example fuller CPU run:
+Example fuller CPU run with the tiny random test model:
 
 ```bash
 .venv/bin/python src/run_stage3d_train_phone_ctc.py \
@@ -315,6 +360,26 @@ Example fuller CPU run:
 ```
 
 With `--max-phone-tokens 60`, the long NTU val/test rows are filtered out. Eval falls back to held-out short AISHELL rows. The NTU test rows should be evaluated separately as a final test set.
+
+Better real training command:
+
+```bash
+.venv/bin/python src/run_stage3d_train_phone_ctc.py \
+  --dataset stage3b_dataset/dataset.csv \
+  --base-model jonatasgrosman/wav2vec2-large-xlsr-53-chinese-zh-cn \
+  --output-dir models/mandarin_phone_ctc_xlsr_chinese \
+  --max-train-samples 300 \
+  --max-eval-samples 50 \
+  --max-steps 1000 \
+  --batch-size 1 \
+  --learning-rate 0.0001 \
+  --max-audio-seconds 6.0 \
+  --max-phone-tokens 60 \
+  --eval-every 25 \
+  --early-stop-patience 6
+```
+
+Use `batch-size 1` for this model first because it is much larger than the tiny random model. After it works, increase batch size only if the machine has enough memory.
 
 ## Training Outputs
 
