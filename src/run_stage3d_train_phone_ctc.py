@@ -39,6 +39,8 @@ class TrainingConfig:
     early_stop_patience: int
     early_stop_min_delta: float
     load_best_at_end: bool
+    low_cpu_mem_usage: bool
+    train_head_only: bool
     freeze_feature_encoder: bool
 
 
@@ -227,23 +229,49 @@ def plot_loss(history: list[dict[str, float | int | None]], path: Path) -> None:
     plt.close()
 
 
-def build_model_and_processor(model_name: str, vocab_size: int, device: str):
-    from transformers import AutoConfig, AutoProcessor, AutoModelForCTC
+def build_model_and_processor(
+    model_name: str,
+    vocab_size: int,
+    device: str,
+    low_cpu_mem_usage: bool,
+):
+    from transformers import AutoConfig, AutoFeatureExtractor, AutoProcessor, AutoModelForCTC
 
-    processor = AutoProcessor.from_pretrained(model_name)
+    try:
+        processor = AutoProcessor.from_pretrained(model_name)
+    except (OSError, TypeError, ValueError):
+        processor = AutoFeatureExtractor.from_pretrained(model_name)
     config = AutoConfig.from_pretrained(
         model_name,
         vocab_size=vocab_size,
         ctc_loss_reduction="mean",
         pad_token_id=0,
     )
-    model = AutoModelForCTC.from_pretrained(
-        model_name,
-        config=config,
-        ignore_mismatched_sizes=True,
-    )
+    load_kwargs: dict[str, Any] = {
+        "config": config,
+        "ignore_mismatched_sizes": True,
+    }
+    if low_cpu_mem_usage:
+        load_kwargs["low_cpu_mem_usage"] = True
+    try:
+        model = AutoModelForCTC.from_pretrained(model_name, **load_kwargs)
+    except ImportError:
+        if not low_cpu_mem_usage:
+            raise
+        load_kwargs.pop("low_cpu_mem_usage", None)
+        print("low_cpu_mem_usage requires accelerate; retrying normal model loading.")
+        model = AutoModelForCTC.from_pretrained(model_name, **load_kwargs)
     model.to(device)
     return processor, model
+
+
+def set_train_head_only(model: Any) -> None:
+    for name, parameter in model.named_parameters():
+        parameter.requires_grad = name.startswith("lm_head.")
+
+
+def trainable_parameters(model: Any) -> list[torch.nn.Parameter]:
+    return [parameter for parameter in model.parameters() if parameter.requires_grad]
 
 
 def train(args: argparse.Namespace) -> int:
@@ -277,11 +305,21 @@ def train(args: argparse.Namespace) -> int:
         raise RuntimeError(f"Train/eval overlap is not allowed: {', '.join(overlap_ids)}")
 
     token_to_id, id_to_token = token_inventory()
-    processor, model = build_model_and_processor(args.base_model, len(token_to_id), device)
-    if args.freeze_feature_encoder and hasattr(model, "freeze_feature_encoder"):
+    processor, model = build_model_and_processor(
+        args.base_model,
+        len(token_to_id),
+        device,
+        args.low_cpu_mem_usage,
+    )
+    if args.train_head_only:
+        set_train_head_only(model)
+    elif args.freeze_feature_encoder and hasattr(model, "freeze_feature_encoder"):
         model.freeze_feature_encoder()
 
-    optimizer = torch.optim.AdamW(model.parameters(), lr=args.learning_rate)
+    optimizer_parameters = trainable_parameters(model)
+    if not optimizer_parameters:
+        raise RuntimeError("No trainable parameters were found.")
+    optimizer = torch.optim.AdamW(optimizer_parameters, lr=args.learning_rate)
     history: list[dict[str, float | int | None]] = []
     best_eval_loss: float | None = None
     best_eval_step: int | None = None
@@ -297,6 +335,9 @@ def train(args: argparse.Namespace) -> int:
     print(f"Vocabulary size: {len(token_to_id)}")
     print(f"Max phone tokens: {args.max_phone_tokens}")
     print(f"Max steps: {args.max_steps}")
+    print(f"Train head only: {args.train_head_only}")
+    print(f"Low CPU memory loading: {args.low_cpu_mem_usage}")
+    print(f"Trainable parameters: {sum(parameter.numel() for parameter in optimizer_parameters):,}")
 
     model.train()
     for step in range(1, args.max_steps + 1):
@@ -309,7 +350,7 @@ def train(args: argparse.Namespace) -> int:
 
         optimizer.zero_grad(set_to_none=True)
         loss.backward()
-        torch.nn.utils.clip_grad_norm_(model.parameters(), args.max_grad_norm)
+        torch.nn.utils.clip_grad_norm_(optimizer_parameters, args.max_grad_norm)
         optimizer.step()
 
         eval_loss = None
@@ -389,6 +430,8 @@ def train(args: argparse.Namespace) -> int:
                     early_stop_patience=args.early_stop_patience,
                     early_stop_min_delta=args.early_stop_min_delta,
                     load_best_at_end=args.load_best_at_end,
+                    low_cpu_mem_usage=args.low_cpu_mem_usage,
+                    train_head_only=args.train_head_only,
                     freeze_feature_encoder=args.freeze_feature_encoder,
                 )
             ),
@@ -399,6 +442,8 @@ def train(args: argparse.Namespace) -> int:
             "train_eval_overlap_count": len(overlap_ids),
             "train_eval_overlap_ids": overlap_ids,
             "vocab_size": len(token_to_id),
+            "n_total_parameters": sum(parameter.numel() for parameter in model.parameters()),
+            "n_trainable_parameters": sum(parameter.numel() for parameter in optimizer_parameters),
             "steps_ran": history[-1]["step"] if history else 0,
             "stopped_early": stopped_early,
             "best_eval_loss": best_eval_loss,
@@ -438,11 +483,15 @@ def main() -> int:
     parser.add_argument("--early-stop-patience", type=int, default=6)
     parser.add_argument("--early-stop-min-delta", type=float, default=0.01)
     parser.add_argument("--no-load-best-at-end", action="store_true")
+    parser.add_argument("--no-low-cpu-mem-usage", action="store_true")
+    parser.add_argument("--fine-tune-encoder", action="store_true")
     parser.add_argument("--max-grad-norm", type=float, default=1.0)
     parser.add_argument("--no-freeze-feature-encoder", action="store_true")
     args = parser.parse_args()
     args.freeze_feature_encoder = not args.no_freeze_feature_encoder
     args.load_best_at_end = not args.no_load_best_at_end
+    args.low_cpu_mem_usage = not args.no_low_cpu_mem_usage
+    args.train_head_only = not args.fine_tune_encoder
     return train(args)
 
 

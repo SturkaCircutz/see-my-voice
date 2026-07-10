@@ -31,6 +31,8 @@ stage2b_eval_results/
 stage3a_label_results/
 stage3b_dataset/
 stage3c_ctc_inspection/
+models/
+*.safetensors
 
 # Local audio recordings
 sample.wav

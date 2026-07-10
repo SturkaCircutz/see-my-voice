@@ -239,7 +239,8 @@ So the idea is:
 Chinese ASR Wav2Vec2 model
 -> replace old CTC output head
 -> resize/reinitialize head to 67 phone-token outputs
--> post-train on our audio -> phone_tokens labels
+-> freeze the large encoder by default on this machine
+-> post-train the new 67-label CTC head on audio -> phone_tokens labels
 ```
 
 This is better than `hf-internal-testing/tiny-random-wav2vec2` because the encoder already knows useful speech features from a real Chinese ASR task.
@@ -385,9 +386,17 @@ max phone tokens:  60
 eval every:        25 steps
 early stop:        6 eval checks without improvement
 min delta:         0.01
+low CPU memory:    on by default
+train mode:        head-only by default
 ```
 
 The Python trainer defaults now match these selected parameters. Use `batch-size 1` for this model first because it is much larger than the tiny random model. After it works, increase batch size only if the machine has enough memory.
+
+The default run trains only `model.lm_head` and keeps the large Chinese encoder frozen. This is intentional for local CPU/RAM training. To fine-tune the full encoder later on a stronger machine, add:
+
+```bash
+--fine-tune-encoder
+```
 
 ## Files Used By The Selected Training Command
 
