@@ -1,0 +1,37 @@
+{
+  "stage": "stage_3d_phone_ctc_test_evaluation",
+  "evaluated_at_utc": "2026-07-13T08:00:28.550162+00:00",
+  "model_dir": "models/mandarin_phone_ctc_xlsr_chinese_gpu",
+  "dataset": "stage3b_dataset/dataset.csv",
+  "split": "test",
+  "device": "cuda",
+  "n_test_rows": 2,
+  "mean_test_loss": 2.361301064491272,
+  "phone_token_weighted_test_loss": 2.3719201472450773,
+  "phone_token_error_rate": 0.7025045815516188,
+  "exact_phone_token_matches": 0,
+  "per_sample": [
+    {
+      "sample_id": "ntu_l2_0032",
+      "n_phone_tokens": 522,
+      "predicted_phone_tokens": 199,
+      "ctc_frames": 6074,
+      "ctc_loss": 2.331986665725708,
+      "phone_token_edits": 363,
+      "phone_token_error_rate": 0.6954022988505747,
+      "exact_phone_token_match": false,
+      "target_fits_frames": true
+    },
+    {
+      "sample_id": "ntu_l2_0042",
+      "n_phone_tokens": 1115,
+      "predicted_phone_tokens": 407,
+      "ctc_frames": 7553,
+      "ctc_loss": 2.390615463256836,
+      "phone_token_edits": 787,
+      "phone_token_error_rate": 0.705829596412556,
+      "exact_phone_token_match": false,
+      "target_fits_frames": true
+    }
+  ]
+}
