@@ -144,7 +144,10 @@ def build_model(model_name: str, device: str):
     # We intentionally skip the punctuation model here.
     # Reason: punctuation does not help us decide whether "你好" was understood,
     # and the punctuation model can be larger than the ASR model itself.
-    return AutoModel(model=model_name, vad_model="fsmn-vad", device=device)
+    try:
+        return AutoModel(model=model_name, vad_model="fsmn-vad", device=device, disable_update=True)
+    except TypeError:
+        return AutoModel(model=model_name, vad_model="fsmn-vad", device=device)
 
 
 def run_one(model: Any, audio_path: Path, target_text: str) -> dict[str, Any]:

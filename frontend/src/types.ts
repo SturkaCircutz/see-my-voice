@@ -105,6 +105,22 @@ export interface PinyinDiagnosis {
   summary: string;
 }
 
+export interface PhoneCtcAnalysis {
+  enabled: boolean;
+  modelDir?: string;
+  device?: string;
+  targetText?: string;
+  expectedTokens: string[];
+  predictedTokens: string[];
+  expectedText: string;
+  predictedText: string;
+  editDistance?: number;
+  tokenAccuracy?: number;
+  exactMatch?: boolean;
+  summary?: string;
+  error?: string;
+}
+
 export interface PronunciationAnalysis {
   // The UI uses this normalized result regardless of the analysis backend.
   heardText: string;
@@ -112,6 +128,7 @@ export interface PronunciationAnalysis {
   scores: ScoreSet;
   syllables: SyllableFeedback[];
   pinyinDiagnosis?: PinyinDiagnosis | null;
+  phoneCtc?: PhoneCtcAnalysis | null;
   raw?: unknown;
 }
 

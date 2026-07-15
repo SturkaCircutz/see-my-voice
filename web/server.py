@@ -10,6 +10,7 @@ import shutil
 import socket
 import sys
 import tempfile
+import threading
 import traceback
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -115,8 +116,28 @@ except Exception as exc:  # pragma: no cover - keeps the web UI available locall
         return parts
 
 
+PHONE_CTC_IMPORT_ERROR = None
+try:
+    from phone_ctc_inference import analyze_phone_ctc, phone_ctc_model_is_loaded  # noqa: E402
+except Exception as exc:  # pragma: no cover - phone model is optional for local UI startup.
+    PHONE_CTC_IMPORT_ERROR = exc
+    analyze_phone_ctc = None
+    phone_ctc_model_is_loaded = None
+
+
 ASR_MODEL = None
+ASR_MODEL_LOCK = threading.Lock()
+ANALYZE_LOCK = threading.Lock()
 STANDARD_AUDIO_DIR = APP_DIR / "assets" / "standard-audio"
+DEFAULT_MIN_ASR_AVAILABLE_MB = 4500
+DEFAULT_MIN_PHONE_CTC_AVAILABLE_MB = 1800
+DEFAULT_PHONE_CTC_MODEL_DIR = SEE_MY_VOICE_DIR / "models" / "mandarin_phone_ctc_xlsr_chinese_gpu"
+
+
+class AnalysisUnavailableError(RuntimeError):
+    """Raised when analysis cannot run safely in the current local environment."""
+
+    status_code = 503
 
 
 def write_debug_error(exc: Exception) -> None:
@@ -126,6 +147,107 @@ def write_debug_error(exc: Exception) -> None:
     (debug_dir / "latest_error.txt").write_text(
         "".join(traceback.format_exception(type(exc), exc, exc.__traceback__)),
         encoding="utf-8",
+    )
+
+
+def configured_asr_model_name() -> str:
+    return os.environ.get("SEE_MY_VOICE_ASR_MODEL", DEFAULT_MODEL_NAME).strip() or DEFAULT_MODEL_NAME
+
+
+def configured_asr_device() -> str:
+    return os.environ.get("SEE_MY_VOICE_ASR_DEVICE", "cpu").strip() or "cpu"
+
+
+def configured_min_asr_available_mb() -> int:
+    raw = os.environ.get("SEE_MY_VOICE_ASR_MIN_AVAILABLE_MB", str(DEFAULT_MIN_ASR_AVAILABLE_MB)).strip()
+    try:
+        return max(0, int(raw))
+    except ValueError:
+        return DEFAULT_MIN_ASR_AVAILABLE_MB
+
+
+def env_flag(name: str, default: bool = True) -> bool:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() not in {"0", "false", "no", "off"}
+
+
+def configured_phone_ctc_enabled() -> bool:
+    return env_flag("SEE_MY_VOICE_PHONE_CTC_ENABLED", True)
+
+
+def configured_phone_ctc_model_dir() -> Path:
+    raw = os.environ.get("SEE_MY_VOICE_PHONE_CTC_MODEL_DIR", "").strip()
+    path = Path(raw) if raw else DEFAULT_PHONE_CTC_MODEL_DIR
+    if not path.is_absolute():
+        path = SEE_MY_VOICE_DIR / path
+    return path
+
+
+def configured_phone_ctc_device() -> str:
+    return os.environ.get("SEE_MY_VOICE_PHONE_CTC_DEVICE", "cpu").strip() or "cpu"
+
+
+def configured_phone_ctc_max_audio_seconds() -> float:
+    raw = os.environ.get("SEE_MY_VOICE_PHONE_CTC_MAX_AUDIO_SECONDS", "6.0").strip()
+    try:
+        return max(0.0, float(raw))
+    except ValueError:
+        return 6.0
+
+
+def configured_min_phone_ctc_available_mb() -> int:
+    raw = os.environ.get(
+        "SEE_MY_VOICE_PHONE_CTC_MIN_AVAILABLE_MB",
+        str(DEFAULT_MIN_PHONE_CTC_AVAILABLE_MB),
+    ).strip()
+    try:
+        return max(0, int(raw))
+    except ValueError:
+        return DEFAULT_MIN_PHONE_CTC_AVAILABLE_MB
+
+
+def memory_available_mb() -> int | None:
+    """Return Linux MemAvailable in MiB when available."""
+    try:
+        for line in Path("/proc/meminfo").read_text(encoding="utf-8").splitlines():
+            if line.startswith("MemAvailable:"):
+                parts = line.split()
+                return int(parts[1]) // 1024
+    except Exception:
+        return None
+    return None
+
+
+def ensure_asr_model_can_load() -> None:
+    """Avoid an OS-level OOM kill while the large FunASR model is loading."""
+    min_available_mb = configured_min_asr_available_mb()
+    if min_available_mb <= 0:
+        return
+    available_mb = memory_available_mb()
+    if available_mb is None or available_mb >= min_available_mb:
+        return
+    raise AnalysisUnavailableError(
+        "Not enough available RAM to load the local FunASR model safely "
+        f"({available_mb} MiB available, need at least {min_available_mb} MiB). "
+        "Close other apps or lower SEE_MY_VOICE_ASR_MIN_AVAILABLE_MB only if you accept the risk."
+    )
+
+
+def ensure_phone_ctc_model_can_load(model_dir: Path, device: str) -> None:
+    """Avoid loading the experimental phone model when RAM is already too low."""
+    if phone_ctc_model_is_loaded is not None and phone_ctc_model_is_loaded(model_dir, device):
+        return
+    min_available_mb = configured_min_phone_ctc_available_mb()
+    if min_available_mb <= 0:
+        return
+    available_mb = memory_available_mb()
+    if available_mb is None or available_mb >= min_available_mb:
+        return
+    raise AnalysisUnavailableError(
+        "Not enough available RAM to load the local phone-token CTC model safely "
+        f"({available_mb} MiB available, need at least {min_available_mb} MiB)."
     )
 
 
@@ -159,7 +281,10 @@ def get_model():
     """Load the speech recognizer once and reuse it for later recordings."""
     global ASR_MODEL
     if ASR_MODEL is None:
-        ASR_MODEL = build_model(DEFAULT_MODEL_NAME, "cpu")
+        with ASR_MODEL_LOCK:
+            if ASR_MODEL is None:
+                ensure_asr_model_can_load()
+                ASR_MODEL = build_model(configured_asr_model_name(), configured_asr_device())
     return ASR_MODEL
 
 
@@ -545,6 +670,56 @@ def publish_plot_urls(result: dict, temp_plot_dir: Path) -> dict:
     return result
 
 
+def add_phone_ctc_result(result: dict, target_text: str, audio_path: Path) -> dict:
+    """Attach the post-trained phone-token model output when it is available."""
+    model_dir = configured_phone_ctc_model_dir()
+    device = configured_phone_ctc_device()
+    if not configured_phone_ctc_enabled():
+        result["phone_ctc"] = {
+            "enabled": False,
+            "model_dir": str(model_dir),
+            "device": device,
+            "error": "Phone-token CTC analysis is disabled.",
+        }
+        return result
+
+    if PHONE_CTC_IMPORT_ERROR is not None or analyze_phone_ctc is None:
+        result["phone_ctc"] = {
+            "enabled": False,
+            "model_dir": str(model_dir),
+            "device": device,
+            "error": f"Phone-token CTC analysis is unavailable: {PHONE_CTC_IMPORT_ERROR}",
+        }
+        return result
+
+    if not model_dir.exists():
+        result["phone_ctc"] = {
+            "enabled": False,
+            "model_dir": str(model_dir),
+            "device": device,
+            "error": "Phone-token CTC model directory was not found.",
+        }
+        return result
+
+    try:
+        ensure_phone_ctc_model_can_load(model_dir, device)
+        result["phone_ctc"] = analyze_phone_ctc(
+            target_text,
+            audio_path,
+            model_dir=model_dir,
+            device=device,
+            max_audio_seconds=configured_phone_ctc_max_audio_seconds(),
+        )
+    except Exception as exc:
+        result["phone_ctc"] = {
+            "enabled": False,
+            "model_dir": str(model_dir),
+            "device": device,
+            "error": str(exc),
+        }
+    return result
+
+
 class VoiceHandler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=str(APP_DIR), **kwargs)
@@ -576,6 +751,17 @@ class VoiceHandler(SimpleHTTPRequestHandler):
                     "analysis_ready": ANALYSIS_IMPORT_ERROR is None,
                     "see_my_voice_dir": str(SEE_MY_VOICE_DIR),
                     "analysis_error": str(ANALYSIS_IMPORT_ERROR) if ANALYSIS_IMPORT_ERROR else "",
+                    "asr_model": configured_asr_model_name(),
+                    "asr_device": configured_asr_device(),
+                    "asr_model_loaded": ASR_MODEL is not None,
+                    "memory_available_mb": memory_available_mb(),
+                    "min_asr_available_mb": configured_min_asr_available_mb(),
+                    "phone_ctc_enabled": configured_phone_ctc_enabled(),
+                    "phone_ctc_model_dir": str(configured_phone_ctc_model_dir()),
+                    "phone_ctc_model_exists": configured_phone_ctc_model_dir().exists(),
+                    "phone_ctc_device": configured_phone_ctc_device(),
+                    "phone_ctc_import_error": str(PHONE_CTC_IMPORT_ERROR) if PHONE_CTC_IMPORT_ERROR else "",
+                    "min_phone_ctc_available_mb": configured_min_phone_ctc_available_mb(),
                 }
             )
             return
@@ -605,7 +791,8 @@ class VoiceHandler(SimpleHTTPRequestHandler):
             result = self.handle_analyze()
         except Exception as exc:
             write_debug_error(exc)
-            self.send_json({"error": str(exc)}, status=500)
+            status = getattr(exc, "status_code", 500)
+            self.send_json({"error": str(exc)}, status=status)
             return
 
         self.send_json(result)
@@ -652,8 +839,10 @@ class VoiceHandler(SimpleHTTPRequestHandler):
             ensure_recording_has_voice(audio_for_model)
 
             plot_dir = temp_path / "plots"
-            model = get_model()
-            result = combine_results(target_text, audio_for_model, model, plot_dir)
+            with ANALYZE_LOCK:
+                model = get_model()
+                result = combine_results(target_text, audio_for_model, model, plot_dir)
+                result = add_phone_ctc_result(result, target_text, audio_for_model)
             result["communication_result"]["main_feedback"] = result["communication_result"][
                 "main_feedback"
             ].replace("pitch 图", "tone contour chart").replace("看 tone contour chart", "check the tone contour chart")

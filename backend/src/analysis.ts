@@ -36,6 +36,22 @@ export interface PinyinDiagnosis {
   summary: string;
 }
 
+export interface PhoneCtcAnalysis {
+  enabled: boolean;
+  modelDir?: string;
+  device?: string;
+  targetText?: string;
+  expectedTokens: string[];
+  predictedTokens: string[];
+  expectedText: string;
+  predictedText: string;
+  editDistance?: number;
+  tokenAccuracy?: number;
+  exactMatch?: boolean;
+  summary?: string;
+  error?: string;
+}
+
 export interface PronunciationAnalysis {
   // This is the stable analysis shape returned by the backend API.
   heardText: string;
@@ -43,6 +59,7 @@ export interface PronunciationAnalysis {
   scores: ScoreSet;
   syllables: SyllableFeedback[];
   pinyinDiagnosis?: PinyinDiagnosis | null;
+  phoneCtc?: PhoneCtcAnalysis | null;
   raw?: unknown;
 }
 
@@ -90,6 +107,11 @@ function stringList(value: unknown): string[] {
   return Array.isArray(value) ? value.map((item) => String(item)).filter(Boolean) : [];
 }
 
+function optionalNumber(value: unknown): number | undefined {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : undefined;
+}
+
 function normalizePinyinDiagnosis(result: Record<string, any>): PinyinDiagnosis | null {
   // Pinyin diagnosis is optional because some analysis paths only return scores.
   const diagnosis = result?.pinyin_diagnosis;
@@ -115,6 +137,27 @@ function normalizePinyinDiagnosis(result: Record<string, any>): PinyinDiagnosis 
   };
 }
 
+function normalizePhoneCtcAnalysis(result: Record<string, any>): PhoneCtcAnalysis | null {
+  const analysis = result?.phone_ctc;
+  if (!analysis || typeof analysis !== "object") return null;
+  const source = analysis as Record<string, any>;
+  return {
+    enabled: source.enabled === true,
+    modelDir: source.model_dir ? String(source.model_dir) : undefined,
+    device: source.device ? String(source.device) : undefined,
+    targetText: source.target_text ? String(source.target_text) : undefined,
+    expectedTokens: stringList(source.expected_tokens),
+    predictedTokens: stringList(source.predicted_tokens),
+    expectedText: String(source.expected_text || ""),
+    predictedText: String(source.predicted_text || ""),
+    editDistance: optionalNumber(source.edit_distance),
+    tokenAccuracy: optionalNumber(source.token_accuracy),
+    exactMatch: typeof source.exact_match === "boolean" ? source.exact_match : undefined,
+    summary: source.summary ? String(source.summary) : undefined,
+    error: source.error ? String(source.error) : undefined,
+  };
+}
+
 export function normalizePronunciationAnalysis(payload: unknown): PronunciationAnalysis {
   // Translate the Python/FunASR response into the stable contract consumed by the Next.js UI.
   const result = payload && typeof payload === "object" ? payload as Record<string, any> : {};
@@ -135,6 +178,7 @@ export function normalizePronunciationAnalysis(payload: unknown): PronunciationA
     scores,
     syllables: normalizeSyllables(result),
     pinyinDiagnosis: normalizePinyinDiagnosis(result),
+    phoneCtc: normalizePhoneCtcAnalysis(result),
     raw: payload,
   };
 }
