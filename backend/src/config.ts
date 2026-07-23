@@ -1,4 +1,4 @@
-import "dotenv/config";
+
 
 function required(name: string, fallback = ""): string {
   // Use local defaults in development but still fail when a required value is blank.
