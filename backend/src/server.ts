@@ -21,17 +21,19 @@ app.use(
       if (
         !origin ||
         config.frontendOrigins.includes(origin) ||
-        /^https:\/\/[a-z0-9-]+\.vercel\.app$/i.test(origin)
+        /^https:\/\/.+\.vercel\.app$/i.test(origin)  // any vercel.app subdomain
       ) {
         callback(null, true);
         return;
       }
-
-      callback(new Error("Origin is not allowed by CORS."));
+      callback(new Error("Origin is not allowed by CORS: " + origin));
     },
     credentials: true,
   }),
 );
+
+app.options("*", cors());
+
 app.use(express.json({ limit: "1mb" }));
 
 // Root and health endpoints support quick deployment checks.
