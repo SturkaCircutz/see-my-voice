@@ -70,6 +70,11 @@ export interface AnalysisInput {
   authorization?: string;
 }
 
+interface HostedAsrResult {
+  text: string;
+  raw: unknown;
+}
+
 function score(value: unknown): number {
   // The Python service can emit missing or out-of-range values; the UI expects a 0-100 score.
   const numeric = Number(value ?? 0);
@@ -110,6 +115,38 @@ function stringList(value: unknown): string[] {
 function optionalNumber(value: unknown): number | undefined {
   const numeric = Number(value);
   return Number.isFinite(numeric) ? numeric : undefined;
+}
+
+function normalizeComparableText(text: string): string {
+  return (text.match(/[\u4e00-\u9fffA-Za-z0-9]+/g) || []).join("").toLowerCase();
+}
+
+function editDistance(left: string, right: string): number {
+  const rows = left.length + 1;
+  const cols = right.length + 1;
+  const previous = Array.from({ length: cols }, (_, index) => index);
+
+  for (let row = 1; row < rows; row += 1) {
+    const current = [row];
+    for (let col = 1; col < cols; col += 1) {
+      const replaceCost = left[row - 1] === right[col - 1] ? 0 : 1;
+      current[col] = Math.min(
+        previous[col] + 1,
+        current[col - 1] + 1,
+        previous[col - 1] + replaceCost,
+      );
+    }
+    previous.splice(0, previous.length, ...current);
+  }
+
+  return previous[cols - 1] || 0;
+}
+
+function textSimilarity(targetText: string, heardText: string): number {
+  const target = normalizeComparableText(targetText);
+  const heard = normalizeComparableText(heardText);
+  const maxLength = Math.max(target.length, heard.length, 1);
+  return Math.max(0, Math.min(100, Math.round((1 - editDistance(target, heard) / maxLength) * 1000) / 10));
 }
 
 function normalizePinyinDiagnosis(result: Record<string, any>): PinyinDiagnosis | null {
@@ -158,6 +195,121 @@ function normalizePhoneCtcAnalysis(result: Record<string, any>): PhoneCtcAnalysi
   };
 }
 
+function hostedAsrEndpoint(): string {
+  const provider = encodeURIComponent(config.hfInferenceProvider);
+  const modelPath = config.hfAsrModelId.split("/").map(encodeURIComponent).join("/");
+  return `https://router.huggingface.co/${provider}/models/${modelPath}`;
+}
+
+function extractHostedAsrText(payload: unknown): string {
+  if (typeof payload === "string") return payload;
+  if (!payload || typeof payload !== "object") return "";
+  const source = payload as Record<string, any>;
+  if (typeof source.text === "string") return source.text;
+  if (typeof source.generated_text === "string") return source.generated_text;
+  if (Array.isArray(source.chunks)) {
+    return source.chunks.map((chunk) => typeof chunk?.text === "string" ? chunk.text : "").join("");
+  }
+  return "";
+}
+
+async function analyzeWithHostedAsr(input: AnalysisInput): Promise<HostedAsrResult> {
+  if (!config.hfInferenceToken) {
+    throw new Error("Hosted ASR fallback is not configured. Set HF_INFERENCE_TOKEN or PRONUNCIATION_API_URL.");
+  }
+
+  const upstream = await fetch(hostedAsrEndpoint(), {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${config.hfInferenceToken}`,
+      "Content-Type": input.audio.type || "audio/webm",
+    },
+    body: await input.audio.arrayBuffer(),
+  });
+  const payload = await upstream.json().catch(() => ({}));
+
+  if (!upstream.ok) {
+    throw new Error(
+      payload && typeof payload === "object" && "error" in payload
+        ? String((payload as Record<string, unknown>).error)
+        : "Hosted ASR analysis failed.",
+    );
+  }
+
+  return {
+    text: extractHostedAsrText(payload),
+    raw: payload,
+  };
+}
+
+function normalizeHostedAsrAnalysis(input: AnalysisInput, result: HostedAsrResult): PronunciationAnalysis {
+  const similarity = textSimilarity(input.targetText, result.text);
+  const targetChars = Array.from(input.targetText).filter((char) => /[\u4e00-\u9fff]/.test(char));
+  const summary = similarity >= 80
+    ? "The hosted ASR model heard text close to the target. Use the optional trained phone-token model for initial, final, and tone-level feedback."
+    : "The hosted ASR model heard differences from the target. For sound-level feedback, deploy the trained See My Voice phone-token model service.";
+
+  return {
+    heardText: result.text || "The hosted ASR model did not hear clearly",
+    summary,
+    scores: {
+      overall: similarity,
+      tone: 0,
+      clarity: similarity,
+      rhythm: 0,
+    },
+    syllables: targetChars.map((character, index) => ({
+      id: String(index),
+      character,
+      pinyin: "",
+      score: similarity,
+      focus: "ASR",
+      feedback: "This free hosted mode checks recognized text only. Deploy the trained phone-token model for initial, final, and tone labels.",
+    })),
+    pinyinDiagnosis: {
+      targetText: input.targetText,
+      heardText: result.text,
+      targetPinyin: [],
+      heardPinyin: [],
+      issues: similarity >= 95
+        ? []
+        : [
+            {
+              type: "hosted_asr",
+              title: "Hosted ASR text differs from the target",
+              summary,
+              focus: "Whole sentence",
+              detail: `Target: ${input.targetText}. Heard: ${result.text || "unclear"}.`,
+              practice: [input.targetText],
+            },
+          ],
+      summary,
+    },
+    phoneCtc: {
+      enabled: false,
+      modelDir: config.hfAsrModelId,
+      device: config.hfInferenceProvider,
+      targetText: input.targetText,
+      expectedTokens: [],
+      predictedTokens: [],
+      expectedText: "",
+      predictedText: result.text,
+      summary: "The deployed site is using a hosted free ASR fallback. The See My Voice phone-token model is optional and must be deployed as a separate service.",
+      error: "Phone-token CTC model service is not connected.",
+    },
+    raw: {
+      provider: config.hfInferenceProvider,
+      model: config.hfAsrModelId,
+      mode: "hosted_asr_fallback",
+      response: result.raw,
+    },
+  };
+}
+
+export function pronunciationAnalysisIsConfigured(): boolean {
+  return Boolean(config.pronunciationApiUrl || config.hfInferenceToken);
+}
+
 export function normalizePronunciationAnalysis(payload: unknown): PronunciationAnalysis {
   // Translate the Python/FunASR response into the stable contract consumed by the Next.js UI.
   const result = payload && typeof payload === "object" ? payload as Record<string, any> : {};
@@ -186,7 +338,7 @@ export function normalizePronunciationAnalysis(payload: unknown): PronunciationA
 export async function analyzeWithPronunciationService(input: AnalysisInput): Promise<PronunciationAnalysis> {
   // Backend routes call through this function instead of talking to Python directly.
   if (!config.pronunciationApiUrl) {
-    throw new Error("Pronunciation API is not configured yet. Set PRONUNCIATION_API_URL when it is available.");
+    return normalizeHostedAsrAnalysis(input, await analyzeWithHostedAsr(input));
   }
 
   // Rebuild the browser upload as multipart form data for the Python analysis service boundary.

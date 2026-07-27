@@ -25,12 +25,48 @@ MONGODB_DB=see_my_voice
 JWT_SECRET=<long-random-secret>
 FRONTEND_ORIGIN=https://<your-frontend-project>.vercel.app
 PRONUNCIATION_API_URL=https://<your-pronunciation-service>
+HF_INFERENCE_TOKEN=<optional-hugging-face-token-for-free-asr-fallback>
+HF_ASR_MODEL_ID=openai/whisper-large-v3-turbo
 SEED_USERNAME=<optional-demo-user>
 SEED_PASSWORD=<optional-demo-password>
 SEED_NAME=<optional-demo-display-name>
 ```
 
-`PRONUNCIATION_API_URL` is optional for deploying the API, but recording analysis will fail until it points to the Python/FunASR service.
+`PRONUNCIATION_API_URL` connects the trained See My Voice phone-token model service.
+If it is not set, the backend can still use a hosted ASR fallback when
+`HF_INFERENCE_TOKEN` is configured. The fallback keeps the Vercel site usable,
+but it only checks recognized text; it does not provide phone-token feedback.
+Create the Hugging Face token with Inference Providers permission.
+
+The frontend also exposes a public model-options page:
+
+```bash
+https://<your-frontend-project>.vercel.app/model
+```
+
+The trained phone-token model has been uploaded to:
+
+```bash
+https://huggingface.co/sturka/see-my-voice-mandarin-phone-ctc
+```
+
+The deployable Hugging Face Docker Space template lives in:
+
+```bash
+deploy/huggingface-pronunciation-api
+```
+
+Deploy it with:
+
+```bash
+source .venv/bin/activate
+python tools/deploy_hf_pronunciation_api.py
+```
+
+If Hugging Face returns `402 Payment Required`, the account cannot create Docker
+or Gradio Spaces on the current plan. In that case, either enable HF PRO or
+deploy the same Docker service to another container host, then set
+`PRONUNCIATION_API_URL` to that public service URL.
 
 ## Frontend Environment Variables
 

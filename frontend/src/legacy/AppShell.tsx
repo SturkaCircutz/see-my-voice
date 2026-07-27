@@ -176,6 +176,9 @@ export function LoginScreen({
           <p className="m-0 text-xs leading-[1.6] text-[var(--muted)]">
             Student accounts open practice, tasks, progress, chat, and Me. Teacher accounts open learner management, task publishing, reviews, chat, and account settings.
           </p>
+          <a className="text-xs font-black text-[var(--green)]" href="/model">
+            Model deployment options
+          </a>
         </section>
       </div>
     </section>
