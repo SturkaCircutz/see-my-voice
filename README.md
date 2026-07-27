@@ -1,12 +1,40 @@
 # See My Voice
 
-**See My Voice** is a **web-based Mandarin pronunciation practice app** that helps learners compare spoken audio with expected Mandarin sound targets.
+**See My Voice** is a **web-based Mandarin pronunciation practice app** for
+**learners** and **teachers**.
 
-The project includes a **GPU-trained Mandarin phone-token CTC model** that predicts **initials**, **finals**, and **tones** from speech audio. This matches the teaching flow of the app: instead of only checking whole Chinese characters, the model supports feedback at the sound level.
+Learners can **record Mandarin speech**, compare it with a **target sentence**,
+and review feedback about **clarity**, **rhythm**, **tones**, and **Mandarin
+sound units**. Teachers can **assign practice packs**, **review learner
+submissions**, **track progress**, and **chat with students**.
 
-## **What The Model Learns**
+## At A Glance
 
-The model is trained to convert speech into Mandarin pronunciation labels:
+- **Next.js frontend** deployed on **Vercel**
+- **Express backend** deployed separately on **Vercel**
+- **MongoDB-backed** users, attempts, tasks, reviews, and chat
+- **Redis/Vercel KV-backed** HTTP-only cookie sessions
+- **Hosted ASR fallback** for the public deployed site
+- **Optional trained phone-token model service** for sound-level feedback
+
+## Uploaded Model
+
+The trained **Mandarin phone-token CTC model** has been uploaded to
+**Hugging Face**:
+
+https://huggingface.co/sturka/see-my-voice-mandarin-phone-ctc
+
+The latest **local artifact** is:
+
+```text
+models/mandarin_phone_ctc_xlsr_chinese_gpu
+```
+
+The large **model tensor** is kept out of **Git** and hosted separately.
+
+## What The Model Does
+
+The model learns this mapping:
 
 ```text
 audio -> Mandarin phone tokens
@@ -24,74 +52,142 @@ Example labels:
 儿 er2  -> F_er T2
 ```
 
-This gives the app a useful path for pronunciation feedback:
+The app can compare:
 
 ```text
-expected phones vs predicted phones
+expected phone tokens vs predicted phone tokens
 ```
 
-So the app can focus on **which sound changed**, such as an **initial**, **final**, or **tone**.
+That creates a path for feedback on **initials**, **finals**, **tones**, and
+**full syllable token sequences**.
 
-## **Latest Training Run**
+## Latest Training Run
 
-The latest trained model artifact is:
+| Training item | Value |
+| --- | --- |
+| Base model | `jonatasgrosman/wav2vec2-large-xlsr-53-chinese-zh-cn` |
+| Training device | `cuda` |
+| Training examples | `300` |
+| Validation examples | `50` |
+| Training steps | `1000` |
+| Phone vocabulary size | `67` |
+| Train/validation overlap | `0` |
+| Final training loss | `1.5815` |
+| Best validation loss | `1.9028` |
+| Best validation step | `1000` |
+| Validation loss reduction | `89.9%` |
 
-```text
-models/mandarin_phone_ctc_xlsr_chinese_gpu
-```
+The run used a **pretrained Chinese Wav2Vec2/XLS-R CTC backbone** and adapted it
+to the app's **67 Mandarin phone-token labels**. The local **GPU run** kept the
+large **acoustic encoder frozen** and trained the **CTC output head**.
 
-**Training highlights:**
+## Training Loss
 
-- **Base model:** `jonatasgrosman/wav2vec2-large-xlsr-53-chinese-zh-cn`
-- **Training device:** `cuda`
-- **Training examples:** `300`
-- **Validation examples:** `50`
-- **Training steps:** `1000`
-- **Phone vocabulary size:** `67`
-- **Train/validation overlap:** `0`
-- **Final training loss:** `1.5815`
-- **Best validation loss:** `1.9028`
-- **Best validation step:** `1000`
-- **Validation loss reduction during the run:** **89.9%**
-
-The run used a pretrained Chinese Wav2Vec2/XLS-R CTC model and adapted it to the app's **67 Mandarin phone-token labels**. On the local RTX 4060 GPU setup, the default training mode keeps the large acoustic encoder frozen and trains the **CTC output head** for the phone-token target space.
-
-## **Training Loss Graph**
-
-The loss curve below comes from the latest GPU run:
+The loss curve below comes from the latest **GPU run**:
 
 ![Training loss curve](docs/assets/stage3d-phone-ctc-loss-curve.png)
 
-**The graph shows strong learning behavior:** validation loss dropped from **18.8047** at the first evaluation to **1.9028** at step **1000**, while training loss ended at **1.5815**.
+**Validation loss** dropped from `18.8047` at the first evaluation to `1.9028`
+at step `1000`. **Final training loss** ended at `1.5815`.
 
-## **Why This Helps The Website**
+## Deployment Modes
 
-The website can use the model output to support **sound-level Mandarin pronunciation feedback**:
+### 1. Default Vercel Mode
 
-- **Initial feedback:** detect changes like `I_n` vs `I_l`
-- **Final feedback:** detect changes like `F_i` vs `F_ao`
-- **Tone feedback:** compare `T1` through `T5`
-- **Syllable feedback:** compare the full expected token sequence for each Mandarin syllable
+Use this mode when the **public website** should work without hosting the large
+**trained model**.
 
-This is useful because Mandarin pronunciation learning often focuses on one part of a syllable at a time. The phone-token design lets the app explain feedback in the same structure learners practice: **initial + final + tone**.
+Backend variables:
 
-## **Training Pipeline**
+```bash
+HF_INFERENCE_TOKEN=<your-hugging-face-token>
+HF_ASR_MODEL_ID=jonatasgrosman/wav2vec2-large-xlsr-53-chinese-zh-cn
+```
+
+This mode provides **text-level feedback** through **hosted ASR**. It does not
+provide the trained phone-token model's **initial**, **final**, and **tone**
+predictions.
+
+### 2. Optional Trained Model Mode
+
+Use this mode when **sound-level feedback** from the trained **See My Voice
+phone-token model** is needed.
+
+Deploy the **pronunciation API service**:
+
+```bash
+source .venv/bin/activate
+python tools/deploy_hf_pronunciation_api.py
+```
+
+Then set the **backend environment variable**:
+
+```bash
+PRONUNCIATION_API_URL=https://<your-pronunciation-service>
+```
+
+If **Hugging Face** blocks **Docker Spaces** on the current account plan, run
+the model **locally** and expose it with a **tunnel** while testing:
+
+```bash
+SEE_MY_VOICE_PHONE_CTC_MODEL_DIR=models/mandarin_phone_ctc_xlsr_chinese_gpu \
+PORT=7860 \
+python web/server.py
+
+cloudflared tunnel --url http://localhost:7860
+```
+
+## Backend Environment
+
+Required **production variables**:
+
+```bash
+MONGODB_URI=mongodb+srv://...
+MONGODB_DB=see_my_voice
+KV_REST_API_URL=https://...
+KV_REST_API_TOKEN=<vercel-kv-token>
+FRONTEND_ORIGIN=https://<your-frontend-project>.vercel.app
+```
+
+Optional variables:
+
+```bash
+AUTH_SESSION_TTL_SECONDS=604800
+HF_INFERENCE_TOKEN=<optional-hosted-asr-token>
+HF_ASR_MODEL_ID=jonatasgrosman/wav2vec2-large-xlsr-53-chinese-zh-cn
+PRONUNCIATION_API_URL=https://<optional-trained-model-service>
+```
+
+`AUTH_SESSION_TTL_SECONDS=604800` means **login sessions last 7 days**. The code
+already defaults to **7 days** if this variable is not set.
+
+## Project Structure
+
+```text
+frontend/   Next.js web app
+backend/    Express API for auth, tasks, chat, attempts, and reviews
+src/        Training, labeling, and inference scripts
+web/        Local Python pronunciation prototype server
+models/     Local trained artifacts, ignored by Git
+deploy/     Hugging Face pronunciation API deployment template
+docs/       Reports and visual assets
+```
+
+## Training Pipeline
 
 The training pipeline includes:
 
 - **Fixed 67-token Mandarin phone vocabulary**
-- **Dataset manifest with audio paths, text, pinyin, and phone-token labels**
+- **Dataset manifest** with audio paths, text, pinyin, and phone-token labels
 - **CTC loss training**
-- **CUDA/GPU execution through PyTorch**
+- **CUDA/GPU execution** through PyTorch
 - **Validation loss tracking**
 - **Early stopping support**
 - **Saved model artifacts**
 - **Saved loss history and loss graph**
 
-The core training script is:
+Core **training script**:
 
 ```text
 src/run_stage3d_train_phone_ctc.py
 ```
-
-The model files are kept out of Git because the trained tensor file is large. The generated model artifacts can be uploaded separately to Hugging Face or another model store.
