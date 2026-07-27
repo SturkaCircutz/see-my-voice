@@ -2,11 +2,11 @@
 
 import React from "react";
 import {
-  clearToken,
   fetchPracticeAttempts,
+  fetchCurrentUser,
   loginUser,
+  logoutUser,
   registerUser,
-  setToken,
 } from "../api";
 import { LegacyApp } from "../LegacyApp";
 import type { AuthUser, PracticeAttempt } from "../types";
@@ -17,10 +17,12 @@ function App() {
   const [attempts, setAttempts] = React.useState<PracticeAttempt[]>([]);
   const [authReady, setAuthReady] = React.useState(false);
 
-  // Each new site visit starts at the login gate instead of silently restoring an old token.
+  // Restore the HTTP-only cookie session when one exists.
   React.useEffect(() => {
-    clearToken();
-    setAuthReady(true);
+    fetchCurrentUser()
+      .then((payload) => setUser(payload.user))
+      .catch(() => setUser(null))
+      .finally(() => setAuthReady(true));
   }, []);
 
   // Load dashboard data only after the backend confirms the current user.
@@ -31,9 +33,8 @@ function App() {
       .catch(() => setAttempts([]));
   }, [user]);
 
-  // Store the JWT in localStorage through the shared API helper.
-  const handleAuthed = React.useCallback((payload: { token: string; user: AuthUser }) => {
-    setToken(payload.token);
+  // Login/register responses set the session cookie; the page only stores public user state.
+  const handleAuthed = React.useCallback((payload: { user: AuthUser }) => {
     setUser(payload.user);
     return payload.user;
   }, []);
@@ -53,8 +54,8 @@ function App() {
   );
 
   // Clear all user-scoped UI state when the session ends.
-  function handleLogout() {
-    clearToken();
+  async function handleLogout() {
+    await logoutUser().catch(() => undefined);
     setUser(null);
     setAttempts([]);
   }

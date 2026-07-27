@@ -1,8 +1,12 @@
 import type { NextFunction, Request, Response } from "express";
-import jwt from "jsonwebtoken";
 import { ObjectId } from "mongodb";
-import { config } from "./config.js";
 import { usersCollection, type UserDocument } from "./db.js";
+import {
+  clearAuthSessionCookie,
+  destroyAuthSession,
+  getAuthSessionUserId,
+  readSessionToken,
+} from "./session.js";
 
 export interface PublicUser {
   id: string;
@@ -15,12 +19,8 @@ export interface PublicUser {
 }
 
 export interface AuthenticatedRequest extends Request {
-  // Routes attach the loaded user after validating the bearer token.
+  // Routes attach the loaded user after validating the Redis-backed cookie session.
   user?: UserDocument;
-}
-
-interface TokenPayload {
-  sub: string;
 }
 
 export function toPublicUser(user: UserDocument): PublicUser {
@@ -36,30 +36,31 @@ export function toPublicUser(user: UserDocument): PublicUser {
   };
 }
 
-export function signToken(user: UserDocument): string {
-  // JWT payload only needs the user id; the database remains the source of truth.
-  return jwt.sign({ sub: user._id.toHexString() }, config.jwtSecret, {
-    expiresIn: "7d",
-  });
-}
-
 export async function requireAuth(
   request: AuthenticatedRequest,
   response: Response,
   next: NextFunction,
 ): Promise<void> {
   try {
-    // Downstream routes use request.user, so each token is resolved against MongoDB.
-    const header = request.header("Authorization") || "";
-    const token = header.startsWith("Bearer ") ? header.slice("Bearer ".length) : "";
+    // Downstream routes use request.user, so each session is resolved against MongoDB.
+    const token = readSessionToken(request);
     if (!token) {
-      response.status(401).json({ error: "Missing auth token." });
+      response.status(401).json({ error: "Missing auth session." });
       return;
     }
 
-    const payload = jwt.verify(token, config.jwtSecret) as TokenPayload;
-    const user = await usersCollection().findOne({ _id: new ObjectId(payload.sub) });
+    const userId = await getAuthSessionUserId(token);
+    if (!ObjectId.isValid(userId)) {
+      await destroyAuthSession(token);
+      clearAuthSessionCookie(response);
+      response.status(401).json({ error: "Invalid or expired auth session." });
+      return;
+    }
+
+    const user = await usersCollection().findOne({ _id: new ObjectId(userId) });
     if (!user) {
+      await destroyAuthSession(token);
+      clearAuthSessionCookie(response);
       response.status(401).json({ error: "User no longer exists." });
       return;
     }
@@ -67,6 +68,6 @@ export async function requireAuth(
     request.user = user;
     next();
   } catch {
-    response.status(401).json({ error: "Invalid or expired auth token." });
+    response.status(401).json({ error: "Invalid or expired auth session." });
   }
 }

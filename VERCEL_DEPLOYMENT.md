@@ -22,15 +22,22 @@ Set these on the backend Vercel project:
 ```bash
 MONGODB_URI=mongodb+srv://...
 MONGODB_DB=see_my_voice
-JWT_SECRET=<long-random-secret>
+UPSTASH_REDIS_REST_URL=https://...
+UPSTASH_REDIS_REST_TOKEN=<upstash-rest-token>
 FRONTEND_ORIGIN=https://<your-frontend-project>.vercel.app
 PRONUNCIATION_API_URL=https://<your-pronunciation-service>
 HF_INFERENCE_TOKEN=<optional-hugging-face-token-for-free-asr-fallback>
 HF_ASR_MODEL_ID=openai/whisper-large-v3-turbo
+AUTH_SESSION_TTL_SECONDS=604800
 SEED_USERNAME=<optional-demo-user>
 SEED_PASSWORD=<optional-demo-password>
 SEED_NAME=<optional-demo-display-name>
 ```
+
+Authentication uses an HTTP-only `smv_session` cookie backed by Redis. Use
+Upstash Redis on Vercel and set both `UPSTASH_REDIS_REST_URL` and
+`UPSTASH_REDIS_REST_TOKEN` on the backend project. The frontend must call the
+backend with credentials enabled, which is already handled by the API helper.
 
 `PRONUNCIATION_API_URL` connects the trained See My Voice phone-token model service.
 If it is not set, the backend can still use a hosted ASR fallback when

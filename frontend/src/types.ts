@@ -12,8 +12,7 @@ export interface AuthUser {
 }
 
 export interface AuthResponse {
-  // Login and registration both return a token plus user profile.
-  token: string;
+  // Login and registration set an HTTP-only session cookie and return the public profile.
   user: AuthUser;
 }
 

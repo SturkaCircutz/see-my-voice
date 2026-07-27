@@ -1,4 +1,5 @@
 import cors from "cors";
+import type { CorsOptions } from "cors";
 import express, { type ErrorRequestHandler } from "express";
 import { config } from "./config.js";
 import { connectToMongo } from "./db.js";
@@ -14,27 +15,40 @@ import { seedConfiguredUser } from "./seed.js";
 
 const app = express();
 
-// Allow the configured frontend origins plus Vercel preview domains.
-app.use(
-  cors({
-    origin(origin, callback) {
-      if (
-        !origin ||
-        config.frontendOrigins.includes(origin) ||
-        /^https:\/\/.+\.vercel\.app$/i.test(origin)  // any vercel.app subdomain
-      ) {
-        callback(null, true);
-        return;
-      }
-      callback(new Error("Origin is not allowed by CORS: " + origin));
-    },
-    credentials: true,
-  }),
-);
+function originIsAllowed(origin?: string): boolean {
+  return Boolean(
+    !origin ||
+      config.frontendOrigins.includes(origin) ||
+      /^https:\/\/.+\.vercel\.app$/i.test(origin),
+  );
+}
 
-app.options("*", cors());
+// Allow the configured frontend origins plus Vercel preview domains.
+const corsOptions: CorsOptions = {
+  origin(origin, callback) {
+    if (originIsAllowed(origin)) {
+      callback(null, true);
+      return;
+    }
+    callback(new Error("Origin is not allowed by CORS: " + origin));
+  },
+  credentials: true,
+};
+
+app.use(cors(corsOptions));
+
+app.options("*", cors(corsOptions));
 
 app.use(express.json({ limit: "1mb" }));
+
+app.use((request, response, next) => {
+  if (["GET", "HEAD", "OPTIONS"].includes(request.method) || originIsAllowed(request.header("Origin"))) {
+    next();
+    return;
+  }
+
+  response.status(403).json({ error: "Origin is not allowed." });
+});
 
 // Root and health endpoints support quick deployment checks.
 app.get("/", (_request, response) => {

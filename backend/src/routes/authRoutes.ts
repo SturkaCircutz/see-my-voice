@@ -3,7 +3,6 @@ import { Router } from "express";
 import { ObjectId } from "mongodb";
 import {
   requireAuth,
-  signToken,
   toPublicUser,
   type AuthenticatedRequest,
 } from "../auth.js";
@@ -12,6 +11,12 @@ import {
   usersCollection,
   type UserDocument,
 } from "../db.js";
+import {
+  clearAuthSessionCookie,
+  createAuthSession,
+  destroyAuthSession,
+  readSessionToken,
+} from "../session.js";
 
 export const authRoutes = Router();
 
@@ -90,10 +95,8 @@ authRoutes.post("/register", async (request, response) => {
     throw error;
   }
 
-  response.status(201).json({
-    token: signToken(user),
-    user: toPublicUser(user),
-  });
+  await createAuthSession(response, user._id.toHexString());
+  response.status(201).json({ user: toPublicUser(user) });
 });
 
 authRoutes.post("/login", async (request, response) => {
@@ -136,13 +139,17 @@ authRoutes.post("/login", async (request, response) => {
     ...readClientMeta(request),
   });
 
-  response.json({
-    token: signToken(updatedUser),
-    user: toPublicUser(updatedUser),
-  });
+  await createAuthSession(response, updatedUser._id.toHexString());
+  response.json({ user: toPublicUser(updatedUser) });
 });
 
 authRoutes.get("/me", requireAuth, (request: AuthenticatedRequest, response) => {
-  // The frontend uses /me to restore a session from local storage.
+  // The frontend uses /me to restore a session from the HTTP-only cookie.
   response.json({ user: toPublicUser(request.user!) });
+});
+
+authRoutes.post("/logout", async (request, response) => {
+  await destroyAuthSession(readSessionToken(request));
+  clearAuthSessionCookie(response);
+  response.json({ ok: true });
 });
