@@ -34,7 +34,9 @@ function getRedis(): Redis | null {
 
 function assertSessionStoreAvailable(): void {
   if (getRedis() || !productionSessionStoreRequired()) return;
-  throw new Error("Redis session store is not configured. Set UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN.");
+  throw new Error(
+    "Redis session store is not configured. Set KV_REST_API_URL and KV_REST_API_TOKEN from Vercel KV, or set UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN.",
+  );
 }
 
 function sessionKey(token: string): string {

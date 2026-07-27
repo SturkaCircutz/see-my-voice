@@ -22,8 +22,8 @@ Set these on the backend Vercel project:
 ```bash
 MONGODB_URI=mongodb+srv://...
 MONGODB_DB=see_my_voice
-UPSTASH_REDIS_REST_URL=https://...
-UPSTASH_REDIS_REST_TOKEN=<upstash-rest-token>
+KV_REST_API_URL=https://...
+KV_REST_API_TOKEN=<vercel-kv-token>
 FRONTEND_ORIGIN=https://<your-frontend-project>.vercel.app
 PRONUNCIATION_API_URL=https://<your-pronunciation-service>
 HF_INFERENCE_TOKEN=<optional-hugging-face-token-for-free-asr-fallback>
@@ -35,9 +35,11 @@ SEED_NAME=<optional-demo-display-name>
 ```
 
 Authentication uses an HTTP-only `smv_session` cookie backed by Redis. Use
-Upstash Redis on Vercel and set both `UPSTASH_REDIS_REST_URL` and
-`UPSTASH_REDIS_REST_TOKEN` on the backend project. The frontend must call the
-backend with credentials enabled, which is already handled by the API helper.
+Upstash Redis/Vercel KV and set both `KV_REST_API_URL` and
+`KV_REST_API_TOKEN` on the backend project. The backend also accepts the direct
+Upstash names `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`. The
+frontend must call the backend with credentials enabled, which is already
+handled by the API helper.
 
 `PRONUNCIATION_API_URL` connects the trained See My Voice phone-token model service.
 If it is not set, the backend can still use a hosted ASR fallback when
