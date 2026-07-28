@@ -3166,11 +3166,40 @@ async function startRecording() {
   }
   recordedChunks = [];
   mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-  mediaRecorder = new MediaRecorder(mediaStream);
+  const mimeType = preferredAudioMimeType();
+  mediaRecorder = new MediaRecorder(mediaStream, mimeType ? { mimeType } : undefined);
   mediaRecorder.addEventListener("dataavailable", (event) => {
     if (event.data.size > 0) recordedChunks.push(event.data);
   });
   mediaRecorder.start();
+}
+
+function preferredAudioMimeType() {
+  const candidates = [
+    "audio/webm;codecs=opus",
+    "audio/webm",
+    "audio/mp4",
+    "audio/m4a",
+  ];
+  return candidates.find((type) => MediaRecorder.isTypeSupported?.(type));
+}
+
+function normalizeRecordingBlob(blob) {
+  const type = blob.type.trim().toLowerCase();
+  const baseType = type.split(";")[0]?.trim() || "";
+  if (baseType === "audio/mp4" || baseType === "audio/x-m4a") {
+    return new Blob([blob], { type: "audio/m4a" });
+  }
+  return blob;
+}
+
+function audioUploadFilename(blob) {
+  const type = blob.type.toLowerCase();
+  if (type.includes("m4a") || type.includes("mp4") || type.includes("aac")) return "practice.m4a";
+  if (type.includes("ogg")) return "practice.ogg";
+  if (type.includes("mpeg") || type.includes("mp3")) return "practice.mp3";
+  if (type.includes("wav") || type.includes("wave")) return "practice.wav";
+  return "practice.webm";
 }
 
 function stopTracks() {
@@ -3183,7 +3212,7 @@ async function stopRecordingAndAnalyze() {
   const blob = await new Promise((resolve) => {
     mediaRecorder.addEventListener(
       "stop",
-      () => resolve(new Blob(recordedChunks, { type: mediaRecorder.mimeType || "audio/webm" })),
+      () => resolve(normalizeRecordingBlob(new Blob(recordedChunks, { type: mediaRecorder.mimeType || "audio/webm" }))),
       { once: true },
     );
     mediaRecorder.stop();
@@ -3198,7 +3227,7 @@ async function stopRecordingAndAnalyze() {
 async function analyzeRecording(blob, persistentRecordingUrl = "") {
   const form = new FormData();
   form.append("text", standardPronunciationText() || state.targetText.trim());
-  form.append("audio", blob, "practice.webm");
+  form.append("audio", blob, audioUploadFilename(blob));
   state = reduceState(state, { type: "ANALYZE_START" });
   render();
 

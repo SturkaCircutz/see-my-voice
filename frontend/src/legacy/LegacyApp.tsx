@@ -567,6 +567,25 @@ export function LegacyApp({
   }
 
   // Start microphone capture, then submit the collected blob when recording stops.
+  function preferredAudioMimeType(): string | undefined {
+    const candidates = [
+      "audio/webm;codecs=opus",
+      "audio/webm",
+      "audio/mp4",
+      "audio/m4a",
+    ];
+    return candidates.find((type) => MediaRecorder.isTypeSupported?.(type));
+  }
+
+  function normalizeRecordingBlob(blob: Blob): Blob {
+    const type = blob.type.trim().toLowerCase();
+    const baseType = type.split(";")[0]?.trim() || "";
+    if (baseType === "audio/mp4" || baseType === "audio/x-m4a") {
+      return new Blob([blob], { type: "audio/m4a" });
+    }
+    return blob;
+  }
+
   async function startRecording(context: RecordingContext = "practice") {
     setMessage("");
     if (!navigator.mediaDevices?.getUserMedia) {
@@ -576,7 +595,8 @@ export function LegacyApp({
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     chunks.current = [];
     recordingSignalRef.current = { peak: 0, hasSignal: false };
-    const recorder = new MediaRecorder(stream);
+    const mimeType = preferredAudioMimeType();
+    const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
     mediaRecorder.current = recorder;
     let monitorSignal: (() => void) | null = null;
     try {
@@ -613,7 +633,7 @@ export function LegacyApp({
     });
     recorder.addEventListener("stop", () => {
       stream.getTracks().forEach((track) => track.stop());
-      const blob = new Blob(chunks.current, { type: recorder.mimeType || "audio/webm" });
+      const blob = normalizeRecordingBlob(new Blob(chunks.current, { type: recorder.mimeType || "audio/webm" }));
       audioContextRef.current?.close().catch(() => undefined);
       audioContextRef.current = null;
       if (!recordingSignalRef.current.hasSignal) {

@@ -3,6 +3,15 @@ import type { AuthResponse, AuthUser, ChatApiMessage, ChatApiThread, PracticeAtt
 const configuredApiBase = (process.env.NEXT_PUBLIC_API_BASE_URL || "").replace(/\/$/, "");
 const API_BASE = process.env.NEXT_PUBLIC_API_MODE === "direct" ? configuredApiBase : "";
 
+function audioUploadFilename(audio: Blob): string {
+  const type = audio.type.toLowerCase();
+  if (type.includes("m4a") || type.includes("mp4") || type.includes("aac")) return "practice.m4a";
+  if (type.includes("ogg")) return "practice.ogg";
+  if (type.includes("mpeg") || type.includes("mp3")) return "practice.mp3";
+  if (type.includes("wav") || type.includes("wave")) return "practice.wav";
+  return "practice.webm";
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   // All API helpers pass through one fetch wrapper.
   const headers = new Headers(options.headers);
@@ -125,7 +134,7 @@ export function analyzePracticeAttempt(
 ): Promise<{ attempt: PracticeAttempt; analysis: PronunciationAnalysis }> {
   // Attempt analysis uploads only audio because target text is already stored.
   const form = new FormData();
-  form.append("audio", audio, "practice.webm");
+  form.append("audio", audio, audioUploadFilename(audio));
 
   return request<{ attempt: PracticeAttempt; analysis: PronunciationAnalysis }>(
     `/api/attempts/${attemptId}/analyze`,
@@ -143,7 +152,7 @@ export function analyzePronunciation(
   // Standalone pronunciation analysis still sends both text and audio.
   const form = new FormData();
   form.append("text", text);
-  form.append("audio", audio, "practice.webm");
+  form.append("audio", audio, audioUploadFilename(audio));
 
   return request<PronunciationAnalysis>("/api/pronunciation/analyze", {
     method: "POST",
