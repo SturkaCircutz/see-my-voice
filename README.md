@@ -161,6 +161,19 @@ PRONUNCIATION_API_URL=https://<optional-trained-model-service>
 `AUTH_SESSION_TTL_SECONDS=604800` means **login sessions last 7 days**. The code
 already defaults to **7 days** if this variable is not set.
 
+## Frontend Environment
+
+Set the backend target for the Next.js API rewrite:
+
+```bash
+NEXT_PUBLIC_API_BASE_URL=https://<your-backend-project>.vercel.app
+```
+
+The frontend sends browser requests to same-origin `/api/...` by default, and
+Next.js rewrites them to the backend. This keeps auth cookies first-party for
+mobile browsers. Use `NEXT_PUBLIC_API_MODE=direct` only when you intentionally
+want the browser to call the backend origin directly.
+
 ## Project Structure
 
 ```text

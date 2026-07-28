@@ -1,6 +1,7 @@
 import type { AuthResponse, AuthUser, ChatApiMessage, ChatApiThread, PracticeAttempt, PronunciationAnalysis, TaskApiItem } from "./types";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "";
+const configuredApiBase = (process.env.NEXT_PUBLIC_API_BASE_URL || "").replace(/\/$/, "");
+const API_BASE = process.env.NEXT_PUBLIC_API_MODE === "direct" ? configuredApiBase : "";
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   // All API helpers pass through one fetch wrapper.
