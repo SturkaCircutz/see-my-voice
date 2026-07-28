@@ -344,10 +344,12 @@ function normalizeHostedAsrAnalysis(input: AnalysisInput, result: HostedAsrResul
   };
 }
 
-function normalizeDefaultAnalysis(input: AnalysisInput): PronunciationAnalysis {
+function normalizeDefaultAnalysis(input: AnalysisInput, reason?: string): PronunciationAnalysis {
   const targetChars = targetCharacters(input.targetText);
   const scoreValue = input.audio.size > 0 ? 72 : 0;
-  const summary = "Default pronunciation baseline received the recording. Add HF_INFERENCE_TOKEN for hosted speech recognition or PRONUNCIATION_API_URL for trained phone-token feedback.";
+  const summary = reason
+    ? "Default pronunciation baseline received the recording because the hosted ASR service is unavailable."
+    : "Default pronunciation baseline received the recording. Add HF_INFERENCE_TOKEN for hosted speech recognition or PRONUNCIATION_API_URL for trained phone-token feedback.";
 
   return {
     heardText: "Recording received by the default baseline",
@@ -388,7 +390,7 @@ function normalizeDefaultAnalysis(input: AnalysisInput): PronunciationAnalysis {
     },
     raw: {
       mode: "default_baseline",
-      reason: "No PRONUNCIATION_API_URL or HF_INFERENCE_TOKEN is configured.",
+      reason: reason || "No PRONUNCIATION_API_URL or HF_INFERENCE_TOKEN is configured.",
     },
   };
 }
@@ -422,7 +424,12 @@ export async function analyzeWithPronunciationService(input: AnalysisInput): Pro
   // Backend routes call through this function instead of talking to Python directly.
   if (!config.pronunciationApiUrl) {
     if (config.hfInferenceToken) {
-      return normalizeHostedAsrAnalysis(input, await analyzeWithHostedAsr(input));
+      try {
+        return normalizeHostedAsrAnalysis(input, await analyzeWithHostedAsr(input));
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Hosted ASR analysis failed.";
+        return normalizeDefaultAnalysis(input, message);
+      }
     }
     return normalizeDefaultAnalysis(input);
   }
