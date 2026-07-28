@@ -205,6 +205,39 @@ function hostedAsrEndpoint(): string {
   return `https://router.huggingface.co/${provider}/models/${modelPath}`;
 }
 
+function normalizeAudioContentType(contentType: string): string {
+  const normalized = contentType.trim().toLowerCase();
+  const baseType = normalized.split(";")[0]?.trim() || "";
+
+  // iOS Safari commonly records AAC in an MP4 container. Hugging Face rejects
+  // `audio/mp4; codecs=...` but accepts the same payload as m4a audio.
+  if (baseType === "audio/mp4" || baseType === "audio/x-m4a") return "audio/m4a";
+  if (baseType === "audio/webm") return "audio/webm";
+  return normalized || "audio/webm";
+}
+
+function normalizeAudioFilename(filename: string | undefined, contentType: string): string {
+  const rawName = filename || "practice.webm";
+  if (contentType === "audio/m4a" && !/\.(m4a|mp4|aac)$/i.test(rawName)) {
+    return rawName.replace(/\.[^.]+$/i, "") + ".m4a";
+  }
+  if (contentType === "audio/webm" && !/\.webm$/i.test(rawName)) {
+    return rawName.replace(/\.[^.]+$/i, "") + ".webm";
+  }
+  return rawName;
+}
+
+async function normalizedAudioUpload(input: AnalysisInput): Promise<{ audio: Blob; contentType: string; filename: string }> {
+  const contentType = normalizeAudioContentType(input.audio.type);
+  const filename = normalizeAudioFilename(input.filename, contentType);
+  if (contentType === input.audio.type) return { audio: input.audio, contentType, filename };
+  return {
+    audio: new Blob([await input.audio.arrayBuffer()], { type: contentType }),
+    contentType,
+    filename,
+  };
+}
+
 function extractHostedAsrText(payload: unknown): string {
   if (typeof payload === "string") return payload;
   if (!payload || typeof payload !== "object") return "";
@@ -221,14 +254,15 @@ async function analyzeWithHostedAsr(input: AnalysisInput): Promise<HostedAsrResu
   if (!config.hfInferenceToken) {
     throw new Error("Hosted ASR fallback is not configured. Set HF_INFERENCE_TOKEN or PRONUNCIATION_API_URL.");
   }
+  const upload = await normalizedAudioUpload(input);
 
   const upstream = await fetch(hostedAsrEndpoint(), {
     method: "POST",
     headers: {
       Authorization: `Bearer ${config.hfInferenceToken}`,
-      "Content-Type": input.audio.type || "audio/webm",
+      "Content-Type": upload.contentType,
     },
-    body: await input.audio.arrayBuffer(),
+    body: await upload.audio.arrayBuffer(),
   });
   const payload = await upstream.json().catch(() => ({}));
 
@@ -394,9 +428,10 @@ export async function analyzeWithPronunciationService(input: AnalysisInput): Pro
   }
 
   // Rebuild the browser upload as multipart form data for the Python analysis service boundary.
+  const upload = await normalizedAudioUpload(input);
   const form = new FormData();
   form.append("text", input.targetText);
-  form.append("audio", input.audio, input.filename || "practice.webm");
+  form.append("audio", upload.audio, upload.filename);
 
   const headers = new Headers();
   if (input.authorization) headers.set("Authorization", input.authorization);
