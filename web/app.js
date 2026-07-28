@@ -1178,7 +1178,7 @@ function renderPractice() {
   }[state.recordingState];
 
   const statusCopy = {
-    idle: "Waiting for Recording",
+    idle: "Default Model Ready",
     recording: "Recording",
     analyzing: "Analyzing Pronunciation",
     complete: "Analysis Complete",

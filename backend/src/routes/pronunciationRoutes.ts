@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { analyzeWithPronunciationService, pronunciationAnalysisIsConfigured } from "../analysis.js";
+import { analyzeWithPronunciationService } from "../analysis.js";
 import { requireAuth, type AuthenticatedRequest } from "../auth.js";
 
 export const pronunciationRoutes = Router();
@@ -29,15 +29,7 @@ async function readAnalyzeForm(request: AuthenticatedRequest) {
 }
 
 pronunciationRoutes.post("/analyze", requireAuth, async (request, response) => {
-  // This endpoint can use either the trained Python service or the hosted ASR fallback.
-  if (!pronunciationAnalysisIsConfigured()) {
-    response.status(501).json({
-      error:
-        "Pronunciation analysis is not configured yet. Set PRONUNCIATION_API_URL for the trained model service or HF_INFERENCE_TOKEN for the hosted ASR fallback.",
-    });
-    return;
-  }
-
+  // This endpoint can use the trained Python service, hosted ASR, or built-in default baseline.
   try {
     const { text, audio, filename } = await readAnalyzeForm(request);
     const analysis = await analyzeWithPronunciationService({

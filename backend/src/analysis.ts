@@ -149,6 +149,10 @@ function textSimilarity(targetText: string, heardText: string): number {
   return Math.max(0, Math.min(100, Math.round((1 - editDistance(target, heard) / maxLength) * 1000) / 10));
 }
 
+function targetCharacters(targetText: string): string[] {
+  return Array.from(targetText).filter((char) => /[\u4e00-\u9fff]/.test(char));
+}
+
 function normalizePinyinDiagnosis(result: Record<string, any>): PinyinDiagnosis | null {
   // Pinyin diagnosis is optional because some analysis paths only return scores.
   const diagnosis = result?.pinyin_diagnosis;
@@ -244,7 +248,7 @@ async function analyzeWithHostedAsr(input: AnalysisInput): Promise<HostedAsrResu
 
 function normalizeHostedAsrAnalysis(input: AnalysisInput, result: HostedAsrResult): PronunciationAnalysis {
   const similarity = textSimilarity(input.targetText, result.text);
-  const targetChars = Array.from(input.targetText).filter((char) => /[\u4e00-\u9fff]/.test(char));
+  const targetChars = targetCharacters(input.targetText);
   const summary = similarity >= 80
     ? "The hosted ASR model heard text close to the target. Use the optional trained phone-token model for initial, final, and tone-level feedback."
     : "The hosted ASR model heard differences from the target. For sound-level feedback, deploy the trained See My Voice phone-token model service.";
@@ -306,8 +310,53 @@ function normalizeHostedAsrAnalysis(input: AnalysisInput, result: HostedAsrResul
   };
 }
 
-export function pronunciationAnalysisIsConfigured(): boolean {
-  return Boolean(config.pronunciationApiUrl || config.hfInferenceToken);
+function normalizeDefaultAnalysis(input: AnalysisInput): PronunciationAnalysis {
+  const targetChars = targetCharacters(input.targetText);
+  const scoreValue = input.audio.size > 0 ? 72 : 0;
+  const summary = "Default pronunciation baseline received the recording. Add HF_INFERENCE_TOKEN for hosted speech recognition or PRONUNCIATION_API_URL for trained phone-token feedback.";
+
+  return {
+    heardText: "Recording received by the default baseline",
+    summary,
+    scores: {
+      overall: scoreValue,
+      tone: scoreValue,
+      clarity: scoreValue,
+      rhythm: scoreValue,
+    },
+    syllables: targetChars.map((character, index) => ({
+      id: String(index),
+      character,
+      pinyin: "",
+      score: scoreValue,
+      focus: "Default",
+      feedback: "Practice this syllable slowly, then compare it with the reference audio. Connect the hosted or trained model for automatic transcription and phone-level diagnosis.",
+    })),
+    pinyinDiagnosis: {
+      targetText: input.targetText,
+      heardText: "Recording received",
+      targetPinyin: [],
+      heardPinyin: [],
+      issues: [],
+      summary,
+    },
+    phoneCtc: {
+      enabled: false,
+      modelDir: "default-baseline",
+      device: "server",
+      targetText: input.targetText,
+      expectedTokens: [],
+      predictedTokens: [],
+      expectedText: "",
+      predictedText: "",
+      summary: "The built-in default baseline is active. The trained phone-token model is optional and runs through PRONUNCIATION_API_URL.",
+      error: "Phone-token CTC model service is not connected.",
+    },
+    raw: {
+      mode: "default_baseline",
+      reason: "No PRONUNCIATION_API_URL or HF_INFERENCE_TOKEN is configured.",
+    },
+  };
 }
 
 export function normalizePronunciationAnalysis(payload: unknown): PronunciationAnalysis {
@@ -338,7 +387,10 @@ export function normalizePronunciationAnalysis(payload: unknown): PronunciationA
 export async function analyzeWithPronunciationService(input: AnalysisInput): Promise<PronunciationAnalysis> {
   // Backend routes call through this function instead of talking to Python directly.
   if (!config.pronunciationApiUrl) {
-    return normalizeHostedAsrAnalysis(input, await analyzeWithHostedAsr(input));
+    if (config.hfInferenceToken) {
+      return normalizeHostedAsrAnalysis(input, await analyzeWithHostedAsr(input));
+    }
+    return normalizeDefaultAnalysis(input);
   }
 
   // Rebuild the browser upload as multipart form data for the Python analysis service boundary.

@@ -6,9 +6,9 @@ export const STORAGE_KEY = "see-my-voice-practice-state";
 
 export const fallbackAnalysis: PronunciationAnalysis = {
   // Fallback analysis keeps the UI populated before the first recording.
-  heardText: "Waiting for recording analysis",
+  heardText: "Default model ready",
   summary:
-    "Enter a Chinese sentence to practice. After recording, the system will give tone, clarity, and rhythm feedback based on your pronunciation.",
+    "Enter a Chinese sentence to practice. After recording, the default pronunciation baseline will give tone, clarity, and rhythm feedback.",
   scores: defaultScores,
   syllables: defaultSyllables,
 };

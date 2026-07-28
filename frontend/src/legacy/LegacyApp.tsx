@@ -1364,7 +1364,7 @@ function PracticeScreen({
       : hasAnalysis
         ? "Analysis Complete · Practice Again"
         : "Start Recording";
-  const statusCopy = busy ? "Analyzing Pronunciation" : analysis === fallbackAnalysis ? "Waiting for Recording" : "Analysis Complete";
+  const statusCopy = busy ? "Analyzing Pronunciation" : analysis === fallbackAnalysis ? "Default Model Ready" : "Analysis Complete";
   const focusSyllable = getFocusSyllable(syllables);
   const recordButtonColor = recording
     ? "animate-pulse bg-[var(--red)]"
