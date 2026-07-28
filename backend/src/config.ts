@@ -22,7 +22,7 @@ export const config = {
   upstashRedisRestToken: process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN || "",
   pronunciationApiUrl: process.env.PRONUNCIATION_API_URL || "",
   hfInferenceToken: process.env.HF_INFERENCE_TOKEN || process.env.HUGGING_FACE_HUB_TOKEN || "",
-  hfInferenceProvider: process.env.HF_INFERENCE_PROVIDER || "hf-inference",
+  hfInferenceApiBase: process.env.HF_INFERENCE_API_BASE || "https://api-inference.huggingface.co/models",
   hfAsrModelId: process.env.HF_ASR_MODEL_ID || "jonatasgrosman/wav2vec2-large-xlsr-53-chinese-zh-cn",
   seedUsername: process.env.SEED_USERNAME || "",
   seedPassword: process.env.SEED_PASSWORD || "",

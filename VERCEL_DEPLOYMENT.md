@@ -28,6 +28,7 @@ FRONTEND_ORIGIN=https://<your-frontend-project>.vercel.app
 PRONUNCIATION_API_URL=https://<your-pronunciation-service>
 HF_INFERENCE_TOKEN=<optional-hugging-face-token-for-free-asr-fallback>
 HF_ASR_MODEL_ID=jonatasgrosman/wav2vec2-large-xlsr-53-chinese-zh-cn
+HF_INFERENCE_API_BASE=https://api-inference.huggingface.co/models
 AUTH_SESSION_TTL_SECONDS=604800
 SEED_USERNAME=<optional-demo-user>
 SEED_PASSWORD=<optional-demo-password>
@@ -42,9 +43,9 @@ frontend must call the backend with credentials enabled, which is already
 handled by the API helper.
 
 `PRONUNCIATION_API_URL` connects the trained See My Voice phone-token model service.
-If it is not set, the backend can still use a hosted ASR fallback when
-`HF_INFERENCE_TOKEN` is configured. The fallback keeps the Vercel site usable,
-but it only checks recognized text; it does not provide phone-token feedback.
+If it is not set, the backend uses the default untrained Hugging Face ASR model
+when `HF_INFERENCE_TOKEN` is configured. That default checks recognized text; it
+does not provide trained phone-token feedback.
 Create the Hugging Face token with Inference Providers permission.
 
 The frontend also exposes a public model-options page:

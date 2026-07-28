@@ -200,9 +200,9 @@ function normalizePhoneCtcAnalysis(result: Record<string, any>): PhoneCtcAnalysi
 }
 
 function hostedAsrEndpoint(): string {
-  const provider = encodeURIComponent(config.hfInferenceProvider);
+  const baseUrl = config.hfInferenceApiBase.replace(/\/$/, "");
   const modelPath = config.hfAsrModelId.split("/").map(encodeURIComponent).join("/");
-  return `https://router.huggingface.co/${provider}/models/${modelPath}`;
+  return `${baseUrl}/${modelPath}`;
 }
 
 function normalizeAudioContentType(contentType: string): string {
@@ -326,7 +326,7 @@ function normalizeHostedAsrAnalysis(input: AnalysisInput, result: HostedAsrResul
     phoneCtc: {
       enabled: false,
       modelDir: config.hfAsrModelId,
-      device: config.hfInferenceProvider,
+      device: "huggingface-inference-api",
       targetText: input.targetText,
       expectedTokens: [],
       predictedTokens: [],
@@ -336,61 +336,10 @@ function normalizeHostedAsrAnalysis(input: AnalysisInput, result: HostedAsrResul
       error: "Phone-token CTC model service is not connected.",
     },
     raw: {
-      provider: config.hfInferenceProvider,
+      provider: "huggingface-inference-api",
       model: config.hfAsrModelId,
       mode: "hosted_asr_fallback",
       response: result.raw,
-    },
-  };
-}
-
-function normalizeDefaultAnalysis(input: AnalysisInput, reason?: string): PronunciationAnalysis {
-  const targetChars = targetCharacters(input.targetText);
-  const scoreValue = input.audio.size > 0 ? 72 : 0;
-  const summary = reason
-    ? "Default pronunciation baseline received the recording because the hosted ASR service is unavailable."
-    : "Default pronunciation baseline received the recording. Add HF_INFERENCE_TOKEN for hosted speech recognition or PRONUNCIATION_API_URL for trained phone-token feedback.";
-
-  return {
-    heardText: "Recording received by the default baseline",
-    summary,
-    scores: {
-      overall: scoreValue,
-      tone: scoreValue,
-      clarity: scoreValue,
-      rhythm: scoreValue,
-    },
-    syllables: targetChars.map((character, index) => ({
-      id: String(index),
-      character,
-      pinyin: "",
-      score: scoreValue,
-      focus: "Default",
-      feedback: "Practice this syllable slowly, then compare it with the reference audio. Connect the hosted or trained model for automatic transcription and phone-level diagnosis.",
-    })),
-    pinyinDiagnosis: {
-      targetText: input.targetText,
-      heardText: "Recording received",
-      targetPinyin: [],
-      heardPinyin: [],
-      issues: [],
-      summary,
-    },
-    phoneCtc: {
-      enabled: false,
-      modelDir: "default-baseline",
-      device: "server",
-      targetText: input.targetText,
-      expectedTokens: [],
-      predictedTokens: [],
-      expectedText: "",
-      predictedText: "",
-      summary: "The built-in default baseline is active. The trained phone-token model is optional and runs through PRONUNCIATION_API_URL.",
-      error: "Phone-token CTC model service is not connected.",
-    },
-    raw: {
-      mode: "default_baseline",
-      reason: reason || "No PRONUNCIATION_API_URL or HF_INFERENCE_TOKEN is configured.",
     },
   };
 }
@@ -427,11 +376,12 @@ export async function analyzeWithPronunciationService(input: AnalysisInput): Pro
       try {
         return normalizeHostedAsrAnalysis(input, await analyzeWithHostedAsr(input));
       } catch (error) {
-        const message = error instanceof Error ? error.message : "Hosted ASR analysis failed.";
-        return normalizeDefaultAnalysis(input, message);
+        throw new Error(error instanceof Error ? error.message : "Hosted ASR analysis failed.");
       }
     }
-    return normalizeDefaultAnalysis(input);
+    throw new Error(
+      "Default Hugging Face pronunciation model is not configured. Set HF_INFERENCE_TOKEN for the default ASR model or PRONUNCIATION_API_URL for a separate pronunciation service.",
+    );
   }
 
   // Rebuild the browser upload as multipart form data for the Python analysis service boundary.
