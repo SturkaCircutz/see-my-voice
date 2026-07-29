@@ -65,7 +65,7 @@ That creates a path for feedback on **initials**, **finals**, **tones**, and
 
 | Training item | Value |
 | --- | --- |
-| Base model | `jonatasgrosman/wav2vec2-large-xlsr-53-chinese-zh-cn` |
+| Optional trained CTC base model | `jonatasgrosman/wav2vec2-large-xlsr-53-chinese-zh-cn` |
 | Training device | `cuda` |
 | Training examples | `300` |
 | Validation examples | `50` |
@@ -103,7 +103,8 @@ Backend variables:
 HF_INFERENCE_TOKEN=<your-hugging-face-token>
 ```
 
-This mode provides **text-level feedback** through **hosted ASR**. It does not
+This mode provides **text-level feedback** through the hosted
+`openai/whisper-large-v3` speech-to-text model. It does not
 provide the trained phone-token model's **initial**, **final**, and **tone**
 predictions.
 

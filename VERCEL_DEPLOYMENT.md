@@ -41,8 +41,8 @@ frontend must call the backend with credentials enabled, which is already
 handled by the API helper.
 
 `PRONUNCIATION_API_URL` connects the trained See My Voice phone-token model service.
-If it is not set, the backend uses the built-in default untrained Hugging Face ASR model
-when `HF_INFERENCE_TOKEN` is configured. That default checks recognized text; it
+If it is not set, the backend uses the built-in hosted `openai/whisper-large-v3`
+speech-to-text model when `HF_INFERENCE_TOKEN` is configured. That default checks recognized text; it
 does not provide trained phone-token feedback.
 Create the Hugging Face token with Inference Providers permission.
 

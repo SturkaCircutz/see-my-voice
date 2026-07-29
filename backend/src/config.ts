@@ -23,7 +23,7 @@ export const config = {
   pronunciationApiUrl: process.env.PRONUNCIATION_API_URL || "",
   hfInferenceToken: process.env.HF_INFERENCE_TOKEN || process.env.HUGGING_FACE_HUB_TOKEN || "",
   hfInferenceApiBase: process.env.HF_INFERENCE_API_BASE || "https://router.huggingface.co/hf-inference/models",
-  hfAsrModelId: "jonatasgrosman/wav2vec2-large-xlsr-53-chinese-zh-cn",
+  hfAsrModelId: "openai/whisper-large-v3",
   seedUsername: process.env.SEED_USERNAME || "",
   seedPassword: process.env.SEED_PASSWORD || "",
   seedName: process.env.SEED_NAME || "",
