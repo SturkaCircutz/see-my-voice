@@ -31,11 +31,10 @@ export default function ModelPage() {
             heard. It does not produce initial, final, or tone phone-token labels.
           </p>
           <div className={codeBlockClass}>
-            <pre className="m-0">{`HF_INFERENCE_TOKEN=<your-hugging-face-token>
-HF_ASR_MODEL_ID=jonatasgrosman/wav2vec2-large-xlsr-53-chinese-zh-cn`}</pre>
+            <pre className="m-0">{`HF_INFERENCE_TOKEN=<your-hugging-face-token>`}</pre>
           </div>
           <p className="m-0 text-sm leading-7 text-[#647181]">
-            Add those variables to the backend Vercel project, then redeploy the backend.
+            Add that variable to the backend Vercel project, then redeploy the backend.
           </p>
         </section>
 

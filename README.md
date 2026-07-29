@@ -101,7 +101,6 @@ Backend variables:
 
 ```bash
 HF_INFERENCE_TOKEN=<your-hugging-face-token>
-HF_ASR_MODEL_ID=jonatasgrosman/wav2vec2-large-xlsr-53-chinese-zh-cn
 ```
 
 This mode provides **text-level feedback** through **hosted ASR**. It does not
@@ -154,7 +153,6 @@ Optional variables:
 ```bash
 AUTH_SESSION_TTL_SECONDS=604800
 HF_INFERENCE_TOKEN=<optional-hosted-asr-token>
-HF_ASR_MODEL_ID=jonatasgrosman/wav2vec2-large-xlsr-53-chinese-zh-cn
 PRONUNCIATION_API_URL=https://<optional-trained-model-service>
 ```
 
