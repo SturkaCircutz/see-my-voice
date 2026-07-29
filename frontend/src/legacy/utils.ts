@@ -1,15 +1,98 @@
-import { defaultSyllables, teacherNavItems, type ChatThread, type LegacySyllable, type TeacherView } from "./data";
+import {
+  defaultSyllables,
+  pinyinByCharacter,
+  pinyinSyllablesByText,
+  teacherNavItems,
+  type ChatThread,
+  type LegacySyllable,
+  type TeacherView,
+} from "./data";
 import type { PracticeAttempt, PronunciationAnalysis, SyllableFeedback } from "../types";
 
+const punctuationPattern = /[\s，。！？、,.!?;；:："'“”‘’（）()[\]{}<>《》]/g;
+
+function textCharacters(text?: string) {
+  return Array.from(String(text || "").replace(punctuationPattern, ""));
+}
+
+function toneFromPinyin(pinyin?: string) {
+  const tone = String(pinyin || "").match(/[1-5]$/)?.[0];
+  return tone ? `T${tone}` : "T1";
+}
+
+function fallbackCueForPinyin(pinyin?: string) {
+  const parts = pinyinPartsFor({ pinyin: pinyin || "" } as LegacySyllable);
+  const focus = parts.initial ? `initial ${parts.initial}` : `final ${parts.final || pinyin || "sound"}`;
+  return {
+    mouthCue: parts.final
+      ? `Compare the mouth shape with the local ${parts.final} reference image.`
+      : `Compare the lip shape with the local ${focus} reference image.`,
+    tongueCue: parts.initial
+      ? `Compare the tongue position with the local ${parts.initial} reference image.`
+      : `Use the local final ${parts.final || pinyin || "sound"} tongue-position reference.`,
+  };
+}
+
+export function syllablesForTargetText(targetText?: string): LegacySyllable[] {
+  const characters = textCharacters(targetText);
+  if (!characters.length) return defaultSyllables;
+
+  const compactText = characters.join("");
+  const pinyinItems = pinyinSyllablesByText[compactText] || characters.map((character) => pinyinByCharacter[character] || "");
+
+  return characters.map((character, index) => {
+    const pinyin = pinyinItems[index] || pinyinByCharacter[character] || "";
+    const matchingDefault = defaultSyllables.find((item) => item.character === character);
+    const fallback = matchingDefault || defaultSyllables[index] || defaultSyllables[0];
+    const cues = fallback && fallback.character === character ? fallback : fallbackCueForPinyin(pinyin);
+    const tone = toneFromPinyin(pinyin);
+
+    return {
+      ...fallback,
+      ...cues,
+      id: `${character}-${index}`,
+      character,
+      pinyin,
+      tone,
+      focus: tone,
+      score: fallback?.score ?? 0,
+      status: fallback?.status ?? "Clear",
+      level: fallback?.level ?? "good",
+      feedback: fallback?.character === character
+        ? fallback.feedback
+        : `Practice ${character}${pinyin ? ` / ${pinyin}` : ""} with the matching pronunciation demo and articulation images.`,
+    };
+  });
+}
+
 // API syllable feedback is merged with legacy display metadata for existing screens.
-export function normalizeSyllables(items?: SyllableFeedback[]): LegacySyllable[] {
-  if (!items?.length) return defaultSyllables;
+export function normalizeSyllables(items?: SyllableFeedback[], targetText?: string): LegacySyllable[] {
+  const targetSyllables = syllablesForTargetText(targetText);
+  if (!items?.length) return targetSyllables;
   return items.map((item, index) => {
-    const fallback = defaultSyllables[index] || defaultSyllables.find((syllable) => syllable.id === item.id) || defaultSyllables[0];
+    const targetFallback = targetSyllables[index] || targetSyllables.find((syllable) => syllable.character === item.character);
+    const fallback = targetFallback || defaultSyllables.find((syllable) => syllable.id === item.id) || defaultSyllables[index] || defaultSyllables[0];
+    const itemTone = /^T[1-5]$/.test(item.focus || "") ? item.focus : fallback.tone;
+    const useTargetIdentity = Boolean(targetText && targetFallback);
+    const hasStaleItemIdentity = Boolean(useTargetIdentity && item.character && item.character !== targetFallback?.character);
+    const character = useTargetIdentity ? targetFallback.character : item.character || fallback.character;
+    const pinyin = useTargetIdentity && item.character !== targetFallback?.character
+      ? targetFallback.pinyin
+      : item.pinyin || fallback.pinyin;
+    const staleCues = hasStaleItemIdentity ? fallbackCueForPinyin(pinyin) : null;
     return {
       ...fallback,
       ...item,
-      tone: item.focus || fallback.tone,
+      id: useTargetIdentity ? targetFallback!.id : item.id || fallback.id || `${item.character || fallback.character}-${index}`,
+      character,
+      pinyin,
+      tone: itemTone,
+      focus: itemTone,
+      feedback: hasStaleItemIdentity
+        ? `Practice ${character}${pinyin ? ` / ${pinyin}` : ""} with the matching pronunciation demo and articulation images.`
+        : item.feedback || fallback.feedback,
+      mouthCue: staleCues?.mouthCue || fallback.mouthCue,
+      tongueCue: staleCues?.tongueCue || fallback.tongueCue,
       level: levelFromScore(item.score),
       status: statusFromScore(item.score),
       targetTone: fallback.targetTone,
@@ -90,26 +173,6 @@ function normalizePinyinUnit(value?: string) {
   return String(value || "").toLowerCase().replace(/ü/g, "v").replace(/u:/g, "v");
 }
 
-const hevcOnlyFinalClipUnits = new Set([
-  "an",
-  "ang",
-  "eng",
-  "ian",
-  "iang",
-  "iao",
-  "ie",
-  "in",
-  "iu",
-  "ong",
-  "ou",
-  "ua",
-  "uai",
-  "ui",
-  "uo",
-  "van",
-  "ve",
-]);
-
 function splitZeroInitialSpelling(pinyinBody: string) {
   // Mandarin y/w spellings often represent finals without a true initial.
   if (!pinyinBody) return null;
@@ -145,6 +208,7 @@ export function pinyinPartsFor(syllable: LegacySyllable) {
   if (zeroInitial) return zeroInitial;
   const initial = initials.find((item) => pinyinBody.startsWith(item)) || "";
   let final = initial ? pinyinBody.slice(initial.length) : pinyinBody;
+  if (["j", "q", "x"].includes(initial) && final.startsWith("u")) final = `v${final.slice(1)}`;
   if (final === "i" && ["z", "c", "s"].includes(initial)) final = "i_z";
   if (final === "i" && ["zh", "ch", "sh", "r"].includes(initial)) final = "i_zh";
   return { initial, final };
@@ -156,10 +220,10 @@ export function clipSourceForUnit(type: "initial" | "final", unit: string) {
 }
 
 export function playableClipTargetFor(syllable: LegacySyllable, preferredType: "initial" | "final" = "final") {
-  // Some generated final clips use codecs Chrome cannot play, so fall back to initials.
+  // Prefer the requested pinyin unit so the demo corresponds to the selected syllable.
   const parts = pinyinPartsFor(syllable);
   if (preferredType === "initial" && parts.initial) return { type: "initial" as const, unit: parts.initial };
-  if (parts.final && !hevcOnlyFinalClipUnits.has(parts.final)) return { type: "final" as const, unit: parts.final };
+  if (parts.final) return { type: "final" as const, unit: parts.final };
   if (parts.initial) return { type: "initial" as const, unit: parts.initial };
   if (parts.final) return { type: "final" as const, unit: parts.final };
   return { type: "final" as const, unit: "a" };

@@ -62,7 +62,13 @@ function clipTargetFor(issue: PinyinDiagnosisIssue | undefined, syllable: Legacy
 // Builds the teaching clip playlist from the diagnosis focus items.
 export function buildTeachingClipPlan(analysis: PronunciationAnalysis, syllables: LegacySyllable[], targetText: string): TeachingClipPlan | null {
   const issues = teachingIssuesFor(analysis);
-  const rows = issues.length
+  const hasSentenceLevelIssue = issues.length === 1 && !Number.isFinite(Number(issues[0].index));
+  const rows: { issue?: PinyinDiagnosisIssue; syllable?: LegacySyllable }[] = hasSentenceLevelIssue
+    ? syllables.map((syllable) => ({
+        issue: issues[0],
+        syllable,
+      }))
+    : issues.length
     ? issues.map((issue) => ({
         issue,
         syllable: syllables[Number(issue.index ?? 0)] || getFocusSyllable(syllables) || syllables[0],
@@ -85,7 +91,9 @@ export function buildTeachingClipPlan(analysis: PronunciationAnalysis, syllables
         clipType: target.type,
         clipUnit: target.unit,
         clipUrl: clipSourceForUnit(target.type, target.unit),
-        practiceWords: issue?.practice?.length ? issue.practice : [syllable.character, targetText].filter(Boolean),
+        practiceWords: hasSentenceLevelIssue
+          ? [syllable.character, targetText].filter(Boolean)
+          : issue?.practice?.length ? issue.practice : [syllable.character, targetText].filter(Boolean),
         videoTitle: `${label} Pronunciation Demo`,
       };
     });

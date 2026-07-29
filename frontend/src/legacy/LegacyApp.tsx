@@ -419,7 +419,7 @@ export function LegacyApp({
   // Derived practice data falls back to the latest completed attempt or demo values.
   const activeAnalysis = analysis || latestCompleteAnalysis(attempts) || fallbackAnalysis;
   const scores = activeAnalysis.scores || defaultScores;
-  const syllables = normalizeSyllables(activeAnalysis.syllables);
+  const syllables = normalizeSyllables(activeAnalysis.syllables, targetText);
   const hasAssessmentProfile = localAssessmentProfiles.length > assessmentProfiles.length || assessmentSession.completed;
   const selectedSyllable =
     syllables.find((item) => item.id === selectedSyllableId) || syllables[0] || defaultSyllables[0];
@@ -651,7 +651,7 @@ export function LegacyApp({
         setTeachingClipPlan(null);
         setSelectedClipSegmentIndex(0);
       } else {
-        setTeachingClipPlan(buildTeachingClipPlan(payload.analysis, normalizeSyllables(payload.analysis.syllables), targetText));
+        setTeachingClipPlan(buildTeachingClipPlan(payload.analysis, normalizeSyllables(payload.analysis.syllables, targetText), targetText));
         setSelectedClipSegmentIndex(0);
       }
       setAttempts((current) => [
@@ -1082,6 +1082,7 @@ export function LegacyApp({
     screen = (
       <DetailScreen
         syllable={selectedSyllable}
+        syllables={syllables}
         onBack={() => navigateStudent("practice")}
         onPlay={playReference}
       />
@@ -1641,10 +1642,12 @@ function PronunciationVideo({
 // Syllable detail screen combines reference media, visual tone curves, and coaching text.
 function DetailScreen({
   syllable,
+  syllables,
   onBack,
   onPlay,
 }: {
   syllable: LegacySyllable;
+  syllables: LegacySyllable[];
   onBack: () => void;
   onPlay: () => void;
 }) {
@@ -1681,7 +1684,7 @@ function DetailScreen({
           <h2 className="m-0 text-lg" id="detail-teaching-video-title">Teaching Video</h2>
           <p className="m-0 text-xs leading-[1.55] text-[var(--muted)]">{syllable.character} Personalized Teaching Video</p>
           <div className="flex gap-2 overflow-x-auto px-0 pt-0.5 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" aria-label="Choose a character in the sentence">
-            {defaultSyllables.map((item) => (
+            {syllables.map((item) => (
               <button
                 type="button"
                 className={`grid min-h-[54px] min-w-14 flex-none place-items-center gap-0.5 rounded-2xl border px-3 py-1.5 ${
@@ -2095,6 +2098,8 @@ function TeachingClipScreen({
             ))}
           </div>
         </section>
+
+        <ArticulationReference syllable={segment.syllable} />
 
         <div className="grid grid-cols-2 gap-2" aria-label="Teaching Clip Controls">
           <button className="rounded-[13px] bg-[#efede7] text-[13px] font-extrabold text-[var(--muted)] disabled:cursor-default" type="button" onClick={onPrevious} disabled={index <= 0}>Previous</button>

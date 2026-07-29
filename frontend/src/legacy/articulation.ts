@@ -213,8 +213,10 @@ function normalizedFinal(syllable: LegacySyllable) {
   const pinyinBody = pinyinBodyFor(syllable);
   const zeroInitial = splitZeroInitialSpelling(pinyinBody);
   if (zeroInitial) return zeroInitial.final;
+  const initial = normalizedInitial(syllable);
   const raw = pinyinBody.replace(/^(zh|ch|sh|[bpmfdtnlgkhjqxrzcsyw])/, "");
-  return normalizePinyinUnit(raw);
+  const final = ["j", "q", "x"].includes(initial) && raw.startsWith("u") ? `v${raw.slice(1)}` : raw;
+  return normalizePinyinUnit(final);
 }
 
 function normalizedInitial(syllable: LegacySyllable) {
