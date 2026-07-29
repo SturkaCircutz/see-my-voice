@@ -73,6 +73,7 @@ export interface AnalysisInput {
 interface HostedAsrResult {
   text: string;
   raw: unknown;
+  unavailableReason?: string;
 }
 
 function score(value: unknown): number {
@@ -268,8 +269,15 @@ async function analyzeWithHostedAsr(input: AnalysisInput): Promise<HostedAsrResu
       body: await upload.audio.arrayBuffer(),
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "network request failed";
-    throw new Error(`Default Hugging Face ASR request failed at ${endpoint}: ${message}`);
+    return {
+      text: "",
+      raw: {
+        error: "Default Hugging Face ASR network request failed.",
+        endpoint,
+        detail: error instanceof Error ? error.name : "NetworkError",
+      },
+      unavailableReason: "Default Hugging Face ASR network request failed.",
+    };
   }
   const payload = await upstream.json().catch(() => ({}));
 
@@ -290,7 +298,9 @@ async function analyzeWithHostedAsr(input: AnalysisInput): Promise<HostedAsrResu
 function normalizeHostedAsrAnalysis(input: AnalysisInput, result: HostedAsrResult): PronunciationAnalysis {
   const similarity = textSimilarity(input.targetText, result.text);
   const targetChars = targetCharacters(input.targetText);
-  const summary = similarity >= 80
+  const summary = result.unavailableReason
+    ? "The default hosted ASR model could not be reached. The recording was received, but text recognition is temporarily unavailable."
+    : similarity >= 80
     ? "The hosted ASR model heard text close to the target. Use the optional trained phone-token model for initial, final, and tone-level feedback."
     : "The hosted ASR model heard differences from the target. For sound-level feedback, deploy the trained See My Voice phone-token model service.";
 
@@ -340,7 +350,7 @@ function normalizeHostedAsrAnalysis(input: AnalysisInput, result: HostedAsrResul
       expectedText: "",
       predictedText: result.text,
       summary: "The deployed site is using a hosted free ASR fallback. The See My Voice phone-token model is optional and must be deployed as a separate service.",
-      error: "Phone-token CTC model service is not connected.",
+      error: result.unavailableReason || "Phone-token CTC model service is not connected.",
     },
     raw: {
       provider: "huggingface-inference-api",
