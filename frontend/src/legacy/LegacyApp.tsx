@@ -156,12 +156,6 @@ import {
   unreadCount,
 } from "./utils";
 
-declare global {
-  interface Window {
-    webkitAudioContext?: typeof AudioContext;
-  }
-}
-
 function chatMessageTime(value: string) {
   // Backend timestamps become compact chat bubble times.
   const date = new Date(value);
@@ -307,8 +301,6 @@ export function LegacyApp({
   // Recording and toast refs hold browser objects that should not trigger rerenders.
   const mediaRecorder = React.useRef<MediaRecorder | null>(null);
   const chunks = React.useRef<Blob[]>([]);
-  const audioContextRef = React.useRef<AudioContext | null>(null);
-  const recordingSignalRef = React.useRef({ peak: 0, hasSignal: false });
   const toastTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const recordingUrlRef = React.useRef("");
   const recordingContextRef = React.useRef<RecordingContext>("practice");
@@ -420,7 +412,6 @@ export function LegacyApp({
     return () => {
       if (toastTimer.current) clearTimeout(toastTimer.current);
       if (mediaRecorder.current?.state === "recording") mediaRecorder.current.stop();
-      audioContextRef.current?.close().catch(() => undefined);
       if (recordingUrlRef.current) URL.revokeObjectURL(recordingUrlRef.current);
     };
   }, []);
@@ -594,39 +585,9 @@ export function LegacyApp({
     }
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     chunks.current = [];
-    recordingSignalRef.current = { peak: 0, hasSignal: false };
     const mimeType = preferredAudioMimeType();
     const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
     mediaRecorder.current = recorder;
-    let monitorSignal: (() => void) | null = null;
-    try {
-      const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
-      const audioContext = new AudioContextCtor();
-      const source = audioContext.createMediaStreamSource(stream);
-      const analyser = audioContext.createAnalyser();
-      analyser.fftSize = 2048;
-      source.connect(analyser);
-      const samples = new Float32Array(analyser.fftSize);
-      let animationFrame = 0;
-      monitorSignal = () => {
-        analyser.getFloatTimeDomainData(samples);
-        let peak = 0;
-        for (const sample of samples) peak = Math.max(peak, Math.abs(sample));
-        recordingSignalRef.current.peak = Math.max(recordingSignalRef.current.peak, peak);
-        if (peak > 0.01) recordingSignalRef.current.hasSignal = true;
-        if (mediaRecorder.current?.state === "recording") {
-          if (monitorSignal) animationFrame = window.requestAnimationFrame(monitorSignal);
-        }
-      };
-      audioContextRef.current = audioContext;
-      stream.getTracks()[0]?.addEventListener("ended", () => {
-        if (animationFrame) window.cancelAnimationFrame(animationFrame);
-        audioContext.close().catch(() => undefined);
-        if (audioContextRef.current === audioContext) audioContextRef.current = null;
-      });
-    } catch {
-      // Some browsers restrict audio analysis; the backend still validates silent uploads.
-    }
     // MediaRecorder delivers audio in chunks until the user taps finish.
     recorder.addEventListener("dataavailable", (event) => {
       if (event.data.size > 0) chunks.current.push(event.data);
@@ -634,13 +595,6 @@ export function LegacyApp({
     recorder.addEventListener("stop", () => {
       stream.getTracks().forEach((track) => track.stop());
       const blob = normalizeRecordingBlob(new Blob(chunks.current, { type: recorder.mimeType || "audio/webm" }));
-      audioContextRef.current?.close().catch(() => undefined);
-      audioContextRef.current = null;
-      if (!recordingSignalRef.current.hasSignal) {
-        setMessage("No voice was detected. Check that your microphone is not muted, then record again.");
-        showToast("No voice detected.");
-        return;
-      }
       if (recordingUrlRef.current) URL.revokeObjectURL(recordingUrlRef.current);
       const recordingUrl = URL.createObjectURL(blob);
       recordingUrlRef.current = recordingUrl;
@@ -649,7 +603,6 @@ export function LegacyApp({
     });
     recordingContextRef.current = context;
     recorder.start();
-    monitorSignal?.();
     setRecording(true);
   }
 
