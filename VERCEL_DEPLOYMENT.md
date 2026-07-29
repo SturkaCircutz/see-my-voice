@@ -27,7 +27,6 @@ KV_REST_API_TOKEN=<vercel-kv-token>
 FRONTEND_ORIGIN=https://<your-frontend-project>.vercel.app
 PRONUNCIATION_API_URL=https://<your-pronunciation-service>
 HF_INFERENCE_TOKEN=<optional-hugging-face-token-for-free-asr-fallback>
-HF_INFERENCE_API_BASE=https://api-inference.huggingface.co/models
 AUTH_SESSION_TTL_SECONDS=604800
 SEED_USERNAME=<optional-demo-user>
 SEED_PASSWORD=<optional-demo-password>
