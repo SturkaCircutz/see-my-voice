@@ -255,15 +255,22 @@ async function analyzeWithHostedAsr(input: AnalysisInput): Promise<HostedAsrResu
     throw new Error("Hosted ASR fallback is not configured. Set HF_INFERENCE_TOKEN or PRONUNCIATION_API_URL.");
   }
   const upload = await normalizedAudioUpload(input);
+  const endpoint = hostedAsrEndpoint();
 
-  const upstream = await fetch(hostedAsrEndpoint(), {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${config.hfInferenceToken}`,
-      "Content-Type": upload.contentType,
-    },
-    body: await upload.audio.arrayBuffer(),
-  });
+  let upstream: Response;
+  try {
+    upstream = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${config.hfInferenceToken}`,
+        "Content-Type": upload.contentType,
+      },
+      body: await upload.audio.arrayBuffer(),
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "network request failed";
+    throw new Error(`Default Hugging Face ASR request failed at ${endpoint}: ${message}`);
+  }
   const payload = await upstream.json().catch(() => ({}));
 
   if (!upstream.ok) {
@@ -393,14 +400,26 @@ export async function analyzeWithPronunciationService(input: AnalysisInput): Pro
   const headers = new Headers();
   if (input.authorization) headers.set("Authorization", input.authorization);
 
-  const upstream = await fetch(`${config.pronunciationApiUrl}/api/analyze`, {
-    method: "POST",
-    headers,
-    body: form,
-  });
+  let upstream: Response;
+  try {
+    upstream = await fetch(`${config.pronunciationApiUrl}/api/analyze`, {
+      method: "POST",
+      headers,
+      body: form,
+    });
+  } catch (error) {
+    if (config.hfInferenceToken) {
+      return normalizeHostedAsrAnalysis(input, await analyzeWithHostedAsr(input));
+    }
+    const message = error instanceof Error ? error.message : "network request failed";
+    throw new Error(`Pronunciation API request failed at ${config.pronunciationApiUrl}: ${message}`);
+  }
   const payload = await upstream.json().catch(() => ({}));
 
   if (!upstream.ok) {
+    if (config.hfInferenceToken) {
+      return normalizeHostedAsrAnalysis(input, await analyzeWithHostedAsr(input));
+    }
     throw new Error(
       payload && typeof payload === "object" && "error" in payload
         ? String(payload.error)
