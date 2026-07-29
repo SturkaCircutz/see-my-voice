@@ -18,6 +18,7 @@ backend/dist/
 backend/.env
 backend/.uploads/
 frontend/.env
+frontend/.env.local
 
 # Generated Stage 1 / Stage 1.5 / Stage 2A outputs
 stage1_feedback.json
