@@ -251,6 +251,22 @@ function extractHostedAsrText(payload: unknown): string {
   return "";
 }
 
+function hostedAsrUnavailable(reason: string, raw: unknown): HostedAsrResult {
+  return {
+    text: "",
+    raw,
+    unavailableReason: reason,
+  };
+}
+
+function hostedAsrErrorPayload(payload: unknown): unknown {
+  if (!payload || typeof payload !== "object") return {};
+  const source = payload as Record<string, unknown>;
+  return {
+    error: source.error ? "Hosted ASR provider could not run the default model." : "Hosted ASR provider did not return a transcript.",
+  };
+}
+
 async function analyzeWithHostedAsr(input: AnalysisInput): Promise<HostedAsrResult> {
   if (!config.hfInferenceToken) {
     throw new Error("Hosted ASR fallback is not configured. Set HF_INFERENCE_TOKEN or PRONUNCIATION_API_URL.");
@@ -269,23 +285,25 @@ async function analyzeWithHostedAsr(input: AnalysisInput): Promise<HostedAsrResu
       body: await upload.audio.arrayBuffer(),
     });
   } catch (error) {
-    return {
-      text: "",
-      raw: {
+    return hostedAsrUnavailable(
+      "Default Hugging Face ASR network request failed.",
+      {
         error: "Default Hugging Face ASR network request failed.",
-        endpoint,
+        endpoint: "default-hosted-asr",
         detail: error instanceof Error ? error.name : "NetworkError",
       },
-      unavailableReason: "Default Hugging Face ASR network request failed.",
-    };
+    );
   }
   const payload = await upstream.json().catch(() => ({}));
 
   if (!upstream.ok) {
-    throw new Error(
-      payload && typeof payload === "object" && "error" in payload
-        ? String((payload as Record<string, unknown>).error)
-        : "Hosted ASR analysis failed.",
+    return hostedAsrUnavailable(
+      "Default Hugging Face ASR is unavailable from the hosted provider.",
+      {
+        status: upstream.status,
+        endpoint: "default-hosted-asr",
+        response: hostedAsrErrorPayload(payload),
+      },
     );
   }
 
@@ -343,7 +361,7 @@ function normalizeHostedAsrAnalysis(input: AnalysisInput, result: HostedAsrResul
     phoneCtc: {
       enabled: false,
       modelDir: config.hfAsrModelId,
-      device: "huggingface-inference-api",
+      device: "default-hosted-asr",
       targetText: input.targetText,
       expectedTokens: [],
       predictedTokens: [],
@@ -353,7 +371,7 @@ function normalizeHostedAsrAnalysis(input: AnalysisInput, result: HostedAsrResul
       error: result.unavailableReason || "Phone-token CTC model service is not connected.",
     },
     raw: {
-      provider: "huggingface-inference-api",
+      provider: "default-hosted-asr",
       model: config.hfAsrModelId,
       mode: "hosted_asr_fallback",
       response: result.raw,
